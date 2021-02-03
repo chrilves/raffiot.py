@@ -169,11 +169,11 @@ def read() -> Resource[R, E, R]:
 
 
 def error(err: E) -> Resource[R, E, A]:
-    return Resource(io.IORaise(err))
+    return Resource(io.error(err))
 
 
 def panic(exception: Exception) -> Resource[R, E, A]:
-    return Resource(io.IOPanic(exception))
+    return Resource(io.panic(exception))
 
 
 def from_result(r: result.Result[E, A]) -> Resource[R, E, A]:

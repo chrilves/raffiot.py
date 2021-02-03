@@ -30,7 +30,7 @@ about:
   home: "https://github.com/chrilves/raffiot.py"
   license: Apache Software
   license_family: APACHE
-  license_file: LICENCE.txt
+  license_file: LICENSE.txt
   summary: "Robust And Fast Functional IO Toolkit"
   doc_url: 
   dev_url: 
