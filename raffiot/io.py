@@ -63,10 +63,6 @@ class IO(Generic[R, E, A]):
         return IORecover(self, handler)
 
     @final
-    def _naive_run(self, context: R) -> Result[E, A]:
-        return _naive_run(context, self)
-
-    @final
     def run(self, context: R) -> Result[E, A]:
         return run(context, self)
 
@@ -199,46 +195,6 @@ def panic(exception: Exception) -> IO[R, E, A]:
 
 def from_result(r: Result[E, A]) -> IO[R, E, A]:
     return r.fold(pure, error, panic)
-
-
-@result.safe
-def _naive_run(context: R, io: IO[R, E, A]) -> Result[E, A]:
-    if isinstance(io, IOPure):
-        return result.Ok(io.value)
-    if isinstance(io, IOAp):
-        return _naive_run(context, io.fun).ap(_naive_run(context, io.arg))
-    if isinstance(io, IOFlatten):
-        return _naive_run(context, io.tower).flat_map(lambda x: _naive_run(context, x))
-    # Defer
-    if isinstance(io, IODefer):
-        try:
-            return result.Ok(io.deferred())
-        except Exception as exception:
-            return result.Panic(exception)
-    # Read
-    if isinstance(io, IORead):
-        return result.Ok(context)
-    if isinstance(io, IOMapRead):
-        return _naive_run(io.fun(context), io.main)
-    # Error
-    if isinstance(io, IORaise):
-        return result.Error(io.error)
-    if isinstance(io, IOCatch):
-        return _naive_run(context, io.main).catch(
-            lambda err: _naive_run(context, io.handler(err))
-        )
-    if isinstance(io, IOMapError):
-        return _naive_run(context, io.main).map_error(io.fun)
-    # Panic
-    if isinstance(io, IOPanic):
-        return result.Error(io.error)
-    if isinstance(io, IORecover):
-        return _naive_run(context, io.main).recover(
-            lambda err: _naive_run(context, io.handler(err))
-        )
-    if isinstance(io, IOMapPanic):
-        return _naive_run(context, io.main).map_panic(io.fun)
-    raise MatchError(f"{io} should be an IO")
 
 
 class _Cont:

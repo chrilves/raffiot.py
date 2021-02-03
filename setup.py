@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = "0.0.2"
+version = "0.0.3"
 
 setup(
     name="raffiot",
@@ -22,4 +22,5 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
+    install_requires=['typing-extensions']
 )
