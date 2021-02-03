@@ -1,4 +1,4 @@
-.PHONY: test clean format check publish
+.PHONY: test clean format check publish docs
 
 test:
 	python -m pytest
@@ -10,9 +10,14 @@ clean:
 format:
 	black `find raffiot/ tests/ -iname "*.py" -type f`
 
-check: format test clean
+check: format test docs clean
 
 publish: check
 	python setup.py sdist
 	twine upload dist/*
 
+docs:
+	rm -r docs/ || true
+	pdoc3 --html raffiot -o docs/
+	mv docs/raffiot/* docs/
+	rm -r docs/raffiot/

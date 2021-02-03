@@ -2,6 +2,7 @@ from hypothesis import given
 import hypothesis.strategies as st
 from unittest import TestCase
 from raffiot.resource import *
+from raffiot import _MatchError
 
 
 class TestResource(TestCase):
@@ -43,27 +44,27 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_not_catch_panic(self, u: str, v: str) -> None:
-        pan = MatchError(u)
+        pan = _MatchError(u)
         assert panic(pan).catch(lambda x: pure(x + v)).use(io.pure).run(
             None
         ) == result.Panic(pan)
 
     @given(st.text())
     def test_panic(self, err: str) -> None:
-        pan = MatchError(err)
+        pan = _MatchError(err)
         assert panic(pan).use(io.pure).run(None) == result.Panic(pan)
 
     @given(st.text(), st.text())
     def test_map_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
-        puv = MatchError(u + v)
-        assert panic(pu).map_panic(lambda x: MatchError(x.message + v)).use(
+        pu = _MatchError(u)
+        puv = _MatchError(u + v)
+        assert panic(pu).map_panic(lambda x: _MatchError(x.message + v)).use(
             io.pure
         ).run(None) == result.Panic(puv)
 
     @given(st.text(), st.text())
     def test_recover_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
+        pu = _MatchError(u)
         assert panic(pu).recover(lambda x: pure(x.message + v)).use(io.pure).run(
             None
         ) == result.Ok(u + v)
@@ -78,8 +79,8 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_panic(self, pan: str) -> None:
-        assert panic(MatchError(pan)).use(io.pure).run(None) == result.Panic(
-            MatchError(pan)
+        assert panic(_MatchError(pan)).use(io.pure).run(None) == result.Panic(
+            _MatchError(pan)
         )
 
     @given(st.text(), st.text())
@@ -96,7 +97,7 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_on_failure_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
+        pu = _MatchError(u)
         assert panic(pu).map(lambda _: v).on_failure(pure).use(io.pure).run(
             None
         ) == result.Ok(result.Panic(pu))
@@ -107,7 +108,9 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_map_read(self, u: str, v: str) -> None:
-        assert read().map_read(lambda x: x + v).use(io.pure).run(u) == result.Ok(u + v)
+        assert read().contra_map_read(lambda x: x + v).use(io.pure).run(u) == result.Ok(
+            u + v
+        )
 
     @given(st.text())
     def test_attempt_ok(self, u: str) -> None:
@@ -119,7 +122,7 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:
-        pu = MatchError(u)
+        pu = _MatchError(u)
         assert panic(pu).attempt().use(io.pure).run(None) == result.Ok(result.Panic(pu))
 
     @given(st.text())
@@ -134,7 +137,7 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_from_panic(self, u: str) -> None:
-        x = result.Panic(MatchError(u))
+        x = result.Panic(_MatchError(u))
         assert from_result(x).use(io.pure).run(None) == x
 
     @given(st.integers(min_value=1000, max_value=2000))
@@ -339,4 +342,4 @@ class TestResource(TestCase):
             1 if can_open_a and can_flat_map and can_open_b and not can_close_b else 0
         )
         if can_open_a and can_flat_map and can_open_b and can_use:
-            assert ret.fail_on_panic() == result.Ok(i)
+            assert ret.raise_on_panic() == result.Ok(i)
