@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from raffiot import result, MatchError
 from raffiot.result import Result
 
-
 R = TypeVar("R")
 E = TypeVar("E")
 A = TypeVar("A")
@@ -17,12 +16,12 @@ A2 = TypeVar("A2")
 
 class IO(Generic[R, E, A]):
     @final
-    def map(self, f: Callable[[A], A2]) -> IO[Any, Any, A2]:
-        return IOAp(IOPure(f), self)
+    def map(self, f: Callable[[A], A2]) -> IO[R, E, A2]:
+        return map(self, f)
 
     @final
     def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, A2]:
-        return IOFlatten(IOAp(IOPure(f), self))
+        return flat_map(self, f)
 
     @final
     def then(self, io: IO[R, E, A2]) -> IO[R, E, A2]:
@@ -30,37 +29,37 @@ class IO(Generic[R, E, A]):
 
     @final
     def ap(self, arg):
-        return IOAp(self, arg)
+        return ap(self, arg)
 
     @final
     def flatten(self):
-        return IOFlatten(self)
+        return flatten(self)
 
     # Error API
 
     @final
     def catch(self, handler: Callable[[E], IO[R, E, A]]) -> IO[R, E, A]:
-        return IOCatch(self, handler)
+        return catch(self, handler)
 
     @final
     def map_error(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
-        return IOMapError(self, f)
+        return map_error(self, f)
 
     # Reader API
 
     @final
     def map_read(self, f: Callable[[R2], R]) -> IO[R2, E, A]:
-        return IOMapRead(f, self)
+        return map_read(f, self)
 
     # Panic
 
     @final
     def map_panic(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
-        return IOMapPanic(self, f)
+        return map_panic(self, f)
 
     @final
     def recover(self, handler: Callable[[Exception], IO[R, E, A]]) -> IO[R, E, A]:
-        return IORecover(self, handler)
+        return recover(self, handler)
 
     @final
     def run(self, context: R) -> Result[E, A]:
@@ -93,195 +92,233 @@ class IO(Generic[R, E, A]):
 
 @final
 @dataclass
-class IOPure(IO[R, E, A]):
+class __IOPure(IO[R, E, A]):
     value: A
 
 
 @final
 @dataclass
-class IODefer(IO[R, E, A]):
-    deferred: Callable[[], A]
-
-
-@final
-@dataclass
-class IOAp(IO[R, E, A], Generic[R, E, A, X]):
+class __IOAp(IO[R, E, A], Generic[R, E, A, X]):
     fun: IO[R, E, Callable[[X], A]]
     arg: IO[R, E, X]
 
 
 @final
 @dataclass
-class IOFlatten(IO[R, E, A]):
+class __IOFlatten(IO[R, E, A]):
     tower: IO[R, E, IO[R, E, A]]
 
 
 @final
 @dataclass
-class IORead(IO[R, E, R]):
+class __IODefer(IO[R, E, A]):
+    deferred: Callable[[], A]
+
+
+@final
+@dataclass
+class __IORead(IO[R, E, R]):
     pass
 
 
 @final
 @dataclass
-class IOMapRead(IO[R, E, A], Generic[R, E, A, R2]):
+class __IOMapRead(IO[R, E, A], Generic[R, E, A, R2]):
     fun: Callable[[R], R2]
     main: IO[R2, E, A]
 
 
 @final
 @dataclass
-class IORaise(IO[R, E, A]):
+class __IORaise(IO[R, E, A]):
     error: E
 
 
 @final
 @dataclass
-class IOCatch(IO[R, E, A]):
+class __IOCatch(IO[R, E, A]):
     main: IO[R, E, A]
     handler: Callable[[E], IO[R, E, A]]
 
 
 @final
 @dataclass
-class IOMapError(IO[R, E, A], Generic[R, E, A, E2]):
+class __IOMapError(IO[R, E, A], Generic[R, E, A, E2]):
     main: IO[R, E2, A]
     fun: Callable[[E2], E]
 
 
 @final
 @dataclass
-class IOPanic(IO[R, E, A]):
+class __IOPanic(IO[R, E, A]):
     exception: Exception
 
 
 @final
 @dataclass
-class IORecover(IO[R, E, A]):
+class __IORecover(IO[R, E, A]):
     main: IO[R, E, A]
     handler: Callable[[Exception], IO[R, E, A]]
 
 
 @final
 @dataclass
-class IOMapPanic(IO[R, E, A], Generic[R, E, A, E2]):
-    main: IO[R, E2, A]
+class __IOMapPanic(IO[R, E, A]):
+    main: IO[R, E, A]
     fun: Callable[[Exception], Exception]
 
 
 def pure(a: A) -> IO[R, E, A]:
-    return IOPure(a)
+    return __IOPure(a)
+
+
+def map(main: IO[R, E, A], f: Callable[[A], A2]) -> IO[R, E, A2]:
+    return __IOAp(__IOPure(f), main)
+
+
+def flat_map(main: IO[R, E, A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, A2]:
+    return __IOFlatten(__IOAp(__IOPure(f), main))
+
+
+def ap(fun: IO[R, E, Callable[[X], A]], arg: IO[R, E, X]) -> IO[R, E, A]:
+    return __IOAp(fun, arg)
+
+
+def flatten(tower: IO[R, E, IO[R, E, A]]) -> IO[R, E, A]:
+    return __IOFlatten(tower)
 
 
 def defer(deferred: Callable[[], A]) -> IO[R, E, A]:
-    return IODefer(deferred)
+    return __IODefer(deferred)
 
 
 def deferIO(deferred: Callable[[], IO[R, E, A]]) -> IO[R, E, A]:
-    return IOFlatten(IODefer(deferred))
+    return __IOFlatten(__IODefer(deferred))
 
 
 def read() -> IO[R, E, R]:
-    return IORead()
+    return __IORead()
+
+
+def map_read(fun: Callable[[R], R2], main: IO[R2, E, A]) -> IO[R, E2, A]:
+    return __IOMapRead(fun, main)
 
 
 def error(err: E) -> IO[R, E, A]:
-    return IORaise(err)
+    return __IORaise(err)
+
+
+def catch(main: IO[R, E, A], handler: Callable[[E], IO[R, E, A]]) -> IO[R, E, A]:
+    return __IOCatch(main, handler)
+
+
+def map_error(main: IO[R, E2, A], fun: Callable[[E2], E]) -> IO[R, E2, A]:
+    return __IOMapError(main, fun)
 
 
 def panic(exception: Exception) -> IO[R, E, A]:
-    return IOPanic(exception)
+    return __IOPanic(exception)
+
+
+def recover(
+    main: IO[R, E, A], handler: Callable[[Exception], IO[R, E, A]]
+) -> IO[R, E, A]:
+    return __IORecover(main, handler)
+
+
+def map_panic(main: IO[R, E, A], fun: Callable[[Exception], Exception]) -> IO[R, E, A]:
+    return __IOMapPanic(main, fun)
 
 
 def from_result(r: Result[E, A]) -> IO[R, E, A]:
     return r.fold(pure, error, panic)
 
 
-class _Cont:
+class __Cont:
     pass
 
 
 @final
 @dataclass
-class _ContId(_Cont):
+class __ContId(__Cont):
     pass
 
 
 @final
 @dataclass
-class _ContAp1(_Cont):
+class __ContAp1(__Cont):
     context: R
     io: IO[R, E, A]
-    cont: _Cont
+    cont: __Cont
 
 
 @final
 @dataclass
-class _ContAp2(_Cont):
+class __ContAp2(__Cont):
     io: IO[R, E, A]
-    cont: _Cont
+    cont: __Cont
 
 
 @final
 @dataclass
-class _ContFlatten(_Cont):
+class __ContFlatten(__Cont):
     context: R
-    cont: _Cont
+    cont: __Cont
 
 
 @final
 @dataclass
-class _ContCatch(_Cont):
+class __ContCatch(__Cont):
     context: R
     handler: Callable[[E], IO[R, E, A]]
-    cont: _Cont
+    cont: __Cont
 
 
 @final
 @dataclass
-class _ContMapError(_Cont):
+class __ContMapError(__Cont):
     fun: Callable[[E], E2]
-    cont: _Cont
+    cont: __Cont
 
 
 @final
 @dataclass
-class _ContRecover(_Cont):
+class __ContRecover(__Cont):
     context: R
     handler: Callable[[E], IO[R, E, A]]
-    cont: _Cont
+    cont: __Cont
 
 
 @final
 @dataclass
-class _ContMapPanic(_Cont):
+class __ContMapPanic(__Cont):
     fun: Callable[[Exception], Exception]
-    cont: _Cont
+    cont: __Cont
 
 
 def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
     context = main_context
     io = main_io
-    cont = _ContId()
+    cont = __ContId()
     arg = None
     first = True
     while True:
         if first:
             while True:
-                if isinstance(io, IOPure):
+                if isinstance(io, __IOPure):
                     arg = result.Ok(io.value)
                     first = False
                     break
-                if isinstance(io, IOAp):
-                    cont = _ContAp1(context, io.arg, cont)
+                if isinstance(io, __IOAp):
+                    cont = __ContAp1(context, io.arg, cont)
                     io = io.fun
                     continue
-                if isinstance(io, IOFlatten):
-                    cont = _ContFlatten(context, cont)
+                if isinstance(io, __IOFlatten):
+                    cont = __ContFlatten(context, cont)
                     io = io.tower
                     continue
                 # Defer
-                if isinstance(io, IODefer):
+                if isinstance(io, __IODefer):
                     try:
                         arg = result.Ok(io.deferred())
                     except Exception as exception:
@@ -289,11 +326,11 @@ def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
                     first = False
                     break
                 # Read
-                if isinstance(io, IORead):
+                if isinstance(io, __IORead):
                     arg = result.Ok(context)
                     first = False
                     break
-                if isinstance(io, IOMapRead):
+                if isinstance(io, __IOMapRead):
                     try:
                         context = io.fun(context)
                         io = io.main
@@ -303,50 +340,50 @@ def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
                         first = False
                         break
                 # Error
-                if isinstance(io, IORaise):
+                if isinstance(io, __IORaise):
                     arg = result.Error(io.error)
                     first = False
                     break
-                if isinstance(io, IOCatch):
-                    cont = _ContCatch(context, io.handler, cont)
+                if isinstance(io, __IOCatch):
+                    cont = __ContCatch(context, io.handler, cont)
                     io = io.main
                     continue
-                if isinstance(io, IOMapError):
-                    cont = _ContMapError(io.fun, cont)
+                if isinstance(io, __IOMapError):
+                    cont = __ContMapError(io.fun, cont)
                     io = io.main
                     continue
                 # Panic
-                if isinstance(io, IOPanic):
+                if isinstance(io, __IOPanic):
                     arg = result.Panic(io.exception)
                     first = False
                     break
-                if isinstance(io, IORecover):
-                    cont = _ContRecover(context, io.handler, cont)
+                if isinstance(io, __IORecover):
+                    cont = __ContRecover(context, io.handler, cont)
                     io = io.main
                     continue
-                if isinstance(io, IOMapPanic):
-                    cont = _ContMapPanic(io.fun, cont)
+                if isinstance(io, __IOMapPanic):
+                    cont = __ContMapPanic(io.fun, cont)
                     io = io.main
                     continue
                 return result.Panic(MatchError(f"{io} should be an IO"))
         else:
             while True:
-                if isinstance(cont, _ContId):
+                if isinstance(cont, __ContId):
                     return arg
-                if isinstance(cont, _ContAp1):
+                if isinstance(cont, __ContAp1):
                     context = cont.context
                     io = cont.io
-                    cont = _ContAp2(arg, cont.cont)
+                    cont = __ContAp2(arg, cont.cont)
                     first = True
                     break
-                if isinstance(cont, _ContAp2):
+                if isinstance(cont, __ContAp2):
                     try:
                         arg = cont.io.ap(arg)
                     except Exception as exception:
                         arg = result.Panic(exception)
                     cont = cont.cont
                     continue
-                if isinstance(cont, _ContFlatten):
+                if isinstance(cont, __ContFlatten):
                     if isinstance(arg, result.Ok):
                         context = cont.context
                         io = arg.success
@@ -355,7 +392,7 @@ def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
                         break
                     cont = cont.cont
                     continue
-                if isinstance(cont, _ContCatch):
+                if isinstance(cont, __ContCatch):
                     try:
                         if isinstance(arg, result.Error):
                             io = cont.handler(arg.error)
@@ -367,14 +404,14 @@ def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
                         arg = result.Panic(exception)
                     cont = cont.cont
                     continue
-                if isinstance(cont, _ContMapError):
+                if isinstance(cont, __ContMapError):
                     try:
                         arg = arg.map_error(cont.fun)
                     except Exception as exception:
                         arg = result.Panic(exception)
                     cont = cont.cont
                     continue
-                if isinstance(cont, _ContRecover):
+                if isinstance(cont, __ContRecover):
                     try:
                         if isinstance(arg, result.Panic):
                             io = cont.handler(arg.exception)
@@ -386,7 +423,7 @@ def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
                         arg = result.Panic(exception)
                     cont = cont.cont
                     continue
-                if isinstance(cont, _ContMapPanic):
+                if isinstance(cont, __ContMapPanic):
                     try:
                         arg = arg.map_panic(cont.fun)
                     except Exception as exception:
@@ -399,6 +436,6 @@ def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
 
 def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:
     def wrapper(*args, **kwargs):
-        return IOPure(f).flat_map(lambda g: g(*args, **kwargs))
+        return __IOPure(f).flat_map(lambda g: g(*args, **kwargs))
 
     return wrapper
