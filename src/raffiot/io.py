@@ -23,21 +23,25 @@ class IO(Generic[R, E, A]):
     may fail with an error (expected failure) of type E and have access
     anytime to a read-only context of type R.
 
-    /!\\ VERY IMPORTANT /!\\
-        1. The IO is LAZY:
-            no code is run until you invoke the run method.
-        2. The IO never raises exceptions (unless there is a bug):
-            it returns panics instead.
-        3. The IO is stack-safe, but you need to make sure your own code is too!
-            use defer and defer_io to avoid stack-overflow.
+    /!\\ **VERY IMPORTANT** /!\\
+
+    1. **DO NEVER SUB-CLASS IO**: it would break the API.
+    2. **DO NEVER INSTANTIATE an IO DIRECTLY**: use **only** the functions
+       ands methods in this module.
+    3. The IO is **LAZY**:
+        no code is run until you invoke the run method.
+    4. The IO never raises exceptions (unless there is a bug):
+        it returns panics instead.
+    5. The IO is stack-safe, but you need to make sure your own code is too!
+        use defer and defer_io to avoid stack-overflow.
 
     Have a look to the documentation and examples to learn how to use it.
     """
 
     @final
-    def __init__(self, tag, fields):
-        self.tag = tag
-        self.fields = fields
+    def __init__(self, __tag, __fields):
+        self.__tag = __tag
+        self.__fields = __fields
 
     @final
     def map(self, f: Callable[[A], A2]) -> IO[R, E, A2]:
@@ -45,7 +49,9 @@ class IO(Generic[R, E, A]):
         Transform the computed value with f if the computation is successful.
         Do nothing otherwise.
         """
-        return map(self, f)
+        if self.__tag in [9, 12]:
+            return self
+        return IO(1, (self, f))
 
     @final
     def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, A2]:
@@ -53,7 +59,7 @@ class IO(Generic[R, E, A]):
         Chain two computations.
         The result of the first one (self) can be used in the second (f).
         """
-        return flat_map(self, f)
+        return IO(2, (self, f))
 
     @final
     def then(self, io: IO[R, E, A2]) -> IO[R, E, A2]:
@@ -66,20 +72,24 @@ class IO(Generic[R, E, A]):
     @final
     def ap(self: IO[R, E, Callable[[X], A]], arg: IO[R, E, X]) -> IO[R, E, A]:
         """
-        Noting functions from X to A: X -> A
+        Noting functions from X to A: `X -> A`
 
-        If self computes a function f: X -> A
-        and arg computes a value x: X
-        then self.ap(arg) computes f(x): A
+        If self computes a function `f: X -> A`
+        and arg computes a value `x: X`
+        then self.ap(arg) computes `f(x): A`
         """
-        return ap(self, arg)
+        if self.__tag == 0 and arg.__tag == 0:
+            return IO(5, lambda: self.__fields(arg.__fields))
+        return IO(3, (self, arg))
 
     @final
     def flatten(self):
         """
         Concatenation function on IO
         """
-        return flatten(self)
+        if self.__tag == 0:
+            return self.__fields
+        return IO(4, self)
 
     # Reader API
 
@@ -89,7 +99,9 @@ class IO(Generic[R, E, A]):
         Transform the context with f.
         Note that f is not from R to R2 but from R2 to R!
         """
-        return contra_map_read(f, self)
+        if self.__tag in [0, 5, 9, 12]:
+            return self
+        return IO(8, (f, self))
 
     # Error API
 
@@ -100,7 +112,9 @@ class IO(Generic[R, E, A]):
 
         On error, call the handler with the error.
         """
-        return catch(self, handler)
+        if self.__tag in [0, 5, 7, 12]:
+            return self
+        return IO(10, (self, handler))
 
     @final
     def map_error(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
@@ -108,7 +122,9 @@ class IO(Generic[R, E, A]):
         Transform the stored error if the computation fails on an error.
         Do nothing otherwise.
         """
-        return map_error(self, f)
+        if self.__tag in [0, 5, 7, 12]:
+            return self
+        return IO(11, (self, f))
 
     # Panic
 
@@ -119,7 +135,9 @@ class IO(Generic[R, E, A]):
 
         On panic, call the handler with the exception.
         """
-        return recover(self, handler)
+        if self.__tag in [0, 7, 9]:
+            return self
+        return IO(13, (self, handler))
 
     @final
     def map_panic(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
@@ -127,7 +145,9 @@ class IO(Generic[R, E, A]):
         Transform the exception stored if the computation fails on a panic.
         Do nothing otherwise.
         """
-        return map_panic(self, f)
+        if self.__tag in [0, 7, 9]:
+            return self
+        return IO(14, (self, f))
 
     @final
     def run(self, context: R) -> Result[E, A]:
@@ -140,11 +160,179 @@ class IO(Generic[R, E, A]):
         function does. Likewise, declaring an IO does not execute its content,
         only running the IO does.
 
-        Note that the return value is a Result[E,A].
+        Note that the return value is a  `Result[E,A]`.
         No exception will be raised by run (unless there is a bug), run will
         returns a panic instead!
         """
-        return run(context, self)
+        ctxt = context
+        io = self
+        cont = (0,)
+        arg = None
+        # CONT ID        0
+        # CONT MAP       1 CONT FUN
+        # CONT FLATMAP1  2 CONT CONTEXT HANDLER
+        # CONT AP1       3 CONT CONTEXT IO
+        # CONT AP2       4 CONT FUN
+        # CONT FLATTEN   5 CONT CONTEXT
+        # CONT CATCH     6 CONT CONTEXT HANDLER
+        # CONT MAP_ERROR 7 CONT FUN
+        # CONT RECOVER   8 CONT CONTEXT HANDLER
+        # CONT MAP_PANIC 9 CONT FUN
+
+        while True:
+            # Eval IO
+            while True:
+                tag = io.__tag
+                if tag == 0:  # PURE
+                    arg = result.Ok(io.__fields)
+                    break
+                if tag == 1:  # MAP
+                    # run(context, io.main).map(io.f)
+                    cont = (1, cont, io.__fields[1])
+                    io = io.__fields[0]
+                    continue
+                if tag == 2:  # FLATMAP
+                    # run(context, io.main).flat_map(lambda x: run(context, io.f(x)))
+                    cont = (2, cont, ctxt, io.__fields[1])
+                    io = io.__fields[0]
+                    continue
+                if tag == 3:  # AP
+                    cont = (3, cont, ctxt, io.__fields[1])
+                    io = io.__fields[0]
+                    continue
+                if tag == 4:  # FLATTEN
+                    cont = (5, cont, ctxt)
+                    io = io.__fields
+                    continue
+                if tag == 5:  # DEREF
+                    try:
+                        arg = result.Ok(io.__fields())
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    break
+                if tag == 6:  # DEREF_IO
+                    try:
+                        io = io.__fields()
+                        continue
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                        break
+                if tag == 7:  # READ
+                    arg = result.Ok(ctxt)
+                    break
+                if tag == 8:  # MAP READ
+                    try:
+                        ctxt = io.__fields[0](ctxt)
+                        io = io.__fields[1]
+                        continue
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                        break
+                if tag == 9:  # RAISE
+                    arg = result.Error(io.__fields)
+                    break
+                if tag == 10:  # CATCH
+                    cont = (6, cont, ctxt, io.__fields[1])
+                    io = io.__fields[0]
+                    continue
+                if tag == 11:  # MAP ERROR
+                    cont = (7, cont, io.__fields[1])
+                    io = io.__fields[0]
+                    continue
+                if tag == 12:  # PANIC
+                    arg = result.Panic(io.__fields)
+                    break
+                if tag == 13:  # RECOVER
+                    cont = (8, cont, ctxt, io.__fields[1])
+                    io = io.__fields[0]
+                    continue
+                if tag == 14:  # MAP PANIC
+                    cont = (9, cont, io.__fields[1])
+                    io = io.__fields[0]
+                    continue
+                arg = result.Panic(_MatchError(f"{io} should be an IO"))
+                break
+
+            # Eval Cont
+            while True:
+                tag = cont[0]
+                if tag == 0:  # Cont ID
+                    return arg
+                if tag == 1:  # Cont MAP
+                    try:
+                        arg = arg.map(cont[2])
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    cont = cont[1]
+                    continue
+                if tag == 2:  # Cont FLATMAP
+                    try:
+                        if isinstance(arg, result.Ok):
+                            io = cont[3](arg.success)
+                            ctxt = cont[2]
+                            cont = cont[1]
+                            break
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    cont = cont[1]
+                    continue
+                if tag == 3:  # Cont AP1
+                    ctxt = cont[2]
+                    io = cont[3]
+                    cont = (4, cont[1], arg)
+                    break
+                if tag == 4:  # Cont AP2
+                    try:
+                        arg = cont[2].ap(arg)
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    cont = cont[1]
+                    continue
+                if tag == 5:  # Cont Flatten
+                    if isinstance(arg, result.Ok):
+                        ctxt = cont[2]
+                        io = arg.success
+                        cont = cont[1]
+                        break
+                    cont = cont[1]
+                    continue
+                if tag == 6:  # Cont CATCH
+                    try:
+                        if isinstance(arg, result.Error):
+                            io = cont[3](arg.error)
+                            ctxt = cont[2]
+                            cont = cont[1]
+                            break
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    cont = cont[1]
+                    continue
+                if tag == 7:  # Cont MAP ERROR
+                    try:
+                        arg = arg.map_error(cont[2])
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    cont = cont[1]
+                    continue
+                if tag == 8:  # Cont RECOVER
+                    try:
+                        if isinstance(arg, result.Panic):
+                            io = cont[3](arg.exception)
+                            ctxt = cont[2]
+                            cont = cont[1]
+                            break
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    cont = cont[1]
+                    continue
+                if tag == 9:  # CONT MAP PANIC
+                    try:
+                        arg = arg.map_panic(cont[2])
+                    except Exception as exception:
+                        arg = result.Panic(exception)
+                    cont = cont[1]
+                    continue
+                raise _MatchError(f"{cont} should be a Cont")
 
     @final
     def attempt(self) -> IO[R, E, Result[E, A]]:
@@ -152,9 +340,9 @@ class IO(Generic[R, E, A]):
         Transform this computation that may fail into a computation
         that never fails but returns a Result[E,A].
 
-        - If self successfully computes a, then self.attempt() successfully computes Ok(a).
-        - If self fails on error e, then self.attempt() successfully computes Error(e).
-        - If self fails on panic p, then self.attempt() successfully computes Panic(p).
+        - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+        - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the computation, unless a catch or
         recover reacts to such failures. But using map, flat_map, flatten and
@@ -189,9 +377,9 @@ class IO(Generic[R, E, A]):
         React to any failure of the computation.
         Do nothing if the computation is successful.
 
-        - The handler will be called on Error(e) if the computation fails with error e.
-        - The handler will be called on Panic(p) if the computation fails with panic p.
-        - The handler will never be called on Ok(a).
+        - The handler will be called on `Error(e)` if the computation fails with error e.
+        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will never be called on `Ok(a)`.
         """
         return self.attempt().flat_map(
             lambda r: r.fold(
@@ -226,46 +414,6 @@ def pure(a: A) -> IO[R, E, A]:
     return IO(0, a)
 
 
-def map(main: IO[R, E, A], f: Callable[[A], A2]) -> IO[R, E, A2]:
-    """
-    Transform the computed value with f if the computation is successful.
-    Do nothing otherwise.
-    """
-    if main.tag in [9, 12]:
-        return main
-    return IO(1, (main, f))
-
-
-def flat_map(main: IO[R, E, A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, A2]:
-    """
-    Chain two computations.
-    The result of the first one (main) can be used in the second (f).
-    """
-    return IO(2, (main, f))
-
-
-def ap(fun: IO[R, E, Callable[[X], A]], arg: IO[R, E, X]) -> IO[R, E, A]:
-    """
-    Noting functions from X to A: X -> A
-
-    If fun computes a function f: X -> A
-    and arg computes a value x: X
-    then fun.ap(arg) computes f(x): A
-    """
-    if fun.tag == 0 and arg.tag == 0:
-        return IO(5, lambda: fun.fields(arg.fields))
-    return IO(3, (fun, arg))
-
-
-def flatten(tower: IO[R, E, IO[R, E, A]]) -> IO[R, E, A]:
-    """
-    Concatenation function on IO
-    """
-    if tower.tag == 0:
-        return tower.fields
-    return IO(4, tower)
-
-
 def defer(deferred: Callable[[], A]) -> IO[R, E, A]:
     """
     Defer a computation.
@@ -273,21 +421,28 @@ def defer(deferred: Callable[[], A]) -> IO[R, E, A]:
     The result of the computation is the result of deferred() but
     this call is deferred until the IO is run.
 
-    /!\\ VERY IMPORTANT /!\\
+    /!\\ **VERY IMPORTANT** /!\\
+
     This is the only valid way to execute side effects.
     All side effect should we wrapped by:
         defer(lambda: <your side effecting code>)
 
     For example, the following code is buggy:
+
         >>> hello: IO[None, None, None] = pure(print("Hello World!"))
         "Hello World!" is printed
+
         >>> hello.run(None)
         Nothing printed
+
     The correct version is:
+
         >>> hello: IO[None, None, None] = defer(lambda: print("Hello World!"))
         Nothing is printed
+
         >>> hello.run(None)
         "Hello World!" is printed
+
         >>> hello.run(None)
         "Hello World!" is printed again
     """
@@ -303,11 +458,14 @@ def defer_io(deferred: Callable[[], IO[R, E, A]]) -> IO[R, E, A]:
     eliminates stack overflow.
 
     For example, the following code blow the stack:
+
         >>> def f() -> IO[None,None,None]:
         >>>    return f()
         >>> f().run(None)
         RecursionError: maximum recursion depth exceeded
+
     But, this one runs forever:
+
         >> def f() -> IO[None,None,None]:
         >>    return defer_io(lambda: f())
         >> f().run(None)
@@ -319,23 +477,13 @@ def read() -> IO[R, E, R]:
     """
     Read the context.
 
-    To execute a computation IO[R,E,A], you need to call the run method with
-    some value r of type R: io.run(r). the read() action returns the value r
+    To execute a computation `IO[R,E,A]`, you need to call the run method with
+    some value r of type R: `io.run(r)`. the read() action returns the value r
     given to run.
 
     Please note that the contra_map_read method can transform this value r.
     """
     return IO(7, None)
-
-
-def contra_map_read(fun: Callable[[R], R2], main: IO[R2, E, A]) -> IO[R, E2, A]:
-    """
-    Transform the context with f.
-    Note that f is not from R to R2 but from R2 to R!
-    """
-    if main.tag in [0, 5, 9, 12]:
-        return main
-    return IO(8, (fun, main))
 
 
 def error(err: E) -> IO[R, E, A]:
@@ -345,27 +493,6 @@ def error(err: E) -> IO[R, E, A]:
     return IO(9, err)
 
 
-def catch(main: IO[R, E, A], handler: Callable[[E], IO[R, E, A]]) -> IO[R, E, A]:
-    """ "
-    React to errors (the except part of a try-except).
-
-    On error, call the handler with the error.
-    """
-    if main.tag in [0, 5, 7, 12]:
-        return main
-    return IO(10, (main, handler))
-
-
-def map_error(main: IO[R, E2, A], fun: Callable[[E2], E]) -> IO[R, E2, A]:
-    """
-    Transform the stored error if the computation fails on an error.
-    Do nothing otherwise.
-    """
-    if main.tag in [0, 5, 7, 12]:
-        return main
-    return IO(11, (main, fun))
-
-
 def panic(exception: Exception) -> IO[R, E, A]:
     """
     Computation that fails with the panic exception.
@@ -373,217 +500,14 @@ def panic(exception: Exception) -> IO[R, E, A]:
     return IO(12, exception)
 
 
-def recover(
-    main: IO[R, E, A], handler: Callable[[Exception], IO[R, E, A]]
-) -> IO[R, E, A]:
-    """
-    React to panics (the except part of a try-except).
-
-    On panic, call the handler with the exception.
-    """
-    if main.tag in [0, 7, 9]:
-        return main
-    return IO(13, (main, handler))
-
-
-def map_panic(main: IO[R, E, A], fun: Callable[[Exception], Exception]) -> IO[R, E, A]:
-    """
-    Transform the exception stored if the computation fails on a panic.
-    Do nothing otherwise.
-    """
-    if main.tag in [0, 7, 9]:
-        return main
-    return IO(14, (main, fun))
-
-
 def from_result(r: Result[E, A]) -> IO[R, E, A]:
     """
     Computation that:
-    - success if r is an Ok
-    - fails with error e if r is Error(e)
-    - fails with panic p if r is Panic(p)
+    - success if r is an `Ok`
+    - fails with error e if r is `Error(e)`
+    - fails with panic p if r is `Panic(p)`
     """
     return r.fold(pure, error, panic)
-
-
-def run(main_context: R, main_io: IO[R, E, A]) -> Result[E, A]:
-    """
-    Run the IO main_io with main_context as the context (the value that read()
-    returns).
-
-    It never raise any exception (unless there is a bug) so do not
-    treat the absence of exception as a success. Instead process the
-    returned Result[E,A].
-    """
-    context = main_context
-    io = main_io
-    cont = (0,)
-    arg = None
-    # CONT ID        0
-    # CONT MAP       1 CONT FUN
-    # CONT FLATMAP1  2 CONT CONTEXT HANDLER
-    # CONT AP1       3 CONT CONTEXT IO
-    # CONT AP2       4 CONT FUN
-    # CONT FLATTEN   5 CONT CONTEXT
-    # CONT CATCH     6 CONT CONTEXT HANDLER
-    # CONT MAP_ERROR 7 CONT FUN
-    # CONT RECOVER   8 CONT CONTEXT HANDLER
-    # CONT MAP_PANIC 9 CONT FUN
-
-    while True:
-        # Eval IO
-        while True:
-            tag = io.tag
-            if tag == 0:  # PURE
-                arg = result.Ok(io.fields)
-                break
-            if tag == 1:  # MAP
-                # run(context, io.main).map(io.f)
-                cont = (1, cont, io.fields[1])
-                io = io.fields[0]
-                continue
-            if tag == 2:  # FLATMAP
-                # run(context, io.main).flat_map(lambda x: run(context, io.f(x)))
-                cont = (2, cont, context, io.fields[1])
-                io = io.fields[0]
-                continue
-            if tag == 3:  # AP
-                cont = (3, cont, context, io.fields[1])
-                io = io.fields[0]
-                continue
-            if tag == 4:  # FLATTEN
-                cont = (5, cont, context)
-                io = io.fields
-                continue
-            if tag == 5:  # DEREF
-                try:
-                    arg = result.Ok(io.fields())
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                break
-            if tag == 6:  # DEREF_IO
-                try:
-                    io = io.fields()
-                    continue
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                    break
-            if tag == 7:  # READ
-                arg = result.Ok(context)
-                break
-            if tag == 8:  # MAP READ
-                try:
-                    context = io.fields[0](context)
-                    io = io.fields[1]
-                    continue
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                    break
-            if tag == 9:  # RAISE
-                arg = result.Error(io.fields)
-                break
-            if tag == 10:  # CATCH
-                cont = (6, cont, context, io.fields[1])
-                io = io.fields[0]
-                continue
-            if tag == 11:  # MAP ERROR
-                cont = (7, cont, io.fields[1])
-                io = io.fields[0]
-                continue
-            if tag == 12:  # PANIC
-                arg = result.Panic(io.fields)
-                break
-            if tag == 13:  # RECOVER
-                cont = (8, cont, context, io.fields[1])
-                io = io.fields[0]
-                continue
-            if tag == 14:  # MAP PANIC
-                cont = (9, cont, io.fields[1])
-                io = io.fields[0]
-                continue
-            arg = result.Panic(_MatchError(f"{io} should be an IO"))
-            break
-
-        # Eval Cont
-        while True:
-            tag = cont[0]
-            if tag == 0:  # Cont ID
-                return arg
-            if tag == 1:  # Cont MAP
-                try:
-                    arg = arg.map(cont[2])
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                cont = cont[1]
-                continue
-            if tag == 2:  # Cont FLATMAP
-                try:
-                    if isinstance(arg, result.Ok):
-                        io = cont[3](arg.success)
-                        context = cont[2]
-                        cont = cont[1]
-                        break
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                cont = cont[1]
-                continue
-            if tag == 3:  # Cont AP1
-                context = cont[2]
-                io = cont[3]
-                cont = (4, cont[1], arg)
-                break
-            if tag == 4:  # Cont AP2
-                try:
-                    arg = cont[2].ap(arg)
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                cont = cont[1]
-                continue
-            if tag == 5:  # Cont Flatten
-                if isinstance(arg, result.Ok):
-                    context = cont[2]
-                    io = arg.success
-                    cont = cont[1]
-                    break
-                cont = cont[1]
-                continue
-            if tag == 6:  # Cont CATCH
-                try:
-                    if isinstance(arg, result.Error):
-                        io = cont[3](arg.error)
-                        context = cont[2]
-                        cont = cont[1]
-                        break
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                cont = cont[1]
-                continue
-            if tag == 7:  # Cont MAP ERROR
-                try:
-                    arg = arg.map_error(cont[2])
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                cont = cont[1]
-                continue
-            if tag == 8:  # Cont RECOVER
-                try:
-                    if isinstance(arg, result.Panic):
-                        io = cont[3](arg.exception)
-                        context = cont[2]
-                        cont = cont[1]
-                        break
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                cont = cont[1]
-                continue
-            if tag == 9:  # CONT MAP PANIC
-                try:
-                    arg = arg.map_panic(cont[2])
-                except Exception as exception:
-                    arg = result.Panic(exception)
-                cont = cont[1]
-                continue
-            raise _MatchError(f"{cont} should be a Cont")
 
 
 def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:
