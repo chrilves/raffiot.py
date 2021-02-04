@@ -41,13 +41,13 @@ class Result(Generic[E, A]):
     The Result[E,A] data structure represents the result of a computation. It has
     3 possible cases:
 
-    - Ok(some_value: A)
+    - *Ok(some_value: A)*
             The computation succeeded.
             The value some_value, of type A, is the result of the computation
-    - Error(some_error: E)
+    - *Error(some_error: E)*
             The computation failed with an expected error.
             The error some_error, of type E, is the expected error encountered.
-    - Panic(some_exception: Exception)
+    - *Panic(some_exception: Exception)*
             The computation failed on an unexpected error.
             The exception some_exception is the unexpected error encountered.
 
@@ -79,9 +79,9 @@ class Result(Generic[E, A]):
     ) -> X:
         """
         Transform this Result[E,A] into X.
-        :param on_success: is called if this result is a Ok.
-        :param on_error: is called if this result is a Error.
-        :param on_panic: is called if this result is a Panic.
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
+        :param on_panic: is called if this result is a `Panic`.
         :return:
         """
         if isinstance(self, Ok):
@@ -95,13 +95,13 @@ class Result(Generic[E, A]):
     @final
     def fold_raise(self, on_success: Callable[[A], X], on_error: Callable[[E], X]) -> X:
         """
-        Transform this Result[E,A] into X if this result is an Ok or Error.
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
         But raise the stored exception is this is a panic.
 
         It is useful to raise an exception on panics.
 
-        :param on_success: is called if this result is a Ok.
-        :param on_error: is called if this result is a Error.
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
         :return:
         """
         if isinstance(self, Ok):
@@ -123,7 +123,7 @@ class Result(Generic[E, A]):
 
         Chain operations returning results.
 
-        :param f: operation to perform it this result is an Ok.
+        :param f: operation to perform it this result is an `Ok`.
         :return: the result combined result.
         """
         if isinstance(self, Ok):
@@ -139,9 +139,9 @@ class Result(Generic[E, A]):
     ) -> Result[E2, A2]:
         """
         Transform the value/error/exception stored in this result.
-        :param f: how to transform the value a if this result is Ok(a)
-        :param g: how to transform the error e if this result is Error(e)
-        :param h: how to transform the exception p if this result is Panic(p)
+        :param f: how to transform the value a if this result is `Ok(a)`
+        :param g: how to transform the error e if this result is `Error(e)`
+        :param h: how to transform the exception p if this result is `Panic(p)`
         :return: the "same" result with the stored value transformed.
         """
         return self.fold(
@@ -153,28 +153,28 @@ class Result(Generic[E, A]):
     @final
     def is_ok(self) -> bool:
         """
-        :return: True if this result is an Ok
+        :return: True if this result is an `Ok`
         """
         return isinstance(self, Ok)
 
     @final
     def is_error(self) -> bool:
         """
-        :return: True if this result is an Error
+        :return: True if this result is an `Error`
         """
         return isinstance(self, Error)
 
     @final
     def is_panic(self) -> bool:
         """
-        :return: True if this result is an Panic
+        :return: True if this result is an `Panic`
         """
         return isinstance(self, Panic)
 
     @final
     def map(self, f: Callable[[A], A2]) -> Result[E, A2]:
         """
-        Transform the value stored in Ok, it this result is an Ok.
+        Transform the value stored in `Ok`, it this result is an `Ok`.
         :param f: the transformation function.
         :return:
         """
@@ -183,11 +183,11 @@ class Result(Generic[E, A]):
     @final
     def ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -> Result[E, A]:
         """
-        Noting functions from X to A: X -> A.
+        Noting functions from X to A: `X -> A`.
 
-        If this result represent a computation returning a function f: X -> A
-        and arg represent a computation returning a value x: X.
-        self.ap(arg) represents the computation returning f(x): A
+        If this result represent a computation returning a function `f: X -> A`
+        and arg represent a computation returning a value `x: X`, then
+        `self.ap(arg)` represents the computation returning `f(x): A`.
         """
         return self.flat_map(lambda f: arg.map(f))
 
@@ -202,7 +202,7 @@ class Result(Generic[E, A]):
     @safe
     def map_error(self, f: Callable[[E], E2]) -> Result[E2, A]:
         """
-        Transform the error stored if this result is an Error
+        Transform the error stored if this result is an `Error`.
         :param f: the transformation function
         :return:
         """
@@ -215,7 +215,7 @@ class Result(Generic[E, A]):
         """
         React to errors (the except part of a try-except).
 
-        If this result is an Error(some_error), then replace it with handler(some_error).
+        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
         Otherwise, do nothing.
         """
         if isinstance(self, Error):
@@ -225,7 +225,7 @@ class Result(Generic[E, A]):
     @final
     def map_panic(self, f: Callable[[Exception], Exception]) -> Result[E, A]:
         """
-        Transform the exception stored if this result is a Panic(some_exception).
+        Transform the exception stored if this result is a `Panic(some_exception)`.
         """
         if isinstance(self, Panic):
             return Panic(f(self.exception))
@@ -236,7 +236,7 @@ class Result(Generic[E, A]):
         """
         React to panics (the except part of a try-except).
 
-        If this result is a Panic(exception), replace it by handler(exception).
+        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
         Otherwise do nothing.
         """
         if isinstance(self, Panic):
@@ -246,8 +246,8 @@ class Result(Generic[E, A]):
     @final
     def raise_on_panic(self) -> Result[E, A]:
         """
-        If this result is an Ok or Error, do nothing.
-        If it is a Panic(some_exception), raise the exception.
+        If this result is an `Ok` or `Error`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exception.
 
         Use with extreme care since it raise exception.
         """
@@ -290,21 +290,21 @@ class Panic(Result[E, A]):
 
 def pure(a: A) -> Result[Any, A]:
     """
-    Alias for Ok(a).
+    Alias for `Ok(a)`.
     """
     return Ok(a)
 
 
 def error(error: E) -> Result[E, Any]:
     """
-    Alias for Error(error).
+    Alias for `Error(error)`.
     """
     return Error(error)
 
 
 def panic(exception: Exception) -> Result[Any, Any]:
     """
-    Alias for Panic(exception).
+    Alias for `Panic(exception)`.
     """
     return Panic(exception)
 
@@ -312,7 +312,7 @@ def panic(exception: Exception) -> Result[Any, Any]:
 def returns_result(f: Callable[..., Result[E, A]]) -> Callable[..., Result[E, A]]:
     """
     Decorator that transform a function f returning A,
-    into a function f returning Result[E,A].
+    into a function f returning `Result[E,A]`.
 
     All exceptions are transformed into panics.
     """

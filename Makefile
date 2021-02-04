@@ -25,6 +25,7 @@ docs:
 	cd src/ && pdoc3 --html raffiot -o ../docs/
 	mv docs/raffiot/* docs/
 	rm -r docs/raffiot/
+	git add docs/
 
 opt: clean
 	./opt.sh

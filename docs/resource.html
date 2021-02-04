@@ -62,13 +62,15 @@ class Resource(Generic[R, E, A]):
     &#34;&#34;&#34;
     IO to create one resource along with the IO for releasing it.
     
-    On success, this IO must produce a Tuple[A, IO[R,Any,Any]:
-        - The first value of the tuple, of type A, is the created resource.
-        - The second value of the tuple, of type IO[R,Any,Any], is the IO that
+    On success, this IO must produce a `Tuple[A, IO[R,Any,Any]`:
+        - The first value of the tuple, of type `A`, is the created resource.
+        - The second value of the tuple, of type `IO[R,Any,Any]`, is the IO that
             release the first value.
     
     For example:
-        &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(lambda a: (a, io.defer(a.close))))
+        
+        &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(
+        &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
     &#34;&#34;&#34;
 
     @final
@@ -161,11 +163,11 @@ class Resource(Generic[R, E, A]):
         self: Resource[R, E, Callable[[X], A2]], rs: Resource[R, E, X]
     ) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
-        Noting functions from X to A: X -&gt; A
+        Noting functions from X to A: `X -&gt; A`
 
-        If self computes a function f: X -&gt; A
-        and arg computes a value x: X
-        then self.ap(arg) computes f(x): A
+        If self computes a function `f: X -&gt; A`
+        and arg computes a value `x: X`,
+        then `self.ap(arg)` computes `f(x): A`
         &#34;&#34;&#34;
         return self.flat_map(lambda f: rs.map(f))
 
@@ -238,9 +240,9 @@ class Resource(Generic[R, E, A]):
         Transform this Resource that may fail into a Resource
         that never fails but creates a Result[E,A].
 
-        - If self successfully computes a, then self.attempt() successfully computes Ok(a).
-        - If self fails on error e, then self.attempt() successfully computes Error(e).
-        - If self fails on panic p, then self.attempt() successfully computes Panic(p).
+        - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+        - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the resource creation, unless a catch or
         recover reacts to such failures. But using map, flat_map, flatten and
@@ -279,9 +281,9 @@ class Resource(Generic[R, E, A]):
         React to any failure of the resource creation.
         Do nothing if the resource creation is successful.
 
-        - The handler will be called on Error(e) if the resource creation fails with error e.
-        - The handler will be called on Panic(p) if the resource creation fails with panic p.
-        - The handler will never be called on Ok(a).
+        - The handler will be called on `Error(e)` if the resource creation fails with error e.
+        - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
+        - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
         return self.attempt().flat_map(
             lambda r: r.fold(
@@ -311,22 +313,22 @@ def defer(deferred: Callable[[], A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
-    The result of the Resource is the result of deferred().
+    The result of the Resource is the result of `deferred()`.
 
-    For more details, see io.defer
+    For more details, see `io.defer`
     &#34;&#34;&#34;
     return liftIO(io.defer(deferred))
 
 
 def defer_resource(deferred: Callable[[], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Make a function that returns an Resource, a Resource itself.
+    Make a function that returns an `Resource`, a `Resource` itself.
 
     This is extremely useful with recursive function that would normally blow
     the stack (raise a stack overflow exception). Deferring recursive calls
     eliminates stack overflow.
 
-    For more information see io.defer_io
+    For more information see `io.defer_io`
     &#34;&#34;&#34;
     return Resource(io.defer(deferred).flat_map(lambda rs: rs.create))
 
@@ -335,8 +337,8 @@ def read() -&gt; Resource[R, E, R]:
     &#34;&#34;&#34;
     Read the context.
 
-    To execute a computation IO[R,E,A], you need to call the run method with
-    some value r of type R: io.run(r). the read() action returns the value r
+    To execute a computation `IO[R,E,A]`, you need to call the run method with
+    some value r of type R: `io.run(r)`. the `read()` action returns the value r
     given to run.
 
     Please note that the contra_map_read method can transform this value r.
@@ -361,16 +363,16 @@ def panic(exception: Exception) -&gt; Resource[R, E, A]:
 def from_result(r: result.Result[E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that:
-    - success if r is an Ok
-    - fails with error e if r is Error(e)
-    - fails with panic p if r is Panic(p)
+    - success if r is an `Ok`
+    - fails with error e if r is `Error(e)`
+    - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
     return r.fold(pure, error, panic)
 
 
 def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Construct a Resource from an IO[R,E,Resource[R,E,A]]
+    Construct a `Resource` from an `IO[R,E,Resource[R,E,A]]`
     &#34;&#34;&#34;
     return Resource(mio.flat_map(lambda rs: rs.create))
 
@@ -379,7 +381,7 @@ def from_open_close_io(
     open: IO[R, E, A], close: Callable[[A], IO[R, Any, Any]]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Construct a Resource from an IO to open a resource and one to close it.
+    Construct a `Resource` from an IO to open a resource and one to close it.
     &#34;&#34;&#34;
     return Resource(open.map(lambda a: (a, close(a))))
 
@@ -388,7 +390,7 @@ def from_open_close(
     open: Callable[[], A], close: Callable[[A], None]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Construct a Resource from a function to open a resource and one to close it.
+    Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
     return Resource(io.defer(open).map(lambda a: (a, io.pure(a).map(close))))
 
@@ -426,8 +428,8 @@ def from_with(expr: Callable[[], Any]) -&gt; Resource[R, E, A]:
 </code></dt>
 <dd>
 <div class="desc"><p>Defer a computation.</p>
-<p>The result of the Resource is the result of deferred().</p>
-<p>For more details, see io.defer</p></div>
+<p>The result of the Resource is the result of <code>deferred()</code>.</p>
+<p>For more details, see <code>io.defer</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -436,9 +438,9 @@ def from_with(expr: Callable[[], Any]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
-    The result of the Resource is the result of deferred().
+    The result of the Resource is the result of `deferred()`.
 
-    For more details, see io.defer
+    For more details, see `io.defer`
     &#34;&#34;&#34;
     return liftIO(io.defer(deferred))</code></pre>
 </details>
@@ -447,24 +449,24 @@ def from_with(expr: Callable[[], Any]) -&gt; Resource[R, E, A]:
 <span>def <span class="ident">defer_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Make a function that returns an Resource, a Resource itself.</p>
+<div class="desc"><p>Make a function that returns an <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code>, a <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code> itself.</p>
 <p>This is extremely useful with recursive function that would normally blow
 the stack (raise a stack overflow exception). Deferring recursive calls
 eliminates stack overflow.</p>
-<p>For more information see io.defer_io</p></div>
+<p>For more information see <code>io.defer_io</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def defer_resource(deferred: Callable[[], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Make a function that returns an Resource, a Resource itself.
+    Make a function that returns an `Resource`, a `Resource` itself.
 
     This is extremely useful with recursive function that would normally blow
     the stack (raise a stack overflow exception). Deferring recursive calls
     eliminates stack overflow.
 
-    For more information see io.defer_io
+    For more information see `io.defer_io`
     &#34;&#34;&#34;
     return Resource(io.defer(deferred).flat_map(lambda rs: rs.create))</code></pre>
 </details>
@@ -489,14 +491,14 @@ eliminates stack overflow.</p>
 <span>def <span class="ident">from_io_resource</span></span>(<span>mio: IO[R, E, <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Construct a Resource from an IO[R,E,Resource[R,E,A]]</p></div>
+<div class="desc"><p>Construct a <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code> from an <code>IO[R,E,<a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R,E,A]]</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Construct a Resource from an IO[R,E,Resource[R,E,A]]
+    Construct a `Resource` from an `IO[R,E,Resource[R,E,A]]`
     &#34;&#34;&#34;
     return Resource(mio.flat_map(lambda rs: rs.create))</code></pre>
 </details>
@@ -505,7 +507,7 @@ eliminates stack overflow.</p>
 <span>def <span class="ident">from_open_close</span></span>(<span>open: Callable[[], A], close: Callable[[A], None]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Construct a Resource from a function to open a resource and one to close it.</p></div>
+<div class="desc"><p>Construct a <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code> from a function to open a resource and one to close it.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -514,7 +516,7 @@ eliminates stack overflow.</p>
     open: Callable[[], A], close: Callable[[A], None]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Construct a Resource from a function to open a resource and one to close it.
+    Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
     return Resource(io.defer(open).map(lambda a: (a, io.pure(a).map(close))))</code></pre>
 </details>
@@ -523,7 +525,7 @@ eliminates stack overflow.</p>
 <span>def <span class="ident">from_open_close_io</span></span>(<span>open: IO[R, E, A], close: Callable[[A], IO[R, Any, Any]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Construct a Resource from an IO to open a resource and one to close it.</p></div>
+<div class="desc"><p>Construct a <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code> from an IO to open a resource and one to close it.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -532,7 +534,7 @@ eliminates stack overflow.</p>
     open: IO[R, E, A], close: Callable[[A], IO[R, Any, Any]]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
-    Construct a Resource from an IO to open a resource and one to close it.
+    Construct a `Resource` from an IO to open a resource and one to close it.
     &#34;&#34;&#34;
     return Resource(open.map(lambda a: (a, close(a))))</code></pre>
 </details>
@@ -542,9 +544,9 @@ eliminates stack overflow.</p>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that:
-- success if r is an Ok
-- fails with error e if r is Error(e)
-- fails with panic p if r is Panic(p)</p></div>
+- success if r is an <code>Ok</code>
+- fails with error e if r is <code>Error(e)</code>
+- fails with panic p if r is <code>Panic(p)</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -552,9 +554,9 @@ eliminates stack overflow.</p>
 <pre><code class="python">def from_result(r: result.Result[E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that:
-    - success if r is an Ok
-    - fails with error e if r is Error(e)
-    - fails with panic p if r is Panic(p)
+    - success if r is an `Ok`
+    - fails with error e if r is `Error(e)`
+    - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
     return r.fold(pure, error, panic)</code></pre>
 </details>
@@ -656,8 +658,8 @@ The releasing IO does nothing.</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>Read the context.</p>
-<p>To execute a computation IO[R,E,A], you need to call the run method with
-some value r of type R: io.run(r). the read() action returns the value r
+<p>To execute a computation <code>IO[R,E,A]</code>, you need to call the run method with
+some value r of type R: <code>io.run(r)</code>. the <code><a title="raffiot.resource.read" href="#raffiot.resource.read">read()</a></code> action returns the value r
 given to run.</p>
 <p>Please note that the contra_map_read method can transform this value r.</p></div>
 <details class="source">
@@ -668,8 +670,8 @@ given to run.</p>
     &#34;&#34;&#34;
     Read the context.
 
-    To execute a computation IO[R,E,A], you need to call the run method with
-    some value r of type R: io.run(r). the read() action returns the value r
+    To execute a computation `IO[R,E,A]`, you need to call the run method with
+    some value r of type R: `io.run(r)`. the `read()` action returns the value r
     given to run.
 
     Please note that the contra_map_read method can transform this value r.
@@ -705,13 +707,15 @@ class Resource(Generic[R, E, A]):
     &#34;&#34;&#34;
     IO to create one resource along with the IO for releasing it.
     
-    On success, this IO must produce a Tuple[A, IO[R,Any,Any]:
-        - The first value of the tuple, of type A, is the created resource.
-        - The second value of the tuple, of type IO[R,Any,Any], is the IO that
+    On success, this IO must produce a `Tuple[A, IO[R,Any,Any]`:
+        - The first value of the tuple, of type `A`, is the created resource.
+        - The second value of the tuple, of type `IO[R,Any,Any]`, is the IO that
             release the first value.
     
     For example:
-        &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(lambda a: (a, io.defer(a.close))))
+        
+        &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(
+        &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
     &#34;&#34;&#34;
 
     @final
@@ -804,11 +808,11 @@ class Resource(Generic[R, E, A]):
         self: Resource[R, E, Callable[[X], A2]], rs: Resource[R, E, X]
     ) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
-        Noting functions from X to A: X -&gt; A
+        Noting functions from X to A: `X -&gt; A`
 
-        If self computes a function f: X -&gt; A
-        and arg computes a value x: X
-        then self.ap(arg) computes f(x): A
+        If self computes a function `f: X -&gt; A`
+        and arg computes a value `x: X`,
+        then `self.ap(arg)` computes `f(x): A`
         &#34;&#34;&#34;
         return self.flat_map(lambda f: rs.map(f))
 
@@ -881,9 +885,9 @@ class Resource(Generic[R, E, A]):
         Transform this Resource that may fail into a Resource
         that never fails but creates a Result[E,A].
 
-        - If self successfully computes a, then self.attempt() successfully computes Ok(a).
-        - If self fails on error e, then self.attempt() successfully computes Error(e).
-        - If self fails on panic p, then self.attempt() successfully computes Panic(p).
+        - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+        - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the resource creation, unless a catch or
         recover reacts to such failures. But using map, flat_map, flatten and
@@ -922,9 +926,9 @@ class Resource(Generic[R, E, A]):
         React to any failure of the resource creation.
         Do nothing if the resource creation is successful.
 
-        - The handler will be called on Error(e) if the resource creation fails with error e.
-        - The handler will be called on Panic(p) if the resource creation fails with panic p.
-        - The handler will never be called on Ok(a).
+        - The handler will be called on `Error(e)` if the resource creation fails with error e.
+        - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
+        - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
         return self.attempt().flat_map(
             lambda r: r.fold(
@@ -943,12 +947,14 @@ class Resource(Generic[R, E, A]):
 <dt id="raffiot.resource.Resource.create"><code class="name">var <span class="ident">create</span> : <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, typing.Tuple[~A, <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, typing.Any, typing.Any]]]</code></dt>
 <dd>
 <div class="desc"><p>IO to create one resource along with the IO for releasing it.</p>
-<p>On success, this IO must produce a Tuple[A, IO[R,Any,Any]:
-- The first value of the tuple, of type A, is the created resource.
-- The second value of the tuple, of type IO[R,Any,Any], is the IO that
+<p>On success, this IO must produce a <code>Tuple[A, IO[R,Any,Any]</code>:
+- The first value of the tuple, of type <code>A</code>, is the created resource.
+- The second value of the tuple, of type <code>IO[R,Any,Any]</code>, is the IO that
 release the first value.</p>
-<p>For example:
-&gt;&gt;&gt; Resource(io.defer(lambda: open("file")).map(lambda a: (a, io.defer(a.close))))</p></div>
+<p>For example:</p>
+<pre><code>&gt;&gt;&gt; Resource(io.defer(lambda: open("file")).map(
+&gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+</code></pre></div>
 </dd>
 </dl>
 <h3>Methods</h3>
@@ -957,10 +963,10 @@ release the first value.</p>
 <span>def <span class="ident">ap</span></span>(<span>self: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, Callable[[X], A2]], rs: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, X]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A2]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Noting functions from X to A: X -&gt; A</p>
-<p>If self computes a function f: X -&gt; A
-and arg computes a value x: X
-then self.ap(arg) computes f(x): A</p></div>
+<div class="desc"><p>Noting functions from X to A: <code>X -&gt; A</code></p>
+<p>If self computes a function <code>f: X -&gt; A</code>
+and arg computes a value <code>x: X</code>,
+then <code>self.ap(arg)</code> computes <code>f(x): A</code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -970,11 +976,11 @@ def ap(
     self: Resource[R, E, Callable[[X], A2]], rs: Resource[R, E, X]
 ) -&gt; Resource[R, E, A2]:
     &#34;&#34;&#34;
-    Noting functions from X to A: X -&gt; A
+    Noting functions from X to A: `X -&gt; A`
 
-    If self computes a function f: X -&gt; A
-    and arg computes a value x: X
-    then self.ap(arg) computes f(x): A
+    If self computes a function `f: X -&gt; A`
+    and arg computes a value `x: X`,
+    then `self.ap(arg)` computes `f(x): A`
     &#34;&#34;&#34;
     return self.flat_map(lambda f: rs.map(f))</code></pre>
 </details>
@@ -986,9 +992,9 @@ def ap(
 <div class="desc"><p>Transform this Resource that may fail into a Resource
 that never fails but creates a Result[E,A].</p>
 <ul>
-<li>If self successfully computes a, then self.attempt() successfully computes Ok(a).</li>
-<li>If self fails on error e, then self.attempt() successfully computes Error(e).</li>
-<li>If self fails on panic p, then self.attempt() successfully computes Panic(p).</li>
+<li>If self successfully computes a, then <code>self.attempt()</code> successfully computes <code>Ok(a)</code>.</li>
+<li>If self fails on error e, then <code>self.attempt()</code> successfully computes <code>Error(e)</code>.</li>
+<li>If self fails on panic p, then <code>self.attempt()</code> successfully computes <code>Panic(p)</code>.</li>
 </ul>
 <p>Note that errors and panics stop the resource creation, unless a catch or
 recover reacts to such failures. But using map, flat_map, flatten and
@@ -1005,9 +1011,9 @@ def attempt(self) -&gt; IO[R, Any, result.Result[E, A]]:
     Transform this Resource that may fail into a Resource
     that never fails but creates a Result[E,A].
 
-    - If self successfully computes a, then self.attempt() successfully computes Ok(a).
-    - If self fails on error e, then self.attempt() successfully computes Error(e).
-    - If self fails on panic p, then self.attempt() successfully computes Panic(p).
+    - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+    - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+    - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
     Note that errors and panics stop the resource creation, unless a catch or
     recover reacts to such failures. But using map, flat_map, flatten and
@@ -1235,9 +1241,9 @@ def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
 React to any failure of the resource creation.
 Do nothing if the resource creation is successful.</p>
 <ul>
-<li>The handler will be called on Error(e) if the resource creation fails with error e.</li>
-<li>The handler will be called on Panic(p) if the resource creation fails with panic p.</li>
-<li>The handler will never be called on Ok(a).</li>
+<li>The handler will be called on <code>Error(e)</code> if the resource creation fails with error e.</li>
+<li>The handler will be called on <code>Panic(p)</code> if the resource creation fails with panic p.</li>
+<li>The handler will never be called on <code>Ok(a)</code>.</li>
 </ul></div>
 <details class="source">
 <summary>
@@ -1252,9 +1258,9 @@ def on_failure(
     React to any failure of the resource creation.
     Do nothing if the resource creation is successful.
 
-    - The handler will be called on Error(e) if the resource creation fails with error e.
-    - The handler will be called on Panic(p) if the resource creation fails with panic p.
-    - The handler will never be called on Ok(a).
+    - The handler will be called on `Error(e)` if the resource creation fails with error e.
+    - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
+    - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
     return self.attempt().flat_map(
         lambda r: r.fold(
