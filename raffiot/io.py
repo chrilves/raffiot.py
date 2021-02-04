@@ -5,7 +5,6 @@ Data structure representing a computation.
 from __future__ import annotations
 from typing import TypeVar, Generic, Callable, Any
 from typing_extensions import final
-from dataclasses import dataclass
 from raffiot import result, _MatchError
 from raffiot.result import Result
 
