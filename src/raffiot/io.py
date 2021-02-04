@@ -38,6 +38,8 @@ class IO(Generic[R, E, A]):
     Have a look to the documentation and examples to learn how to use it.
     """
 
+    __slots__ = "__tag", "__fields"
+
     @final
     def __init__(self, __tag, __fields):
         self.__tag = __tag
@@ -49,8 +51,6 @@ class IO(Generic[R, E, A]):
         Transform the computed value with f if the computation is successful.
         Do nothing otherwise.
         """
-        if self.__tag in [9, 12]:
-            return self
         return IO(1, (self, f))
 
     @final
@@ -78,8 +78,6 @@ class IO(Generic[R, E, A]):
         and arg computes a value `x: X`
         then self.ap(arg) computes `f(x): A`
         """
-        if self.__tag == 0 and arg.__tag == 0:
-            return IO(5, lambda: self.__fields(arg.__fields))
         return IO(3, (self, arg))
 
     @final
@@ -99,8 +97,6 @@ class IO(Generic[R, E, A]):
         Transform the context with f.
         Note that f is not from R to R2 but from R2 to R!
         """
-        if self.__tag in [0, 5, 9, 12]:
-            return self
         return IO(8, (f, self))
 
     # Error API
@@ -112,8 +108,6 @@ class IO(Generic[R, E, A]):
 
         On error, call the handler with the error.
         """
-        if self.__tag in [0, 5, 7, 12]:
-            return self
         return IO(10, (self, handler))
 
     @final
@@ -122,8 +116,6 @@ class IO(Generic[R, E, A]):
         Transform the stored error if the computation fails on an error.
         Do nothing otherwise.
         """
-        if self.__tag in [0, 5, 7, 12]:
-            return self
         return IO(11, (self, f))
 
     # Panic
@@ -135,8 +127,6 @@ class IO(Generic[R, E, A]):
 
         On panic, call the handler with the exception.
         """
-        if self.__tag in [0, 7, 9]:
-            return self
         return IO(13, (self, handler))
 
     @final
@@ -145,8 +135,6 @@ class IO(Generic[R, E, A]):
         Transform the exception stored if the computation fails on a panic.
         Do nothing otherwise.
         """
-        if self.__tag in [0, 7, 9]:
-            return self
         return IO(14, (self, f))
 
     @final
