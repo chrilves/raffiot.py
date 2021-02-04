@@ -49,7 +49,6 @@ def mesure_io(nb):
     return statistics.median(l)
 
 
-print(io.marker)
 print(f"fibo({n})    : {mesure(t)}")
 print(f"fibo_io({n}) : {mesure_io(t)}")
 print(f"fibo({n})    : {mesure(t)}")
