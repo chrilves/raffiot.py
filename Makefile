@@ -1,23 +1,30 @@
-.PHONY: test clean format check publish docs
+.PHONY: test-opt test-src clean format check publish docs opt
 
-test:
-	python -m pytest
+test-opt: opt
+	cd opt/ && python -m pytest
+
+test-src:
+	cd src/ && python -m pytest
 
 clean:
-	rm -r `find . -iname "__pycache__" -type d` || true
-	rm -r .hypothesis/ .pytest_cache/ dist/ raffiot.egg-info/ || true
+	./clean.sh
 
 format:
-	black `find raffiot/ tests/ -iname "*.py" -type f`
+	black `find . -iname "*.py" -type f`
 
-check: format test docs clean
+check: format test-src clean test-opt docs
 
 publish: check
-	python setup.py sdist
-	twine upload dist/*
+	./clean.sh
+	./opt.sh
+	cd opt/ && python setup.py sdist
+	cd opt/ && twine upload dist/*
 
 docs:
 	rm -r docs/ || true
-	pdoc3 --html raffiot -o docs/
+	cd src/ && pdoc3 --html raffiot -o ../docs/
 	mv docs/raffiot/* docs/
 	rm -r docs/raffiot/
+
+opt: clean
+	./opt.sh

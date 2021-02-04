@@ -248,11 +248,10 @@ class Result(Generic[E, A]):
         Otherwise, do nothing.
         &#34;&#34;&#34;
         if isinstance(self, Error):
-            return safe(handler)(self.error)
+            return handler(self.error)
         return self
 
     @final
-    @safe
     def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         Transform the exception stored if this result is a Panic(some_exception).
@@ -270,7 +269,7 @@ class Result(Generic[E, A]):
         Otherwise do nothing.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return safe(handler)(self.exception)
+            return handler(self.exception)
         return self
 
     @final
@@ -526,6 +525,7 @@ class Error(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.map" href="#raffiot.result.Result.map">map</a></code></li>
+<li><code><a title="raffiot.result.Result.map_panic" href="#raffiot.result.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.recover" href="#raffiot.result.Result.recover">recover</a></code></li>
 <li><code><a title="raffiot.result.Result.tri_map" href="#raffiot.result.Result.tri_map">tri_map</a></code></li>
@@ -578,6 +578,7 @@ class Ok(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.map" href="#raffiot.result.Result.map">map</a></code></li>
+<li><code><a title="raffiot.result.Result.map_panic" href="#raffiot.result.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.recover" href="#raffiot.result.Result.recover">recover</a></code></li>
 <li><code><a title="raffiot.result.Result.tri_map" href="#raffiot.result.Result.tri_map">tri_map</a></code></li>
@@ -632,6 +633,7 @@ class Panic(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.map" href="#raffiot.result.Result.map">map</a></code></li>
+<li><code><a title="raffiot.result.Result.map_panic" href="#raffiot.result.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.recover" href="#raffiot.result.Result.recover">recover</a></code></li>
 <li><code><a title="raffiot.result.Result.tri_map" href="#raffiot.result.Result.tri_map">tri_map</a></code></li>
@@ -857,11 +859,10 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         Otherwise, do nothing.
         &#34;&#34;&#34;
         if isinstance(self, Error):
-            return safe(handler)(self.error)
+            return handler(self.error)
         return self
 
     @final
-    @safe
     def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         Transform the exception stored if this result is a Panic(some_exception).
@@ -879,7 +880,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         Otherwise do nothing.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return safe(handler)(self.exception)
+            return handler(self.exception)
         return self
 
     @final
@@ -950,7 +951,7 @@ def catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
     Otherwise, do nothing.
     &#34;&#34;&#34;
     if isinstance(self, Error):
-        return safe(handler)(self.error)
+        return handler(self.error)
     return self</code></pre>
 </details>
 </dd>
@@ -1166,19 +1167,22 @@ def map(self, f: Callable[[A], A2]) -&gt; Result[E, A2]:
 </details>
 </dd>
 <dt id="raffiot.result.Result.map_panic"><code class="name flex">
-<span>def <span class="ident">map_panic</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[Exception], Exception]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Transform the exception stored if this result is a Panic(some_exception).</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
-    try:
-        return f(*args, **kwargs)
-    except Exception as exception:
-        return Panic(exception)</code></pre>
+<pre><code class="python">@final
+def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    Transform the exception stored if this result is a Panic(some_exception).
+    &#34;&#34;&#34;
+    if isinstance(self, Panic):
+        return Panic(f(self.exception))
+    return self</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.raise_on_panic"><code class="name flex">
@@ -1225,7 +1229,7 @@ def recover(self, handler: Callable[[Exception], Result[E, A]]) -&gt; Result[E, 
     Otherwise do nothing.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        return safe(handler)(self.exception)
+        return handler(self.exception)
     return self</code></pre>
 </details>
 </dd>

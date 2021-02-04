@@ -219,11 +219,10 @@ class Result(Generic[E, A]):
         Otherwise, do nothing.
         """
         if isinstance(self, Error):
-            return safe(handler)(self.error)
+            return handler(self.error)
         return self
 
     @final
-    @safe
     def map_panic(self, f: Callable[[Exception], Exception]) -> Result[E, A]:
         """
         Transform the exception stored if this result is a Panic(some_exception).
@@ -241,7 +240,7 @@ class Result(Generic[E, A]):
         Otherwise do nothing.
         """
         if isinstance(self, Panic):
-            return safe(handler)(self.exception)
+            return handler(self.exception)
         return self
 
     @final
