@@ -9,6 +9,7 @@ from typing_extensions import final
 from dataclasses import dataclass
 from raffiot import result, io
 from raffiot.io import IO
+from raffiot.result import Result, Ok, Error, Panic
 
 R = TypeVar("R")
 E = TypeVar("E")
@@ -204,7 +205,7 @@ class Resource(Generic[R, E, A]):
         )
 
     @final
-    def attempt(self) -> IO[R, Any, result.Result[E, A]]:
+    def attempt(self) -> IO[R, Any, Result[E, A]]:
         """
         Transform this Resource that may fail into a Resource
         that never fails but creates a Result[E,A].
@@ -222,9 +223,9 @@ class Resource(Generic[R, E, A]):
         return Resource(
             self.create.attempt().map(
                 lambda x: x.fold(
-                    lambda v: (result.Ok(v[0]), v[1]),
-                    lambda e: (result.Error(e), io.pure(None)),
-                    lambda p: (result.Panic(p), io.pure(None)),
+                    lambda v: (Ok(v[0]), v[1]),
+                    lambda e: (Error(e), io.pure(None)),
+                    lambda p: (Panic(p), io.pure(None)),
                 )
             )
         )
@@ -329,7 +330,7 @@ def panic(exception: Exception) -> Resource[R, E, A]:
     return Resource(io.panic(exception))
 
 
-def from_result(r: result.Result[E, A]) -> Resource[R, E, A]:
+def from_result(r: Result[E, A]) -> Resource[R, E, A]:
     """
     Resource creation that:
     - success if r is an `Ok`

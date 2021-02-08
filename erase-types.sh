@@ -7,5 +7,5 @@ TMP=$(mktemp)
 
 strip-hints "${FILE}" | \
 grep -vE '(TypeVar|from typing |from typing_extensions|[ \t]*@final|install_requires=.*typing-extensions)' | \
-sed 's/^class \(.*\)(Generic\[[^]]*\])/class \1/g;s/Result\[[^]]*\]/Result/g' > "${TMP}"
+sed 's/^class \(.*\)(Generic\[[^]]*\])/class \1/g;s/Result\[[^]]*\]/Result/g;s/^from raffiot\([. ]\)/from raffiot.untyped\1/g;s/^import raffiot\([. ]\)/import raffiot.untyped\1/g' > "${TMP}"
 strip-hints "${TMP}" | sed 's/#\([a-z]\+\):.*/\1: None/g' > "${FILE}"

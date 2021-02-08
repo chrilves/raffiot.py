@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import TypeVar, Generic, Callable, Any
 from typing_extensions import final
 from raffiot import result, _MatchError
-from raffiot.result import Result
+from raffiot.result import Result, Ok, Error, Panic
 
 R = TypeVar("R")
 E = TypeVar("E")
@@ -266,11 +266,11 @@ class IO(Generic[R, E, A]):
                 tag = cont.pop()
                 if tag == 0:  # Cont ID
                     if arg_tag == 0:
-                        return result.Ok(arg_value)
+                        return Ok(arg_value)
                     if arg_tag == 1:
-                        return result.Error(arg_value)
+                        return Error(arg_value)
                     if arg_tag == 2:
-                        return result.Panic(arg_value)
+                        return Panic(arg_value)
                     raise _MatchError(f"Wrong result tag {arg_tag}")
                 if tag == 1:  # Cont MAP
                     fun = cont.pop()
@@ -374,9 +374,9 @@ class IO(Generic[R, E, A]):
         thus enabling you to use map, flat_map, ... to deal with errors.
         """
         return (
-            self.map(result.pure)
-            .catch(lambda x: pure(result.error(x)))
-            .recover(lambda x: pure(result.panic(x)))
+            self.map(Ok)
+            .catch(lambda x: pure(Error(x)))
+            .recover(lambda x: pure(Panic(x)))
         )
 
     @final
@@ -407,8 +407,8 @@ class IO(Generic[R, E, A]):
         return self.attempt().flat_map(
             lambda r: r.fold(
                 pure,
-                lambda e: handler(result.error(e)),
-                lambda p: handler(result.panic(p)),
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
             )
         )
 
