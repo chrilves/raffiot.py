@@ -154,8 +154,9 @@ class IO(Generic[R, E, A]):
         """
         ctxt = context
         io = self
-        cont = (0,)
-        arg = None
+        cont = [0]
+        arg_tag = None
+        arg_value = None
         # CONT ID        0
         # CONT MAP       1 CONT FUN
         # CONT FLATMAP1  2 CONT CONTEXT HANDLER
@@ -172,41 +173,50 @@ class IO(Generic[R, E, A]):
             while True:
                 tag = io.__tag
                 if tag == 0:  # PURE
-                    arg = result.Ok(io.__fields)
+                    arg_tag = 0
+                    arg_value = io.__fields
                     break
                 if tag == 1:  # MAP
-                    # run(context, io.main).map(io.f)
-                    cont = (1, cont, io.__fields[1])
+                    cont.append(io.__fields[1])
+                    cont.append(1)
                     io = io.__fields[0]
                     continue
                 if tag == 2:  # FLATMAP
-                    # run(context, io.main).flat_map(lambda x: run(context, io.f(x)))
-                    cont = (2, cont, ctxt, io.__fields[1])
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(2)
                     io = io.__fields[0]
                     continue
                 if tag == 3:  # AP
-                    cont = (3, cont, ctxt, io.__fields[1])
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(3)
                     io = io.__fields[0]
                     continue
                 if tag == 4:  # FLATTEN
-                    cont = (5, cont, ctxt)
+                    cont.append(ctxt)
+                    cont.append(5)
                     io = io.__fields
                     continue
                 if tag == 5:  # DEREF
                     try:
-                        arg = result.Ok(io.__fields())
+                        arg_tag = 0
+                        arg_value = io.__fields()
                     except Exception as exception:
-                        arg = result.Panic(exception)
+                        arg_tag = 2
+                        arg_value = exception
                     break
                 if tag == 6:  # DEREF_IO
                     try:
                         io = io.__fields()
                         continue
                     except Exception as exception:
-                        arg = result.Panic(exception)
+                        arg_tag = 2
+                        arg_value = exception
                         break
                 if tag == 7:  # READ
-                    arg = result.Ok(ctxt)
+                    arg_tag = 0
+                    arg_value = ctxt
                     break
                 if tag == 8:  # MAP READ
                     try:
@@ -214,111 +224,136 @@ class IO(Generic[R, E, A]):
                         io = io.__fields[1]
                         continue
                     except Exception as exception:
-                        arg = result.Panic(exception)
+                        arg_tag = 2
+                        arg_value = exception
                         break
                 if tag == 9:  # RAISE
-                    arg = result.Error(io.__fields)
+                    arg_tag = 1
+                    arg_value = io.__fields
                     break
                 if tag == 10:  # CATCH
-                    cont = (6, cont, ctxt, io.__fields[1])
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(6)
                     io = io.__fields[0]
                     continue
                 if tag == 11:  # MAP ERROR
-                    cont = (7, cont, io.__fields[1])
+                    cont.append(io.__fields[1])
+                    cont.append(7)
                     io = io.__fields[0]
                     continue
                 if tag == 12:  # PANIC
-                    arg = result.Panic(io.__fields)
+                    arg_tag = 2
+                    arg_value = io.__fields
                     break
                 if tag == 13:  # RECOVER
-                    cont = (8, cont, ctxt, io.__fields[1])
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(8)
                     io = io.__fields[0]
                     continue
                 if tag == 14:  # MAP PANIC
-                    cont = (9, cont, io.__fields[1])
+                    cont.append(io.__fields[1])
+                    cont.append(9)
                     io = io.__fields[0]
                     continue
-                arg = result.Panic(_MatchError(f"{io} should be an IO"))
+                arg_tag = 2
+                arg_value = _MatchError(f"{io} should be an IO")
                 break
 
             # Eval Cont
             while True:
-                tag = cont[0]
+                tag = cont.pop()
                 if tag == 0:  # Cont ID
-                    return arg
+                    if arg_tag == 0:
+                        return result.Ok(arg_value)
+                    if arg_tag == 1:
+                        return result.Error(arg_value)
+                    if arg_tag == 2:
+                        return result.Panic(arg_value)
+                    raise _MatchError(f"Wrong result tag {arg_tag}")
                 if tag == 1:  # Cont MAP
+                    fun = cont.pop()
                     try:
-                        arg = arg.map(cont[2])
+                        if arg_tag == 0:
+                            arg_value = fun(arg_value)
                     except Exception as exception:
-                        arg = result.Panic(exception)
-                    cont = cont[1]
+                        arg_tag = 2
+                        arg_value = exception
                     continue
                 if tag == 2:  # Cont FLATMAP
+                    ctxt = cont.pop()
+                    f = cont.pop()
                     try:
-                        if isinstance(arg, result.Ok):
-                            io = cont[3](arg.success)
-                            ctxt = cont[2]
-                            cont = cont[1]
+                        if arg_tag == 0:
+                            io = f(arg_value)
                             break
                     except Exception as exception:
-                        arg = result.Panic(exception)
-                    cont = cont[1]
+                        arg_tag = 2
+                        arg_value = exception
                     continue
                 if tag == 3:  # Cont AP1
-                    ctxt = cont[2]
-                    io = cont[3]
-                    cont = (4, cont[1], arg)
+                    ctxt = cont.pop()
+                    io = cont.pop()
+                    cont.append(arg_value)
+                    cont.append(arg_tag)
+                    cont.append(4)
                     break
                 if tag == 4:  # Cont AP2
+                    fun_tag = cont.pop()
+                    fun_value = cont.pop()
                     try:
-                        arg = cont[2].ap(arg)
+                        if fun_tag == 0 and arg_tag == 0:
+                            arg_value = fun_value(arg_value)
                     except Exception as exception:
-                        arg = result.Panic(exception)
-                    cont = cont[1]
+                        arg_tag = 2
+                        arg_value = exception
                     continue
                 if tag == 5:  # Cont Flatten
-                    if isinstance(arg, result.Ok):
-                        ctxt = cont[2]
-                        io = arg.success
-                        cont = cont[1]
+                    ctxt = cont.pop()
+                    if arg_tag == 0:
+                        io = arg_value
                         break
-                    cont = cont[1]
                     continue
                 if tag == 6:  # Cont CATCH
+                    ctxt = cont.pop()
+                    handler = cont.pop()
                     try:
-                        if isinstance(arg, result.Error):
-                            io = cont[3](arg.error)
-                            ctxt = cont[2]
-                            cont = cont[1]
+                        if arg_tag == 1:
+                            io = handler(arg_value)
                             break
                     except Exception as exception:
-                        arg = result.Panic(exception)
-                    cont = cont[1]
+                        arg_tag = 2
+                        arg_value = exception
                     continue
                 if tag == 7:  # Cont MAP ERROR
+                    fun = cont.pop()
                     try:
-                        arg = arg.map_error(cont[2])
+                        if arg_tag == 1:
+                            arg_value = fun(arg_value)
                     except Exception as exception:
-                        arg = result.Panic(exception)
-                    cont = cont[1]
+                        arg_tag = 2
+                        arg_value = exception
                     continue
                 if tag == 8:  # Cont RECOVER
+                    ctxt = cont.pop()
+                    handler = cont.pop()
                     try:
-                        if isinstance(arg, result.Panic):
-                            io = cont[3](arg.exception)
-                            ctxt = cont[2]
-                            cont = cont[1]
+                        if arg_tag == 2:
+                            io = handler(arg_value)
                             break
                     except Exception as exception:
-                        arg = result.Panic(exception)
-                    cont = cont[1]
+                        arg_tag = 2
+                        arg_value = exception
                     continue
                 if tag == 9:  # CONT MAP PANIC
+                    fun = cont.pop()
                     try:
-                        arg = arg.map_panic(cont[2])
+                        if arg_tag == 2:
+                            arg_value = fun(arg_value)
                     except Exception as exception:
-                        arg = result.Panic(exception)
-                    cont = cont[1]
+                        arg_tag = 2
+                        arg_value = exception
                     continue
                 raise _MatchError(f"{cont} should be a Cont")
 
@@ -505,6 +540,6 @@ def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:
     """
 
     def wrapper(*args, **kwargs):
-        return pure(f).flat_map(lambda g: g(*args, **kwargs))
+        return defer_io(lambda: g(*args, **kwargs))
 
     return wrapper

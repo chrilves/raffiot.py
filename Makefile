@@ -29,3 +29,6 @@ docs:
 
 opt: clean
 	./opt.sh
+
+profile: opt
+	cd opt && python -m cProfile ../benchmarks/imeprofile.py 30 | less
