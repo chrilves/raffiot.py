@@ -174,9 +174,9 @@ class Result(Generic[E, A]):
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.fold(
-            safe(lambda x: Ok(f(x))),
-            safe(lambda x: Error(g(x))),
-            safe(lambda x: Panic(h(x))),
+            lambda x: Ok(safe(f)(x)),
+            lambda x: Error(safe(g)(x)),
+            lambda x: Panic(safe(h)(x)),
         )
 
     @final
@@ -228,7 +228,6 @@ class Result(Generic[E, A]):
         return self.flat_map(lambda x: x)
 
     @final
-    @safe
     def map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
         &#34;&#34;&#34;
         Transform the error stored if this result is an `Error`.
@@ -236,7 +235,7 @@ class Result(Generic[E, A]):
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Error):
-            return Error(f(self.error))
+            return Error(safe(f)(self.error))
         return self  # type: ignore
 
     @final
@@ -525,6 +524,7 @@ class Error(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.map" href="#raffiot.result.Result.map">map</a></code></li>
+<li><code><a title="raffiot.result.Result.map_error" href="#raffiot.result.Result.map_error">map_error</a></code></li>
 <li><code><a title="raffiot.result.Result.map_panic" href="#raffiot.result.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.recover" href="#raffiot.result.Result.recover">recover</a></code></li>
@@ -578,6 +578,7 @@ class Ok(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.map" href="#raffiot.result.Result.map">map</a></code></li>
+<li><code><a title="raffiot.result.Result.map_error" href="#raffiot.result.Result.map_error">map_error</a></code></li>
 <li><code><a title="raffiot.result.Result.map_panic" href="#raffiot.result.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.recover" href="#raffiot.result.Result.recover">recover</a></code></li>
@@ -633,6 +634,7 @@ class Panic(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.map" href="#raffiot.result.Result.map">map</a></code></li>
+<li><code><a title="raffiot.result.Result.map_error" href="#raffiot.result.Result.map_error">map_error</a></code></li>
 <li><code><a title="raffiot.result.Result.map_panic" href="#raffiot.result.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.recover" href="#raffiot.result.Result.recover">recover</a></code></li>
@@ -785,9 +787,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.fold(
-            safe(lambda x: Ok(f(x))),
-            safe(lambda x: Error(g(x))),
-            safe(lambda x: Panic(h(x))),
+            lambda x: Ok(safe(f)(x)),
+            lambda x: Error(safe(g)(x)),
+            lambda x: Panic(safe(h)(x)),
         )
 
     @final
@@ -839,7 +841,6 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         return self.flat_map(lambda x: x)
 
     @final
-    @safe
     def map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
         &#34;&#34;&#34;
         Transform the error stored if this result is an `Error`.
@@ -847,7 +848,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Error):
-            return Error(f(self.error))
+            return Error(safe(f)(self.error))
         return self  # type: ignore
 
     @final
@@ -1151,19 +1152,26 @@ def map(self, f: Callable[[A], A2]) -&gt; Result[E, A2]:
 </details>
 </dd>
 <dt id="raffiot.result.Result.map_error"><code class="name flex">
-<span>def <span class="ident">map_error</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+<span>def <span class="ident">map_error</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E2, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Transform the error stored if this result is an <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code>.
+:param f: the transformation function
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
-    try:
-        return f(*args, **kwargs)
-    except Exception as exception:
-        return Panic(exception)</code></pre>
+<pre><code class="python">@final
+def map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
+    &#34;&#34;&#34;
+    Transform the error stored if this result is an `Error`.
+    :param f: the transformation function
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(self, Error):
+        return Error(safe(f)(self.error))
+    return self  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.map_panic"><code class="name flex">
@@ -1261,9 +1269,9 @@ def tri_map(
     :return: the &#34;same&#34; result with the stored value transformed.
     &#34;&#34;&#34;
     return self.fold(
-        safe(lambda x: Ok(f(x))),
-        safe(lambda x: Error(g(x))),
-        safe(lambda x: Panic(h(x))),
+        lambda x: Ok(safe(f)(x)),
+        lambda x: Error(safe(g)(x)),
+        lambda x: Panic(safe(h)(x)),
     )</code></pre>
 </details>
 </dd>

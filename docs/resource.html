@@ -40,6 +40,7 @@ from typing_extensions import final
 from dataclasses import dataclass
 from raffiot import result, io
 from raffiot.io import IO
+from raffiot.result import Result, Ok, Error, Panic
 
 R = TypeVar(&#34;R&#34;)
 E = TypeVar(&#34;E&#34;)
@@ -235,7 +236,7 @@ class Resource(Generic[R, E, A]):
         )
 
     @final
-    def attempt(self) -&gt; IO[R, Any, result.Result[E, A]]:
+    def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
         &#34;&#34;&#34;
         Transform this Resource that may fail into a Resource
         that never fails but creates a Result[E,A].
@@ -253,9 +254,9 @@ class Resource(Generic[R, E, A]):
         return Resource(
             self.create.attempt().map(
                 lambda x: x.fold(
-                    lambda v: (result.Ok(v[0]), v[1]),
-                    lambda e: (result.Error(e), io.pure(None)),
-                    lambda p: (result.Panic(p), io.pure(None)),
+                    lambda v: (Ok(v[0]), v[1]),
+                    lambda e: (Error(e), io.pure(None)),
+                    lambda p: (Panic(p), io.pure(None)),
                 )
             )
         )
@@ -360,7 +361,7 @@ def panic(exception: Exception) -&gt; Resource[R, E, A]:
     return Resource(io.panic(exception))
 
 
-def from_result(r: result.Result[E, A]) -&gt; Resource[R, E, A]:
+def from_result(r: Result[E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that:
     - success if r is an `Ok`
@@ -540,7 +541,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.resource.from_result"><code class="name flex">
-<span>def <span class="ident">from_result</span></span>(<span>r: result.Result[E, A]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">from_result</span></span>(<span>r: Result[E, A]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that:
@@ -551,7 +552,7 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_result(r: result.Result[E, A]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def from_result(r: Result[E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that:
     - success if r is an `Ok`
@@ -880,7 +881,7 @@ class Resource(Generic[R, E, A]):
         )
 
     @final
-    def attempt(self) -&gt; IO[R, Any, result.Result[E, A]]:
+    def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
         &#34;&#34;&#34;
         Transform this Resource that may fail into a Resource
         that never fails but creates a Result[E,A].
@@ -898,9 +899,9 @@ class Resource(Generic[R, E, A]):
         return Resource(
             self.create.attempt().map(
                 lambda x: x.fold(
-                    lambda v: (result.Ok(v[0]), v[1]),
-                    lambda e: (result.Error(e), io.pure(None)),
-                    lambda p: (result.Panic(p), io.pure(None)),
+                    lambda v: (Ok(v[0]), v[1]),
+                    lambda e: (Error(e), io.pure(None)),
+                    lambda p: (Panic(p), io.pure(None)),
                 )
             )
         )
@@ -1006,7 +1007,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-def attempt(self) -&gt; IO[R, Any, result.Result[E, A]]:
+def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
     &#34;&#34;&#34;
     Transform this Resource that may fail into a Resource
     that never fails but creates a Result[E,A].
@@ -1024,9 +1025,9 @@ def attempt(self) -&gt; IO[R, Any, result.Result[E, A]]:
     return Resource(
         self.create.attempt().map(
             lambda x: x.fold(
-                lambda v: (result.Ok(v[0]), v[1]),
-                lambda e: (result.Error(e), io.pure(None)),
-                lambda p: (result.Panic(p), io.pure(None)),
+                lambda v: (Ok(v[0]), v[1]),
+                lambda e: (Error(e), io.pure(None)),
+                lambda p: (Panic(p), io.pure(None)),
             )
         )
     )</code></pre>
@@ -1234,7 +1235,7 @@ def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.on_failure"><code class="name flex">
-<span>def <span class="ident">on_failure</span></span>(<span>self, handler: Callable[[Result[E, Any]], IO[R, E, A]]) ‑> IO[R, E, A]</span>
+<span>def <span class="ident">on_failure</span></span>(<span>self, handler: Callable[[Result[E, Any]], IO[R, E, A]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Combined form of catch and recover.
