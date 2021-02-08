@@ -12,10 +12,11 @@ format:
 check: format test docs
 
 publish: check clean
+	./opt.sh
 	python setup.py sdist
 	twine upload dist/*
 
-docs:
+docs: opt
 	rm -r docs/ || true
 	pdoc3 --html raffiot -o docs/
 	mv docs/raffiot/* docs/

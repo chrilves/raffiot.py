@@ -1,0 +1,1784 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.9.2" />
+<title>raffiot.untyped.io API documentation</title>
+<meta name="description" content="Data structure representing a computation." />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>raffiot.untyped.io</code></h1>
+</header>
+<section id="section-intro">
+<p>Data structure representing a computation.</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Data structure representing a computation.
+&#34;&#34;&#34;
+
+from __future__ import annotations
+from raffiot.untyped import result, _MatchError
+from raffiot.untyped.result import Result, Ok, Error, Panic
+
+
+class IO:
+    &#34;&#34;&#34;
+    Represent a computation that computes a value of type A,
+    may fail with an error (expected failure) of type E and have access
+    anytime to a read-only context of type R.
+
+    /!\\ **VERY IMPORTANT** /!\\
+
+    1. **DO NEVER SUB-CLASS IO**: it would break the API.
+    2. **DO NEVER INSTANTIATE an IO DIRECTLY**: use **only** the functions
+       ands methods in this module.
+    3. The IO is **LAZY**:
+        no code is run until you invoke the run method.
+    4. The IO never raises exceptions (unless there is a bug):
+        it returns panics instead.
+    5. The IO is stack-safe, but you need to make sure your own code is too!
+        use defer and defer_io to avoid stack-overflow.
+
+    Have a look to the documentation and examples to learn how to use it.
+    &#34;&#34;&#34;
+
+    __slots__ = &#34;__tag&#34;, &#34;__fields&#34;
+
+    def __init__(self, __tag, __fields):
+        self.__tag = __tag
+        self.__fields = __fields
+
+    def map(self, f):
+        &#34;&#34;&#34;
+        Transform the computed value with f if the computation is successful.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(1, (self, f))
+
+    def flat_map(self, f):
+        &#34;&#34;&#34;
+        Chain two computations.
+        The result of the first one (self) can be used in the second (f).
+        &#34;&#34;&#34;
+        return IO(2, (self, f))
+
+    def then(self, io):
+        &#34;&#34;&#34;
+        Chain two computations.
+        The result of the first one (self) is dropped.
+        &#34;&#34;&#34;
+        return self.flat_map(lambda _: io)
+
+    def ap(self, arg):
+        &#34;&#34;&#34;
+        Noting functions from X to A: `X -&gt; A`
+
+        If self computes a function `f: X -&gt; A`
+        and arg computes a value `x: X`
+        then self.ap(arg) computes `f(x): A`
+        &#34;&#34;&#34;
+        return IO(3, (self, arg))
+
+    def flatten(self):
+        &#34;&#34;&#34;
+        Concatenation function on IO
+        &#34;&#34;&#34;
+        if self.__tag == 0:
+            return self.__fields
+        return IO(4, self)
+
+    # Reader API
+
+    def contra_map_read(self, f):
+        &#34;&#34;&#34;
+        Transform the context with f.
+        Note that f is not from R to R2 but from R2 to R!
+        &#34;&#34;&#34;
+        return IO(8, (f, self))
+
+    # Error API
+
+    def catch(self, handler):
+        &#34;&#34;&#34;
+        React to errors (the except part of a try-except).
+
+        On error, call the handler with the error.
+        &#34;&#34;&#34;
+        return IO(10, (self, handler))
+
+    def map_error(self, f):
+        &#34;&#34;&#34;
+        Transform the stored error if the computation fails on an error.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(11, (self, f))
+
+    # Panic
+
+    def recover(self, handler):
+        &#34;&#34;&#34;
+        React to panics (the except part of a try-except).
+
+        On panic, call the handler with the exception.
+        &#34;&#34;&#34;
+        return IO(13, (self, handler))
+
+    def map_panic(self, f):
+        &#34;&#34;&#34;
+        Transform the exception stored if the computation fails on a panic.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(14, (self, f))
+
+    def run(self, context):
+        &#34;&#34;&#34;
+        Run the computation.
+
+        Note that a IO is a data structure, no action is performed until you
+        call run. You may view an IO value as a function declaration.
+        Declaring a function does not execute its body. Only calling the
+        function does. Likewise, declaring an IO does not execute its content,
+        only running the IO does.
+
+        Note that the return value is a  `Result`.
+        No exception will be raised by run (unless there is a bug), run will
+        returns a panic instead!
+        &#34;&#34;&#34;
+        ctxt = context
+        io = self
+        cont = [0]
+        arg_tag = None
+        arg_value = None
+        # CONT ID        0
+        # CONT MAP       1 CONT FUN
+        # CONT FLATMAP1  2 CONT CONTEXT HANDLER
+        # CONT AP1       3 CONT CONTEXT IO
+        # CONT AP2       4 CONT FUN
+        # CONT FLATTEN   5 CONT CONTEXT
+        # CONT CATCH     6 CONT CONTEXT HANDLER
+        # CONT MAP_ERROR 7 CONT FUN
+        # CONT RECOVER   8 CONT CONTEXT HANDLER
+        # CONT MAP_PANIC 9 CONT FUN
+
+        while True:
+            # Eval IO
+            while True:
+                tag = io.__tag
+                if tag == 0:  # PURE
+                    arg_tag = 0
+                    arg_value = io.__fields
+                    break
+                if tag == 1:  # MAP
+                    cont.append(io.__fields[1])
+                    cont.append(1)
+                    io = io.__fields[0]
+                    continue
+                if tag == 2:  # FLATMAP
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(2)
+                    io = io.__fields[0]
+                    continue
+                if tag == 3:  # AP
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(3)
+                    io = io.__fields[0]
+                    continue
+                if tag == 4:  # FLATTEN
+                    cont.append(ctxt)
+                    cont.append(5)
+                    io = io.__fields
+                    continue
+                if tag == 5:  # DEREF
+                    try:
+                        arg_tag = 0
+                        arg_value = io.__fields()
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    break
+                if tag == 6:  # DEREF_IO
+                    try:
+                        io = io.__fields()
+                        continue
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                        break
+                if tag == 7:  # READ
+                    arg_tag = 0
+                    arg_value = ctxt
+                    break
+                if tag == 8:  # MAP READ
+                    try:
+                        ctxt = io.__fields[0](ctxt)
+                        io = io.__fields[1]
+                        continue
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                        break
+                if tag == 9:  # RAISE
+                    arg_tag = 1
+                    arg_value = io.__fields
+                    break
+                if tag == 10:  # CATCH
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(6)
+                    io = io.__fields[0]
+                    continue
+                if tag == 11:  # MAP ERROR
+                    cont.append(io.__fields[1])
+                    cont.append(7)
+                    io = io.__fields[0]
+                    continue
+                if tag == 12:  # PANIC
+                    arg_tag = 2
+                    arg_value = io.__fields
+                    break
+                if tag == 13:  # RECOVER
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(8)
+                    io = io.__fields[0]
+                    continue
+                if tag == 14:  # MAP PANIC
+                    cont.append(io.__fields[1])
+                    cont.append(9)
+                    io = io.__fields[0]
+                    continue
+                arg_tag = 2
+                arg_value = _MatchError(f&#34;{io} should be an IO&#34;)
+                break
+
+            # Eval Cont
+            while True:
+                tag = cont.pop()
+                if tag == 0:  # Cont ID
+                    if arg_tag == 0:
+                        return Ok(arg_value)
+                    if arg_tag == 1:
+                        return Error(arg_value)
+                    if arg_tag == 2:
+                        return Panic(arg_value)
+                    raise _MatchError(f&#34;Wrong result tag {arg_tag}&#34;)
+                if tag == 1:  # Cont MAP
+                    fun = cont.pop()
+                    try:
+                        if arg_tag == 0:
+                            arg_value = fun(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 2:  # Cont FLATMAP
+                    ctxt = cont.pop()
+                    f = cont.pop()
+                    try:
+                        if arg_tag == 0:
+                            io = f(arg_value)
+                            break
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 3:  # Cont AP1
+                    ctxt = cont.pop()
+                    io = cont.pop()
+                    cont.append(arg_value)
+                    cont.append(arg_tag)
+                    cont.append(4)
+                    break
+                if tag == 4:  # Cont AP2
+                    fun_tag = cont.pop()
+                    fun_value = cont.pop()
+                    try:
+                        if fun_tag == 0 and arg_tag == 0:
+                            arg_value = fun_value(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 5:  # Cont Flatten
+                    ctxt = cont.pop()
+                    if arg_tag == 0:
+                        io = arg_value
+                        break
+                    continue
+                if tag == 6:  # Cont CATCH
+                    ctxt = cont.pop()
+                    handler = cont.pop()
+                    try:
+                        if arg_tag == 1:
+                            io = handler(arg_value)
+                            break
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 7:  # Cont MAP ERROR
+                    fun = cont.pop()
+                    try:
+                        if arg_tag == 1:
+                            arg_value = fun(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 8:  # Cont RECOVER
+                    ctxt = cont.pop()
+                    handler = cont.pop()
+                    try:
+                        if arg_tag == 2:
+                            io = handler(arg_value)
+                            break
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 9:  # CONT MAP PANIC
+                    fun = cont.pop()
+                    try:
+                        if arg_tag == 2:
+                            arg_value = fun(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                raise _MatchError(f&#34;{cont} should be a Cont&#34;)
+
+    def attempt(self):
+        &#34;&#34;&#34;
+        Transform this computation that may fail into a computation
+        that never fails but returns a Result.
+
+        - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+        - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+
+        Note that errors and panics stop the computation, unless a catch or
+        recover reacts to such failures. But using map, flat_map, flatten and
+        ap is sometimes easier than using catch and recover. attempt transforms
+        a failed computation into a successful computation returning a failure,
+        thus enabling you to use map, flat_map, ... to deal with errors.
+        &#34;&#34;&#34;
+        return (
+            self.map(Ok)
+            .catch(lambda x: pure(Error(x)))
+            .recover(lambda x: pure(Panic(x)))
+        )
+
+    def finally_(self, io):
+        &#34;&#34;&#34;
+        After having computed self, but before returning its result,
+        execute the io computation.
+
+        This is extremely useful when you need to perform an action,
+        unconditionally, at the end of a computation, without changing
+        its result, like releasing a resource.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))
+
+    def on_failure(self, handler):
+        &#34;&#34;&#34;
+        Combined form of catch and recover.
+        React to any failure of the computation.
+        Do nothing if the computation is successful.
+
+        - The handler will be called on `Error(e)` if the computation fails with error e.
+        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will never be called on `Ok(a)`.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(
+            lambda r: r.fold(
+                pure,
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
+            )
+        )
+
+
+# IO PURE             0 VALUE
+# IO MAP              1 MAIN      FUN
+# IO FLATMAP          2 MAIN      HANDLER
+# IO AP               3 FUN       ARG
+# IO FLATTEN          4 TOWER
+# IO DEFER            5 DEFERED
+# IO DEFER_IO         6 DEFERED
+# IO READ             7
+# IO CONTRA_MAP_READ  8 FUN       MAIN
+# IO RAISE            9 ERROR
+# IO CATCH           10 MAIN      HANDLER
+# IO MAP_ERROR       11 MAIN      FUN
+# IO PANIC           12 EXCEPTION
+# IO RECOVER         13 MAIN      HANDLER
+# IO MAP_PANIC       14 MAIN      FUN
+
+
+def pure(a):
+    &#34;&#34;&#34;
+    An always successful computation returning a.
+    &#34;&#34;&#34;
+    return IO(0, a)
+
+
+def defer(deferred):
+    &#34;&#34;&#34;
+    Defer a computation.
+
+    The result of the computation is the result of deferred() but
+    this call is deferred until the IO is run.
+
+    /!\\ **VERY IMPORTANT** /!\\
+
+    This is the only valid way to execute side effects.
+    All side effect should we wrapped by:
+        defer(lambda: &lt;your side effecting code&gt;)
+
+    For example, the following code is buggy:
+
+        &gt;&gt;&gt; hello: IO[None, None, None] = pure(print(&#34;Hello World!&#34;))
+        &#34;Hello World!&#34; is printed
+
+        &gt;&gt;&gt; hello.run(None)
+        Nothing printed
+
+    The correct version is:
+
+        &gt;&gt;&gt; hello: IO[None, None, None] = defer(lambda: print(&#34;Hello World!&#34;))
+        Nothing is printed
+
+        &gt;&gt;&gt; hello.run(None)
+        &#34;Hello World!&#34; is printed
+
+        &gt;&gt;&gt; hello.run(None)
+        &#34;Hello World!&#34; is printed again
+    &#34;&#34;&#34;
+    return IO(5, deferred)
+
+
+def defer_io(deferred):
+    &#34;&#34;&#34;
+    Make a function that returns an IO, an IO itself.
+
+    This is extremely useful with recursive function that would normally blow
+    the stack (raise a stack overflow exception). Deferring recursive calls
+    eliminates stack overflow.
+
+    For example, the following code blow the stack:
+
+        &gt;&gt;&gt; def f() -&gt; IO[None,None,None]:
+        &gt;&gt;&gt;    return f()
+        &gt;&gt;&gt; f().run(None)
+        RecursionError: maximum recursion depth exceeded
+
+    But, this one runs forever:
+
+        &gt;&gt; def f() -&gt; IO[None,None,None]:
+        &gt;&gt;    return defer_io(lambda: f())
+        &gt;&gt; f().run(None)
+    &#34;&#34;&#34;
+    return IO(6, deferred)
+
+
+def read():
+    &#34;&#34;&#34;
+    Read the context.
+
+    To execute a computation `IO[R,E,A]`, you need to call the run method with
+    some value r of type R: `io.run(r)`. the read() action returns the value r
+    given to run.
+
+    Please note that the contra_map_read method can transform this value r.
+    &#34;&#34;&#34;
+    return IO(7, None)
+
+
+def error(err):
+    &#34;&#34;&#34;
+    Computation that fails on the error err.
+    &#34;&#34;&#34;
+    return IO(9, err)
+
+
+def panic(exception):
+    &#34;&#34;&#34;
+    Computation that fails with the panic exception.
+    &#34;&#34;&#34;
+    return IO(12, exception)
+
+
+def from_result(r):
+    &#34;&#34;&#34;
+    Computation that:
+    - success if r is an `Ok`
+    - fails with error e if r is `Error(e)`
+    - fails with panic p if r is `Panic(p)`
+    &#34;&#34;&#34;
+    return r.fold(pure, error, panic)
+
+
+def safe(f):
+    &#34;&#34;&#34;
+    Ensures a function retuning an IO never raise any exception but returns a
+    panic instead.
+    &#34;&#34;&#34;
+
+    def wrapper(*args, **kwargs):
+        return defer_io(lambda: g(*args, **kwargs))
+
+    return wrapper</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="raffiot.untyped.io.defer"><code class="name flex">
+<span>def <span class="ident">defer</span></span>(<span>deferred)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Defer a computation.</p>
+<p>The result of the computation is the result of deferred() but
+this call is deferred until the IO is run.</p>
+<p>/!\ <strong>VERY IMPORTANT</strong> /!\</p>
+<p>This is the only valid way to execute side effects.
+All side effect should we wrapped by:
+defer(lambda: <your side effecting code>)</p>
+<p>For example, the following code is buggy:</p>
+<pre><code>&gt;&gt;&gt; hello: IO[None, None, None] = pure(print("Hello World!"))
+"Hello World!" is printed
+
+&gt;&gt;&gt; hello.run(None)
+Nothing printed
+</code></pre>
+<p>The correct version is:</p>
+<pre><code>&gt;&gt;&gt; hello: IO[None, None, None] = defer(lambda: print("Hello World!"))
+Nothing is printed
+
+&gt;&gt;&gt; hello.run(None)
+"Hello World!" is printed
+
+&gt;&gt;&gt; hello.run(None)
+"Hello World!" is printed again
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer(deferred):
+    &#34;&#34;&#34;
+    Defer a computation.
+
+    The result of the computation is the result of deferred() but
+    this call is deferred until the IO is run.
+
+    /!\\ **VERY IMPORTANT** /!\\
+
+    This is the only valid way to execute side effects.
+    All side effect should we wrapped by:
+        defer(lambda: &lt;your side effecting code&gt;)
+
+    For example, the following code is buggy:
+
+        &gt;&gt;&gt; hello: IO[None, None, None] = pure(print(&#34;Hello World!&#34;))
+        &#34;Hello World!&#34; is printed
+
+        &gt;&gt;&gt; hello.run(None)
+        Nothing printed
+
+    The correct version is:
+
+        &gt;&gt;&gt; hello: IO[None, None, None] = defer(lambda: print(&#34;Hello World!&#34;))
+        Nothing is printed
+
+        &gt;&gt;&gt; hello.run(None)
+        &#34;Hello World!&#34; is printed
+
+        &gt;&gt;&gt; hello.run(None)
+        &#34;Hello World!&#34; is printed again
+    &#34;&#34;&#34;
+    return IO(5, deferred)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.defer_io"><code class="name flex">
+<span>def <span class="ident">defer_io</span></span>(<span>deferred)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Make a function that returns an IO, an IO itself.</p>
+<p>This is extremely useful with recursive function that would normally blow
+the stack (raise a stack overflow exception). Deferring recursive calls
+eliminates stack overflow.</p>
+<p>For example, the following code blow the stack:</p>
+<pre><code>&gt;&gt;&gt; def f() -&gt; IO[None,None,None]:
+&gt;&gt;&gt;    return f()
+&gt;&gt;&gt; f().run(None)
+RecursionError: maximum recursion depth exceeded
+</code></pre>
+<p>But, this one runs forever:</p>
+<pre><code>&gt;&gt; def f() -&gt; IO[None,None,None]:
+&gt;&gt;    return defer_io(lambda: f())
+&gt;&gt; f().run(None)
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer_io(deferred):
+    &#34;&#34;&#34;
+    Make a function that returns an IO, an IO itself.
+
+    This is extremely useful with recursive function that would normally blow
+    the stack (raise a stack overflow exception). Deferring recursive calls
+    eliminates stack overflow.
+
+    For example, the following code blow the stack:
+
+        &gt;&gt;&gt; def f() -&gt; IO[None,None,None]:
+        &gt;&gt;&gt;    return f()
+        &gt;&gt;&gt; f().run(None)
+        RecursionError: maximum recursion depth exceeded
+
+    But, this one runs forever:
+
+        &gt;&gt; def f() -&gt; IO[None,None,None]:
+        &gt;&gt;    return defer_io(lambda: f())
+        &gt;&gt; f().run(None)
+    &#34;&#34;&#34;
+    return IO(6, deferred)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.error"><code class="name flex">
+<span>def <span class="ident">error</span></span>(<span>err)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Computation that fails on the error err.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def error(err):
+    &#34;&#34;&#34;
+    Computation that fails on the error err.
+    &#34;&#34;&#34;
+    return IO(9, err)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.from_result"><code class="name flex">
+<span>def <span class="ident">from_result</span></span>(<span>r)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Computation that:
+- success if r is an <code>Ok</code>
+- fails with error e if r is <code>Error(e)</code>
+- fails with panic p if r is <code>Panic(p)</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def from_result(r):
+    &#34;&#34;&#34;
+    Computation that:
+    - success if r is an `Ok`
+    - fails with error e if r is `Error(e)`
+    - fails with panic p if r is `Panic(p)`
+    &#34;&#34;&#34;
+    return r.fold(pure, error, panic)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.panic"><code class="name flex">
+<span>def <span class="ident">panic</span></span>(<span>exception)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Computation that fails with the panic exception.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def panic(exception):
+    &#34;&#34;&#34;
+    Computation that fails with the panic exception.
+    &#34;&#34;&#34;
+    return IO(12, exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.pure"><code class="name flex">
+<span>def <span class="ident">pure</span></span>(<span>a)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>An always successful computation returning a.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def pure(a):
+    &#34;&#34;&#34;
+    An always successful computation returning a.
+    &#34;&#34;&#34;
+    return IO(0, a)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.read"><code class="name flex">
+<span>def <span class="ident">read</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Read the context.</p>
+<p>To execute a computation <code><a title="raffiot.untyped.io.IO" href="#raffiot.untyped.io.IO">IO</a>[R,E,A]</code>, you need to call the run method with
+some value r of type R: <code>io.run(r)</code>. the read() action returns the value r
+given to run.</p>
+<p>Please note that the contra_map_read method can transform this value r.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def read():
+    &#34;&#34;&#34;
+    Read the context.
+
+    To execute a computation `IO[R,E,A]`, you need to call the run method with
+    some value r of type R: `io.run(r)`. the read() action returns the value r
+    given to run.
+
+    Please note that the contra_map_read method can transform this value r.
+    &#34;&#34;&#34;
+    return IO(7, None)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.safe"><code class="name flex">
+<span>def <span class="ident">safe</span></span>(<span>f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Ensures a function retuning an IO never raise any exception but returns a
+panic instead.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def safe(f):
+    &#34;&#34;&#34;
+    Ensures a function retuning an IO never raise any exception but returns a
+    panic instead.
+    &#34;&#34;&#34;
+
+    def wrapper(*args, **kwargs):
+        return defer_io(lambda: g(*args, **kwargs))
+
+    return wrapper</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="raffiot.untyped.io.IO"><code class="flex name class">
+<span>class <span class="ident">IO</span></span>
+<span>(</span><span>_IO__tag, _IO__fields)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Represent a computation that computes a value of type A,
+may fail with an error (expected failure) of type E and have access
+anytime to a read-only context of type R.</p>
+<p>/!\ <strong>VERY IMPORTANT</strong> /!\</p>
+<ol>
+<li><strong>DO NEVER SUB-CLASS IO</strong>: it would break the API.</li>
+<li><strong>DO NEVER INSTANTIATE an IO DIRECTLY</strong>: use <strong>only</strong> the functions
+ands methods in this module.</li>
+<li>The IO is <strong>LAZY</strong>:
+no code is run until you invoke the run method.</li>
+<li>The IO never raises exceptions (unless there is a bug):
+it returns panics instead.</li>
+<li>The IO is stack-safe, but you need to make sure your own code is too!
+use defer and defer_io to avoid stack-overflow.</li>
+</ol>
+<p>Have a look to the documentation and examples to learn how to use it.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class IO:
+    &#34;&#34;&#34;
+    Represent a computation that computes a value of type A,
+    may fail with an error (expected failure) of type E and have access
+    anytime to a read-only context of type R.
+
+    /!\\ **VERY IMPORTANT** /!\\
+
+    1. **DO NEVER SUB-CLASS IO**: it would break the API.
+    2. **DO NEVER INSTANTIATE an IO DIRECTLY**: use **only** the functions
+       ands methods in this module.
+    3. The IO is **LAZY**:
+        no code is run until you invoke the run method.
+    4. The IO never raises exceptions (unless there is a bug):
+        it returns panics instead.
+    5. The IO is stack-safe, but you need to make sure your own code is too!
+        use defer and defer_io to avoid stack-overflow.
+
+    Have a look to the documentation and examples to learn how to use it.
+    &#34;&#34;&#34;
+
+    __slots__ = &#34;__tag&#34;, &#34;__fields&#34;
+
+    def __init__(self, __tag, __fields):
+        self.__tag = __tag
+        self.__fields = __fields
+
+    def map(self, f):
+        &#34;&#34;&#34;
+        Transform the computed value with f if the computation is successful.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(1, (self, f))
+
+    def flat_map(self, f):
+        &#34;&#34;&#34;
+        Chain two computations.
+        The result of the first one (self) can be used in the second (f).
+        &#34;&#34;&#34;
+        return IO(2, (self, f))
+
+    def then(self, io):
+        &#34;&#34;&#34;
+        Chain two computations.
+        The result of the first one (self) is dropped.
+        &#34;&#34;&#34;
+        return self.flat_map(lambda _: io)
+
+    def ap(self, arg):
+        &#34;&#34;&#34;
+        Noting functions from X to A: `X -&gt; A`
+
+        If self computes a function `f: X -&gt; A`
+        and arg computes a value `x: X`
+        then self.ap(arg) computes `f(x): A`
+        &#34;&#34;&#34;
+        return IO(3, (self, arg))
+
+    def flatten(self):
+        &#34;&#34;&#34;
+        Concatenation function on IO
+        &#34;&#34;&#34;
+        if self.__tag == 0:
+            return self.__fields
+        return IO(4, self)
+
+    # Reader API
+
+    def contra_map_read(self, f):
+        &#34;&#34;&#34;
+        Transform the context with f.
+        Note that f is not from R to R2 but from R2 to R!
+        &#34;&#34;&#34;
+        return IO(8, (f, self))
+
+    # Error API
+
+    def catch(self, handler):
+        &#34;&#34;&#34;
+        React to errors (the except part of a try-except).
+
+        On error, call the handler with the error.
+        &#34;&#34;&#34;
+        return IO(10, (self, handler))
+
+    def map_error(self, f):
+        &#34;&#34;&#34;
+        Transform the stored error if the computation fails on an error.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(11, (self, f))
+
+    # Panic
+
+    def recover(self, handler):
+        &#34;&#34;&#34;
+        React to panics (the except part of a try-except).
+
+        On panic, call the handler with the exception.
+        &#34;&#34;&#34;
+        return IO(13, (self, handler))
+
+    def map_panic(self, f):
+        &#34;&#34;&#34;
+        Transform the exception stored if the computation fails on a panic.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(14, (self, f))
+
+    def run(self, context):
+        &#34;&#34;&#34;
+        Run the computation.
+
+        Note that a IO is a data structure, no action is performed until you
+        call run. You may view an IO value as a function declaration.
+        Declaring a function does not execute its body. Only calling the
+        function does. Likewise, declaring an IO does not execute its content,
+        only running the IO does.
+
+        Note that the return value is a  `Result`.
+        No exception will be raised by run (unless there is a bug), run will
+        returns a panic instead!
+        &#34;&#34;&#34;
+        ctxt = context
+        io = self
+        cont = [0]
+        arg_tag = None
+        arg_value = None
+        # CONT ID        0
+        # CONT MAP       1 CONT FUN
+        # CONT FLATMAP1  2 CONT CONTEXT HANDLER
+        # CONT AP1       3 CONT CONTEXT IO
+        # CONT AP2       4 CONT FUN
+        # CONT FLATTEN   5 CONT CONTEXT
+        # CONT CATCH     6 CONT CONTEXT HANDLER
+        # CONT MAP_ERROR 7 CONT FUN
+        # CONT RECOVER   8 CONT CONTEXT HANDLER
+        # CONT MAP_PANIC 9 CONT FUN
+
+        while True:
+            # Eval IO
+            while True:
+                tag = io.__tag
+                if tag == 0:  # PURE
+                    arg_tag = 0
+                    arg_value = io.__fields
+                    break
+                if tag == 1:  # MAP
+                    cont.append(io.__fields[1])
+                    cont.append(1)
+                    io = io.__fields[0]
+                    continue
+                if tag == 2:  # FLATMAP
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(2)
+                    io = io.__fields[0]
+                    continue
+                if tag == 3:  # AP
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(3)
+                    io = io.__fields[0]
+                    continue
+                if tag == 4:  # FLATTEN
+                    cont.append(ctxt)
+                    cont.append(5)
+                    io = io.__fields
+                    continue
+                if tag == 5:  # DEREF
+                    try:
+                        arg_tag = 0
+                        arg_value = io.__fields()
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    break
+                if tag == 6:  # DEREF_IO
+                    try:
+                        io = io.__fields()
+                        continue
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                        break
+                if tag == 7:  # READ
+                    arg_tag = 0
+                    arg_value = ctxt
+                    break
+                if tag == 8:  # MAP READ
+                    try:
+                        ctxt = io.__fields[0](ctxt)
+                        io = io.__fields[1]
+                        continue
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                        break
+                if tag == 9:  # RAISE
+                    arg_tag = 1
+                    arg_value = io.__fields
+                    break
+                if tag == 10:  # CATCH
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(6)
+                    io = io.__fields[0]
+                    continue
+                if tag == 11:  # MAP ERROR
+                    cont.append(io.__fields[1])
+                    cont.append(7)
+                    io = io.__fields[0]
+                    continue
+                if tag == 12:  # PANIC
+                    arg_tag = 2
+                    arg_value = io.__fields
+                    break
+                if tag == 13:  # RECOVER
+                    cont.append(io.__fields[1])
+                    cont.append(ctxt)
+                    cont.append(8)
+                    io = io.__fields[0]
+                    continue
+                if tag == 14:  # MAP PANIC
+                    cont.append(io.__fields[1])
+                    cont.append(9)
+                    io = io.__fields[0]
+                    continue
+                arg_tag = 2
+                arg_value = _MatchError(f&#34;{io} should be an IO&#34;)
+                break
+
+            # Eval Cont
+            while True:
+                tag = cont.pop()
+                if tag == 0:  # Cont ID
+                    if arg_tag == 0:
+                        return Ok(arg_value)
+                    if arg_tag == 1:
+                        return Error(arg_value)
+                    if arg_tag == 2:
+                        return Panic(arg_value)
+                    raise _MatchError(f&#34;Wrong result tag {arg_tag}&#34;)
+                if tag == 1:  # Cont MAP
+                    fun = cont.pop()
+                    try:
+                        if arg_tag == 0:
+                            arg_value = fun(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 2:  # Cont FLATMAP
+                    ctxt = cont.pop()
+                    f = cont.pop()
+                    try:
+                        if arg_tag == 0:
+                            io = f(arg_value)
+                            break
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 3:  # Cont AP1
+                    ctxt = cont.pop()
+                    io = cont.pop()
+                    cont.append(arg_value)
+                    cont.append(arg_tag)
+                    cont.append(4)
+                    break
+                if tag == 4:  # Cont AP2
+                    fun_tag = cont.pop()
+                    fun_value = cont.pop()
+                    try:
+                        if fun_tag == 0 and arg_tag == 0:
+                            arg_value = fun_value(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 5:  # Cont Flatten
+                    ctxt = cont.pop()
+                    if arg_tag == 0:
+                        io = arg_value
+                        break
+                    continue
+                if tag == 6:  # Cont CATCH
+                    ctxt = cont.pop()
+                    handler = cont.pop()
+                    try:
+                        if arg_tag == 1:
+                            io = handler(arg_value)
+                            break
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 7:  # Cont MAP ERROR
+                    fun = cont.pop()
+                    try:
+                        if arg_tag == 1:
+                            arg_value = fun(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 8:  # Cont RECOVER
+                    ctxt = cont.pop()
+                    handler = cont.pop()
+                    try:
+                        if arg_tag == 2:
+                            io = handler(arg_value)
+                            break
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                if tag == 9:  # CONT MAP PANIC
+                    fun = cont.pop()
+                    try:
+                        if arg_tag == 2:
+                            arg_value = fun(arg_value)
+                    except Exception as exception:
+                        arg_tag = 2
+                        arg_value = exception
+                    continue
+                raise _MatchError(f&#34;{cont} should be a Cont&#34;)
+
+    def attempt(self):
+        &#34;&#34;&#34;
+        Transform this computation that may fail into a computation
+        that never fails but returns a Result.
+
+        - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+        - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+
+        Note that errors and panics stop the computation, unless a catch or
+        recover reacts to such failures. But using map, flat_map, flatten and
+        ap is sometimes easier than using catch and recover. attempt transforms
+        a failed computation into a successful computation returning a failure,
+        thus enabling you to use map, flat_map, ... to deal with errors.
+        &#34;&#34;&#34;
+        return (
+            self.map(Ok)
+            .catch(lambda x: pure(Error(x)))
+            .recover(lambda x: pure(Panic(x)))
+        )
+
+    def finally_(self, io):
+        &#34;&#34;&#34;
+        After having computed self, but before returning its result,
+        execute the io computation.
+
+        This is extremely useful when you need to perform an action,
+        unconditionally, at the end of a computation, without changing
+        its result, like releasing a resource.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))
+
+    def on_failure(self, handler):
+        &#34;&#34;&#34;
+        Combined form of catch and recover.
+        React to any failure of the computation.
+        Do nothing if the computation is successful.
+
+        - The handler will be called on `Error(e)` if the computation fails with error e.
+        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will never be called on `Ok(a)`.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(
+            lambda r: r.fold(
+                pure,
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
+            )
+        )</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="raffiot.untyped.io.IO.ap"><code class="name flex">
+<span>def <span class="ident">ap</span></span>(<span>self, arg)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Noting functions from X to A: <code>X -&gt; A</code></p>
+<p>If self computes a function <code>f: X -&gt; A</code>
+and arg computes a value <code>x: X</code>
+then self.ap(arg) computes <code>f(x): A</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ap(self, arg):
+    &#34;&#34;&#34;
+    Noting functions from X to A: `X -&gt; A`
+
+    If self computes a function `f: X -&gt; A`
+    and arg computes a value `x: X`
+    then self.ap(arg) computes `f(x): A`
+    &#34;&#34;&#34;
+    return IO(3, (self, arg))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.attempt"><code class="name flex">
+<span>def <span class="ident">attempt</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform this computation that may fail into a computation
+that never fails but returns a Result.</p>
+<ul>
+<li>If <code>self</code> successfully computes a, then <code>self.attempt()</code> successfully computes <code>Ok(a)</code>.</li>
+<li>If <code>self</code> fails on error e, then <code>self.attempt()</code> successfully computes <code>Error(e)</code>.</li>
+<li>If <code>self</code> fails on panic p, then <code>self.attempt()</code> successfully computes <code>Panic(p)</code>.</li>
+</ul>
+<p>Note that errors and panics stop the computation, unless a catch or
+recover reacts to such failures. But using map, flat_map, flatten and
+ap is sometimes easier than using catch and recover. attempt transforms
+a failed computation into a successful computation returning a failure,
+thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def attempt(self):
+    &#34;&#34;&#34;
+    Transform this computation that may fail into a computation
+    that never fails but returns a Result.
+
+    - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+    - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+    - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+
+    Note that errors and panics stop the computation, unless a catch or
+    recover reacts to such failures. But using map, flat_map, flatten and
+    ap is sometimes easier than using catch and recover. attempt transforms
+    a failed computation into a successful computation returning a failure,
+    thus enabling you to use map, flat_map, ... to deal with errors.
+    &#34;&#34;&#34;
+    return (
+        self.map(Ok)
+        .catch(lambda x: pure(Error(x)))
+        .recover(lambda x: pure(Panic(x)))
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.catch"><code class="name flex">
+<span>def <span class="ident">catch</span></span>(<span>self, handler)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to errors (the except part of a try-except).</p>
+<p>On error, call the handler with the error.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def catch(self, handler):
+    &#34;&#34;&#34;
+    React to errors (the except part of a try-except).
+
+    On error, call the handler with the error.
+    &#34;&#34;&#34;
+    return IO(10, (self, handler))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.contra_map_read"><code class="name flex">
+<span>def <span class="ident">contra_map_read</span></span>(<span>self, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the context with f.
+Note that f is not from R to R2 but from R2 to R!</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def contra_map_read(self, f):
+    &#34;&#34;&#34;
+    Transform the context with f.
+    Note that f is not from R to R2 but from R2 to R!
+    &#34;&#34;&#34;
+    return IO(8, (f, self))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.finally_"><code class="name flex">
+<span>def <span class="ident">finally_</span></span>(<span>self, io)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>After having computed self, but before returning its result,
+execute the io computation.</p>
+<p>This is extremely useful when you need to perform an action,
+unconditionally, at the end of a computation, without changing
+its result, like releasing a resource.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def finally_(self, io):
+    &#34;&#34;&#34;
+    After having computed self, but before returning its result,
+    execute the io computation.
+
+    This is extremely useful when you need to perform an action,
+    unconditionally, at the end of a computation, without changing
+    its result, like releasing a resource.
+    &#34;&#34;&#34;
+    return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.flat_map"><code class="name flex">
+<span>def <span class="ident">flat_map</span></span>(<span>self, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Chain two computations.
+The result of the first one (self) can be used in the second (f).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flat_map(self, f):
+    &#34;&#34;&#34;
+    Chain two computations.
+    The result of the first one (self) can be used in the second (f).
+    &#34;&#34;&#34;
+    return IO(2, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.flatten"><code class="name flex">
+<span>def <span class="ident">flatten</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Concatenation function on IO</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flatten(self):
+    &#34;&#34;&#34;
+    Concatenation function on IO
+    &#34;&#34;&#34;
+    if self.__tag == 0:
+        return self.__fields
+    return IO(4, self)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.map"><code class="name flex">
+<span>def <span class="ident">map</span></span>(<span>self, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the computed value with f if the computation is successful.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map(self, f):
+    &#34;&#34;&#34;
+    Transform the computed value with f if the computation is successful.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return IO(1, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.map_error"><code class="name flex">
+<span>def <span class="ident">map_error</span></span>(<span>self, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the stored error if the computation fails on an error.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map_error(self, f):
+    &#34;&#34;&#34;
+    Transform the stored error if the computation fails on an error.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return IO(11, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.map_panic"><code class="name flex">
+<span>def <span class="ident">map_panic</span></span>(<span>self, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the exception stored if the computation fails on a panic.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map_panic(self, f):
+    &#34;&#34;&#34;
+    Transform the exception stored if the computation fails on a panic.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return IO(14, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.on_failure"><code class="name flex">
+<span>def <span class="ident">on_failure</span></span>(<span>self, handler)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Combined form of catch and recover.
+React to any failure of the computation.
+Do nothing if the computation is successful.</p>
+<ul>
+<li>The handler will be called on <code>Error(e)</code> if the computation fails with error e.</li>
+<li>The handler will be called on <code>Panic(p)</code> if the computation fails with panic p.</li>
+<li>The handler will never be called on <code>Ok(a)</code>.</li>
+</ul></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def on_failure(self, handler):
+    &#34;&#34;&#34;
+    Combined form of catch and recover.
+    React to any failure of the computation.
+    Do nothing if the computation is successful.
+
+    - The handler will be called on `Error(e)` if the computation fails with error e.
+    - The handler will be called on `Panic(p)` if the computation fails with panic p.
+    - The handler will never be called on `Ok(a)`.
+    &#34;&#34;&#34;
+    return self.attempt().flat_map(
+        lambda r: r.fold(
+            pure,
+            lambda e: handler(Error(e)),
+            lambda p: handler(Panic(p)),
+        )
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.recover"><code class="name flex">
+<span>def <span class="ident">recover</span></span>(<span>self, handler)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to panics (the except part of a try-except).</p>
+<p>On panic, call the handler with the exception.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def recover(self, handler):
+    &#34;&#34;&#34;
+    React to panics (the except part of a try-except).
+
+    On panic, call the handler with the exception.
+    &#34;&#34;&#34;
+    return IO(13, (self, handler))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.run"><code class="name flex">
+<span>def <span class="ident">run</span></span>(<span>self, context)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run the computation.</p>
+<p>Note that a IO is a data structure, no action is performed until you
+call run. You may view an IO value as a function declaration.
+Declaring a function does not execute its body. Only calling the
+function does. Likewise, declaring an IO does not execute its content,
+only running the IO does.</p>
+<p>Note that the return value is a
+<code>Result</code>.
+No exception will be raised by run (unless there is a bug), run will
+returns a panic instead!</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run(self, context):
+    &#34;&#34;&#34;
+    Run the computation.
+
+    Note that a IO is a data structure, no action is performed until you
+    call run. You may view an IO value as a function declaration.
+    Declaring a function does not execute its body. Only calling the
+    function does. Likewise, declaring an IO does not execute its content,
+    only running the IO does.
+
+    Note that the return value is a  `Result`.
+    No exception will be raised by run (unless there is a bug), run will
+    returns a panic instead!
+    &#34;&#34;&#34;
+    ctxt = context
+    io = self
+    cont = [0]
+    arg_tag = None
+    arg_value = None
+    # CONT ID        0
+    # CONT MAP       1 CONT FUN
+    # CONT FLATMAP1  2 CONT CONTEXT HANDLER
+    # CONT AP1       3 CONT CONTEXT IO
+    # CONT AP2       4 CONT FUN
+    # CONT FLATTEN   5 CONT CONTEXT
+    # CONT CATCH     6 CONT CONTEXT HANDLER
+    # CONT MAP_ERROR 7 CONT FUN
+    # CONT RECOVER   8 CONT CONTEXT HANDLER
+    # CONT MAP_PANIC 9 CONT FUN
+
+    while True:
+        # Eval IO
+        while True:
+            tag = io.__tag
+            if tag == 0:  # PURE
+                arg_tag = 0
+                arg_value = io.__fields
+                break
+            if tag == 1:  # MAP
+                cont.append(io.__fields[1])
+                cont.append(1)
+                io = io.__fields[0]
+                continue
+            if tag == 2:  # FLATMAP
+                cont.append(io.__fields[1])
+                cont.append(ctxt)
+                cont.append(2)
+                io = io.__fields[0]
+                continue
+            if tag == 3:  # AP
+                cont.append(io.__fields[1])
+                cont.append(ctxt)
+                cont.append(3)
+                io = io.__fields[0]
+                continue
+            if tag == 4:  # FLATTEN
+                cont.append(ctxt)
+                cont.append(5)
+                io = io.__fields
+                continue
+            if tag == 5:  # DEREF
+                try:
+                    arg_tag = 0
+                    arg_value = io.__fields()
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                break
+            if tag == 6:  # DEREF_IO
+                try:
+                    io = io.__fields()
+                    continue
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                    break
+            if tag == 7:  # READ
+                arg_tag = 0
+                arg_value = ctxt
+                break
+            if tag == 8:  # MAP READ
+                try:
+                    ctxt = io.__fields[0](ctxt)
+                    io = io.__fields[1]
+                    continue
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                    break
+            if tag == 9:  # RAISE
+                arg_tag = 1
+                arg_value = io.__fields
+                break
+            if tag == 10:  # CATCH
+                cont.append(io.__fields[1])
+                cont.append(ctxt)
+                cont.append(6)
+                io = io.__fields[0]
+                continue
+            if tag == 11:  # MAP ERROR
+                cont.append(io.__fields[1])
+                cont.append(7)
+                io = io.__fields[0]
+                continue
+            if tag == 12:  # PANIC
+                arg_tag = 2
+                arg_value = io.__fields
+                break
+            if tag == 13:  # RECOVER
+                cont.append(io.__fields[1])
+                cont.append(ctxt)
+                cont.append(8)
+                io = io.__fields[0]
+                continue
+            if tag == 14:  # MAP PANIC
+                cont.append(io.__fields[1])
+                cont.append(9)
+                io = io.__fields[0]
+                continue
+            arg_tag = 2
+            arg_value = _MatchError(f&#34;{io} should be an IO&#34;)
+            break
+
+        # Eval Cont
+        while True:
+            tag = cont.pop()
+            if tag == 0:  # Cont ID
+                if arg_tag == 0:
+                    return Ok(arg_value)
+                if arg_tag == 1:
+                    return Error(arg_value)
+                if arg_tag == 2:
+                    return Panic(arg_value)
+                raise _MatchError(f&#34;Wrong result tag {arg_tag}&#34;)
+            if tag == 1:  # Cont MAP
+                fun = cont.pop()
+                try:
+                    if arg_tag == 0:
+                        arg_value = fun(arg_value)
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                continue
+            if tag == 2:  # Cont FLATMAP
+                ctxt = cont.pop()
+                f = cont.pop()
+                try:
+                    if arg_tag == 0:
+                        io = f(arg_value)
+                        break
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                continue
+            if tag == 3:  # Cont AP1
+                ctxt = cont.pop()
+                io = cont.pop()
+                cont.append(arg_value)
+                cont.append(arg_tag)
+                cont.append(4)
+                break
+            if tag == 4:  # Cont AP2
+                fun_tag = cont.pop()
+                fun_value = cont.pop()
+                try:
+                    if fun_tag == 0 and arg_tag == 0:
+                        arg_value = fun_value(arg_value)
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                continue
+            if tag == 5:  # Cont Flatten
+                ctxt = cont.pop()
+                if arg_tag == 0:
+                    io = arg_value
+                    break
+                continue
+            if tag == 6:  # Cont CATCH
+                ctxt = cont.pop()
+                handler = cont.pop()
+                try:
+                    if arg_tag == 1:
+                        io = handler(arg_value)
+                        break
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                continue
+            if tag == 7:  # Cont MAP ERROR
+                fun = cont.pop()
+                try:
+                    if arg_tag == 1:
+                        arg_value = fun(arg_value)
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                continue
+            if tag == 8:  # Cont RECOVER
+                ctxt = cont.pop()
+                handler = cont.pop()
+                try:
+                    if arg_tag == 2:
+                        io = handler(arg_value)
+                        break
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                continue
+            if tag == 9:  # CONT MAP PANIC
+                fun = cont.pop()
+                try:
+                    if arg_tag == 2:
+                        arg_value = fun(arg_value)
+                except Exception as exception:
+                    arg_tag = 2
+                    arg_value = exception
+                continue
+            raise _MatchError(f&#34;{cont} should be a Cont&#34;)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.then"><code class="name flex">
+<span>def <span class="ident">then</span></span>(<span>self, io)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Chain two computations.
+The result of the first one (self) is dropped.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def then(self, io):
+    &#34;&#34;&#34;
+    Chain two computations.
+    The result of the first one (self) is dropped.
+    &#34;&#34;&#34;
+    return self.flat_map(lambda _: io)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="raffiot.untyped" href="index.html">raffiot.untyped</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="two-column">
+<li><code><a title="raffiot.untyped.io.defer" href="#raffiot.untyped.io.defer">defer</a></code></li>
+<li><code><a title="raffiot.untyped.io.defer_io" href="#raffiot.untyped.io.defer_io">defer_io</a></code></li>
+<li><code><a title="raffiot.untyped.io.error" href="#raffiot.untyped.io.error">error</a></code></li>
+<li><code><a title="raffiot.untyped.io.from_result" href="#raffiot.untyped.io.from_result">from_result</a></code></li>
+<li><code><a title="raffiot.untyped.io.panic" href="#raffiot.untyped.io.panic">panic</a></code></li>
+<li><code><a title="raffiot.untyped.io.pure" href="#raffiot.untyped.io.pure">pure</a></code></li>
+<li><code><a title="raffiot.untyped.io.read" href="#raffiot.untyped.io.read">read</a></code></li>
+<li><code><a title="raffiot.untyped.io.safe" href="#raffiot.untyped.io.safe">safe</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="raffiot.untyped.io.IO" href="#raffiot.untyped.io.IO">IO</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.untyped.io.IO.ap" href="#raffiot.untyped.io.IO.ap">ap</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.attempt" href="#raffiot.untyped.io.IO.attempt">attempt</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.catch" href="#raffiot.untyped.io.IO.catch">catch</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.contra_map_read" href="#raffiot.untyped.io.IO.contra_map_read">contra_map_read</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.finally_" href="#raffiot.untyped.io.IO.finally_">finally_</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.flat_map" href="#raffiot.untyped.io.IO.flat_map">flat_map</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.flatten" href="#raffiot.untyped.io.IO.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.map" href="#raffiot.untyped.io.IO.map">map</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.map_error" href="#raffiot.untyped.io.IO.map_error">map_error</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.map_panic" href="#raffiot.untyped.io.IO.map_panic">map_panic</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.on_failure" href="#raffiot.untyped.io.IO.on_failure">on_failure</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.recover" href="#raffiot.untyped.io.IO.recover">recover</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.run" href="#raffiot.untyped.io.IO.run">run</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.then" href="#raffiot.untyped.io.IO.then">then</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.2</a>.</p>
+</footer>
+</body>
+</html>
