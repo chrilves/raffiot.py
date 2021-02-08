@@ -145,9 +145,9 @@ class Result(Generic[E, A]):
         :return: the "same" result with the stored value transformed.
         """
         return self.fold(
-            safe(lambda x: Ok(f(x))),
-            safe(lambda x: Error(g(x))),
-            safe(lambda x: Panic(h(x))),
+            lambda x: Ok(safe(f)(x)),
+            lambda x: Error(safe(g)(x)),
+            lambda x: Panic(safe(h)(x)),
         )
 
     @final
@@ -199,7 +199,6 @@ class Result(Generic[E, A]):
         return self.flat_map(lambda x: x)
 
     @final
-    @safe
     def map_error(self, f: Callable[[E], E2]) -> Result[E2, A]:
         """
         Transform the error stored if this result is an `Error`.
@@ -207,7 +206,7 @@ class Result(Generic[E, A]):
         :return:
         """
         if isinstance(self, Error):
-            return Error(f(self.error))
+            return Error(safe(f)(self.error))
         return self  # type: ignore
 
     @final
