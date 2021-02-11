@@ -20,3 +20,14 @@ class TestResult(TestCase):
     @given(st.text())
     def test_recover(self, i: int) -> None:
         assert pure(1).map(lambda x: x / 0).recover(lambda x: pure(i)) == pure(i)
+
+    @given(st.lists(st.integers()))
+    def test_traverse(self, l: List[int]) -> None:
+        var = []
+
+        def f(x: int) -> Result[None, int]:
+            var.append(x)
+            return pure(x * 2)
+
+        assert traverse(l, f) == Ok([x * 2 for x in l])
+        assert var == l

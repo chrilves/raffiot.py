@@ -25,3 +25,6 @@ docs: opt
 
 opt:
 	./opt.sh
+env: conda/env.yml
+	conda env remove -n raffiot -y
+	conda env create -f conda/env.yml

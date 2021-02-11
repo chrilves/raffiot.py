@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="raffiot",
-    packages=["raffiot"],
+    packages=["raffiot", "raffiot.untyped"],
     version=version,
     license="Apache 2.0",
     description="Robust And Fast Functional IO Toolkit",

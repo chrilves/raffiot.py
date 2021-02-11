@@ -32,7 +32,7 @@ Data structure representing a computation.
 &#34;&#34;&#34;
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 from raffiot import result, _MatchError
 from raffiot.result import Result, Ok, Error, Panic
@@ -434,7 +434,7 @@ class IO(Generic[R, E, A]):
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
         return self.attempt().flat_map(
-            lambda r: r.fold(
+            lambda r: r.unsafe_fold(
                 pure,
                 lambda e: handler(Error(e)),
                 lambda p: handler(Panic(p)),
@@ -559,7 +559,42 @@ def from_result(r: Result[E, A]) -&gt; IO[R, E, A]:
     - fails with error e if r is `Error(e)`
     - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
-    return r.fold(pure, error, panic)
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Error):
+        return error(r.error)
+    if isinstance(r, Panic):
+        return panic(r.exception)
+    return panic(_MatchError(f&#34;{r} should be a Result&#34;))
+
+
+def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, List[A2]]:
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting IO computes the list of results.
+
+    This function is essentially like map, but f returns IO[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3: List[A2]) -&gt; Callable[[A2], List[A2]]:
+        def do_it(a2: A2) -&gt; List[A2]:
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r
 
 
 def safe(f: Callable[..., IO[R, E, A]]) -&gt; Callable[..., IO[R, E, A]]:
@@ -569,7 +604,7 @@ def safe(f: Callable[..., IO[R, E, A]]) -&gt; Callable[..., IO[R, E, A]]:
     &#34;&#34;&#34;
 
     def wrapper(*args, **kwargs):
-        return defer_io(lambda: g(*args, **kwargs))
+        return defer_io(lambda: f(*args, **kwargs))
 
     return wrapper</code></pre>
 </details>
@@ -730,7 +765,13 @@ RecursionError: maximum recursion depth exceeded
     - fails with error e if r is `Error(e)`
     - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
-    return r.fold(pure, error, panic)</code></pre>
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Error):
+        return error(r.error)
+    if isinstance(r, Panic):
+        return panic(r.exception)
+    return panic(_MatchError(f&#34;{r} should be a Result&#34;))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.panic"><code class="name flex">
@@ -808,9 +849,52 @@ panic instead.</p></div>
     &#34;&#34;&#34;
 
     def wrapper(*args, **kwargs):
-        return defer_io(lambda: g(*args, **kwargs))
+        return defer_io(lambda: f(*args, **kwargs))
 
     return wrapper</code></pre>
+</details>
+</dd>
+<dt id="raffiot.io.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>l: Iterable[A], f: Callable[[A], <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A2]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.List[~A2]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function <code>f</code> to every element of the iterable.
+The resulting IO computes the list of results.</p>
+<p>This function is essentially like map, but f returns IO[R,E,A2] instead of A2.</p>
+<p>:param l: the elements to apply to f
+:param f: the function for each element.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, List[A2]]:
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting IO computes the list of results.
+
+    This function is essentially like map, but f returns IO[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3: List[A2]) -&gt; Callable[[A2], List[A2]]:
+        def do_it(a2: A2) -&gt; List[A2]:
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r</code></pre>
 </details>
 </dd>
 </dl>
@@ -1231,7 +1315,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
         return self.attempt().flat_map(
-            lambda r: r.fold(
+            lambda r: r.unsafe_fold(
                 pure,
                 lambda e: handler(Error(e)),
                 lambda p: handler(Panic(p)),
@@ -1501,7 +1585,7 @@ def on_failure(
     - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
     return self.attempt().flat_map(
-        lambda r: r.fold(
+        lambda r: r.unsafe_fold(
             pure,
             lambda e: handler(Error(e)),
             lambda p: handler(Panic(p)),
@@ -1813,6 +1897,7 @@ def then(self, io: IO[R, E, A2]) -&gt; IO[R, E, A2]:
 <li><code><a title="raffiot.io.pure" href="#raffiot.io.pure">pure</a></code></li>
 <li><code><a title="raffiot.io.read" href="#raffiot.io.read">read</a></code></li>
 <li><code><a title="raffiot.io.safe" href="#raffiot.io.safe">safe</a></code></li>
+<li><code><a title="raffiot.io.traverse" href="#raffiot.io.traverse">traverse</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

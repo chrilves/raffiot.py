@@ -4,7 +4,7 @@ Ensure that create resources are always nicely released after use.
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any, Tuple
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 from typing_extensions import final
 from dataclasses import dataclass
 from raffiot import result, io
@@ -384,3 +384,34 @@ def from_with(expr: Callable[[], Any]) -> Resource[R, E, A]:
         (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
 
     return Resource(io.defer(manager_handler))
+
+
+def traverse(
+    l: Iterable[A], f: Callable[[A], Resource[R, E, A2]]
+) -> Resource[R, E, List[A2]]:
+    """
+    Apply the function `f` to every element of the iterable.
+    The resulting Resource creates the list of all the resources.
+
+    This function is essentially like map, but f returns Resource[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    """
+
+    def append(l3: List[A2]) -> Callable[[A2], List[A2]]:
+        def do_it(a2: A2) -> List[A2]:
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r

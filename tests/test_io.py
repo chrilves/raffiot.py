@@ -145,3 +145,13 @@ class TestResource(TestCase):
                 return pure(j).flat_map(lambda x: f(j - 1).map(lambda y: x + y))
 
         assert f(i).run(None) == result.Ok(i * (i + 1) / 2) if i >= 0 else 0
+
+    @given(st.lists(st.integers()))
+    def test_traverse(self, l: List[int]) -> None:
+        var = []
+
+        def f(x: int) -> IO[None, None, int]:
+            return defer(lambda: var.append(x)).then(pure(x * 2))
+
+        assert traverse(l, f).run(None) == Ok([x * 2 for x in l])
+        assert var == l

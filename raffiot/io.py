@@ -3,7 +3,7 @@ Data structure representing a computation.
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 from raffiot import result, _MatchError
 from raffiot.result import Result, Ok, Error, Panic
@@ -405,7 +405,7 @@ class IO(Generic[R, E, A]):
         - The handler will never be called on `Ok(a)`.
         """
         return self.attempt().flat_map(
-            lambda r: r.fold(
+            lambda r: r.unsafe_fold(
                 pure,
                 lambda e: handler(Error(e)),
                 lambda p: handler(Panic(p)),
@@ -530,7 +530,42 @@ def from_result(r: Result[E, A]) -> IO[R, E, A]:
     - fails with error e if r is `Error(e)`
     - fails with panic p if r is `Panic(p)`
     """
-    return r.fold(pure, error, panic)
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Error):
+        return error(r.error)
+    if isinstance(r, Panic):
+        return panic(r.exception)
+    return panic(_MatchError(f"{r} should be a Result"))
+
+
+def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, List[A2]]:
+    """
+    Apply the function `f` to every element of the iterable.
+    The resulting IO computes the list of results.
+
+    This function is essentially like map, but f returns IO[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    """
+
+    def append(l3: List[A2]) -> Callable[[A2], List[A2]]:
+        def do_it(a2: A2) -> List[A2]:
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r
 
 
 def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:
@@ -540,6 +575,6 @@ def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:
     """
 
     def wrapper(*args, **kwargs):
-        return defer_io(lambda: g(*args, **kwargs))
+        return defer_io(lambda: f(*args, **kwargs))
 
     return wrapper

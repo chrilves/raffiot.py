@@ -407,7 +407,7 @@ class IO:
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
         return self.attempt().flat_map(
-            lambda r: r.fold(
+            lambda r: r.unsafe_fold(
                 pure,
                 lambda e: handler(Error(e)),
                 lambda p: handler(Panic(p)),
@@ -532,7 +532,42 @@ def from_result(r):
     - fails with error e if r is `Error(e)`
     - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
-    return r.fold(pure, error, panic)
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Error):
+        return error(r.error)
+    if isinstance(r, Panic):
+        return panic(r.exception)
+    return panic(_MatchError(f&#34;{r} should be a Result&#34;))
+
+
+def traverse(l, f):
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting IO computes the list of results.
+
+    This function is essentially like map, but f returns IO[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3):
+        def do_it(a2):
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r
 
 
 def safe(f):
@@ -542,7 +577,7 @@ def safe(f):
     &#34;&#34;&#34;
 
     def wrapper(*args, **kwargs):
-        return defer_io(lambda: g(*args, **kwargs))
+        return defer_io(lambda: f(*args, **kwargs))
 
     return wrapper</code></pre>
 </details>
@@ -703,7 +738,13 @@ RecursionError: maximum recursion depth exceeded
     - fails with error e if r is `Error(e)`
     - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
-    return r.fold(pure, error, panic)</code></pre>
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Error):
+        return error(r.error)
+    if isinstance(r, Panic):
+        return panic(r.exception)
+    return panic(_MatchError(f&#34;{r} should be a Result&#34;))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.io.panic"><code class="name flex">
@@ -781,9 +822,52 @@ panic instead.</p></div>
     &#34;&#34;&#34;
 
     def wrapper(*args, **kwargs):
-        return defer_io(lambda: g(*args, **kwargs))
+        return defer_io(lambda: f(*args, **kwargs))
 
     return wrapper</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>l, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function <code>f</code> to every element of the iterable.
+The resulting IO computes the list of results.</p>
+<p>This function is essentially like map, but f returns IO[R,E,A2] instead of A2.</p>
+<p>:param l: the elements to apply to f
+:param f: the function for each element.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(l, f):
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting IO computes the list of results.
+
+    This function is essentially like map, but f returns IO[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3):
+        def do_it(a2):
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r</code></pre>
 </details>
 </dd>
 </dl>
@@ -1187,7 +1271,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
         return self.attempt().flat_map(
-            lambda r: r.fold(
+            lambda r: r.unsafe_fold(
                 pure,
                 lambda e: handler(Error(e)),
                 lambda p: handler(Panic(p)),
@@ -1440,7 +1524,7 @@ Do nothing if the computation is successful.</p>
     - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
     return self.attempt().flat_map(
-        lambda r: r.fold(
+        lambda r: r.unsafe_fold(
             pure,
             lambda e: handler(Error(e)),
             lambda p: handler(Panic(p)),
@@ -1749,6 +1833,7 @@ The result of the first one (self) is dropped.</p></div>
 <li><code><a title="raffiot.untyped.io.pure" href="#raffiot.untyped.io.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.io.read" href="#raffiot.untyped.io.read">read</a></code></li>
 <li><code><a title="raffiot.untyped.io.safe" href="#raffiot.untyped.io.safe">safe</a></code></li>
+<li><code><a title="raffiot.untyped.io.traverse" href="#raffiot.untyped.io.traverse">traverse</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

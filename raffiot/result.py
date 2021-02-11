@@ -3,7 +3,7 @@ Data structure to represent the result of computation.
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 from dataclasses import dataclass
 from raffiot import _MatchError
@@ -71,7 +71,7 @@ class Result(Generic[E, A]):
     """
 
     @final
-    def fold(
+    def unsafe_fold(
         self,
         on_success: Callable[[A], X],
         on_error: Callable[[E], X],
@@ -93,7 +93,26 @@ class Result(Generic[E, A]):
         raise _MatchError(f"{self} should be a Result")
 
     @final
-    def fold_raise(self, on_success: Callable[[A], X], on_error: Callable[[E], X]) -> X:
+    @safe
+    def fold(
+        self,
+        on_success: Callable[[A], X],
+        on_error: Callable[[E], X],
+        on_panic: Callable[[Exception], X],
+    ) -> X:
+        """
+        Transform this Result[E,A] into X.
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
+        :param on_panic: is called if this result is a `Panic`.
+        :return:
+        """
+        return self.unsafe_fold(on_success, on_error, on_panic)
+
+    @final
+    def unsafe_fold_raise(
+        self, on_success: Callable[[A], X], on_error: Callable[[E], X]
+    ) -> X:
         """
         Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
         But raise the stored exception is this is a panic.
@@ -113,7 +132,22 @@ class Result(Generic[E, A]):
         raise _MatchError(f"{self} should be a Result")
 
     @final
-    def flat_map(self, f: Callable[[A], Result[E, A2]]) -> Result[E, A2]:
+    @safe
+    def fold_raise(self, on_success: Callable[[A], X], on_error: Callable[[E], X]) -> X:
+        """
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
+        But raise the stored exception is this is a panic.
+
+        It is useful to raise an exception on panics.
+
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
+        :return:
+        """
+        return self.unsafe_fold_raise(on_success, on_error)
+
+    @final
+    def unsafe_flat_map(self, f: Callable[[A], Result[E, A2]]) -> Result[E, A2]:
         """
         The usual monadic operation called
             - bind, >>=: in Haskell
@@ -127,10 +161,48 @@ class Result(Generic[E, A]):
         :return: the result combined result.
         """
         if isinstance(self, Ok):
-            return safe(f)(self.success)
+            return f(self.success)
         return self
 
     @final
+    @safe
+    def flat_map(self, f: Callable[[A], Result[E, A2]]) -> Result[E, A2]:
+        """
+        The usual monadic operation called
+            - bind, >>=: in Haskell
+            - flatMap: in Scala
+            - andThem: in Elm
+            ...
+
+        Chain operations returning results.
+
+        :param f: operation to perform it this result is an `Ok`.
+        :return: the result combined result.
+        """
+        return self.unsafe_flat_map(f)
+
+    @final
+    def unsafe_tri_map(
+        self,
+        f: Callable[[A], A2],
+        g: Callable[[E], E2],
+        h: Callable[[Exception], Exception],
+    ) -> Result[E2, A2]:
+        """
+        Transform the value/error/exception stored in this result.
+        :param f: how to transform the value a if this result is `Ok(a)`
+        :param g: how to transform the error e if this result is `Error(e)`
+        :param h: how to transform the exception p if this result is `Panic(p)`
+        :return: the "same" result with the stored value transformed.
+        """
+        return self.unsafe_fold(
+            lambda x: Ok(f(x)),
+            lambda x: Error(g(x)),
+            lambda x: Panic(h(x)),
+        )
+
+    @final
+    @safe
     def tri_map(
         self,
         f: Callable[[A], A2],
@@ -144,11 +216,7 @@ class Result(Generic[E, A]):
         :param h: how to transform the exception p if this result is `Panic(p)`
         :return: the "same" result with the stored value transformed.
         """
-        return self.fold(
-            lambda x: Ok(safe(f)(x)),
-            lambda x: Error(safe(g)(x)),
-            lambda x: Panic(safe(h)(x)),
-        )
+        return self.unsafe_tri_map(f, g, h)
 
     @final
     def is_ok(self) -> bool:
@@ -172,15 +240,39 @@ class Result(Generic[E, A]):
         return isinstance(self, Panic)
 
     @final
+    def unsafe_map(self, f: Callable[[A], A2]) -> Result[E, A2]:
+        """
+        Transform the value stored in `Ok`, it this result is an `Ok`.
+        :param f: the transformation function.
+        :return:
+        """
+        if isinstance(self, Ok):
+            return Ok(f(self.success))
+        return self
+
+    @final
+    @safe
     def map(self, f: Callable[[A], A2]) -> Result[E, A2]:
         """
         Transform the value stored in `Ok`, it this result is an `Ok`.
         :param f: the transformation function.
         :return:
         """
-        return self.flat_map(lambda x: Ok(f(x)))
+        return self.unsafe_map(f)
 
     @final
+    def unsafe_ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -> Result[E, A]:
+        """
+        Noting functions from X to A: `X -> A`.
+
+        If this result represent a computation returning a function `f: X -> A`
+        and arg represent a computation returning a value `x: X`, then
+        `self.ap(arg)` represents the computation returning `f(x): A`.
+        """
+        return self.unsafe_flat_map(lambda f: arg.unsafe_map(f))
+
+    @final
+    @safe
     def ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -> Result[E, A]:
         """
         Noting functions from X to A: `X -> A`.
@@ -189,28 +281,40 @@ class Result(Generic[E, A]):
         and arg represent a computation returning a value `x: X`, then
         `self.ap(arg)` represents the computation returning `f(x): A`.
         """
-        return self.flat_map(lambda f: arg.map(f))
+        return self.unsafe_ap(arg)
 
     @final
     def flatten(self: Result[E, Result[E, A]]) -> Result[E, A]:
         """
         The concatenation function on results.
         """
-        return self.flat_map(lambda x: x)
+        if isinstance(self, Ok):
+            return self.success
+        return self
 
     @final
-    def map_error(self, f: Callable[[E], E2]) -> Result[E2, A]:
+    def unsafe_map_error(self, f: Callable[[E], E2]) -> Result[E2, A]:
         """
         Transform the error stored if this result is an `Error`.
         :param f: the transformation function
         :return:
         """
         if isinstance(self, Error):
-            return Error(safe(f)(self.error))
+            return Error(f(self.error))
         return self  # type: ignore
 
     @final
-    def catch(self, handler: Callable[[E], Result[E, A]]) -> Result[E, A]:
+    @safe
+    def map_error(self, f: Callable[[E], E2]) -> Result[E2, A]:
+        """
+        Transform the error stored if this result is an `Error`.
+        :param f: the transformation function
+        :return:
+        """
+        return self.unsafe_map_error(f)
+
+    @final
+    def unsafe_catch(self, handler: Callable[[E], Result[E, A]]) -> Result[E, A]:
         """
         React to errors (the except part of a try-except).
 
@@ -222,7 +326,18 @@ class Result(Generic[E, A]):
         return self
 
     @final
-    def map_panic(self, f: Callable[[Exception], Exception]) -> Result[E, A]:
+    @safe
+    def catch(self, handler: Callable[[E], Result[E, A]]) -> Result[E, A]:
+        """
+        React to errors (the except part of a try-except).
+
+        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        Otherwise, do nothing.
+        """
+        return self.unsafe_catch(handler)
+
+    @final
+    def unsafe_map_panic(self, f: Callable[[Exception], Exception]) -> Result[E, A]:
         """
         Transform the exception stored if this result is a `Panic(some_exception)`.
         """
@@ -231,7 +346,17 @@ class Result(Generic[E, A]):
         return self
 
     @final
-    def recover(self, handler: Callable[[Exception], Result[E, A]]) -> Result[E, A]:
+    @safe
+    def map_panic(self, f: Callable[[Exception], Exception]) -> Result[E, A]:
+        """
+        Transform the exception stored if this result is a `Panic(some_exception)`.
+        """
+        return self.unsafe_map_panic(f)
+
+    @final
+    def unsafe_recover(
+        self, handler: Callable[[Exception], Result[E, A]]
+    ) -> Result[E, A]:
         """
         React to panics (the except part of a try-except).
 
@@ -241,6 +366,17 @@ class Result(Generic[E, A]):
         if isinstance(self, Panic):
             return handler(self.exception)
         return self
+
+    @final
+    @safe
+    def recover(self, handler: Callable[[Exception], Result[E, A]]) -> Result[E, A]:
+        """
+        React to panics (the except part of a try-except).
+
+        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        Otherwise do nothing.
+        """
+        return self.unsafe_recover(handler)
 
     @final
     def raise_on_panic(self) -> Result[E, A]:
@@ -306,6 +442,36 @@ def panic(exception: Exception) -> Result[Any, Any]:
     Alias for `Panic(exception)`.
     """
     return Panic(exception)
+
+
+@safe
+def traverse(l: Iterable[A], f: Callable[[A], Result[E, A2]]) -> Result[E, List[A2]]:
+    """
+    Apply the function `f` to every element of the iterable.
+    The resulting Result is Ok if all results are Ok.
+
+    This function is essentially like map, but f returns Result[E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    """
+
+    def append(l3: List[A2]) -> Callable[[A2], List[A2]]:
+        def do_it(a2: A2) -> List[A2]:
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.unsafe_flat_map(lambda l2: f(a).unsafe_map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r
 
 
 def returns_result(f: Callable[..., Result[E, A]]) -> Callable[..., Result[E, A]]:

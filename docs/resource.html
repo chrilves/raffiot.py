@@ -35,7 +35,7 @@ Ensure that create resources are always nicely released after use.
 &#34;&#34;&#34;
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any, Tuple
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 from typing_extensions import final
 from dataclasses import dataclass
 from raffiot import result, io
@@ -414,7 +414,38 @@ def from_with(expr: Callable[[], Any]) -&gt; Resource[R, E, A]:
         exit = type(manager).__exit__
         (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
 
-    return Resource(io.defer(manager_handler))</code></pre>
+    return Resource(io.defer(manager_handler))
+
+
+def traverse(
+    l: Iterable[A], f: Callable[[A], Resource[R, E, A2]]
+) -&gt; Resource[R, E, List[A2]]:
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting Resource creates the list of all the resources.
+
+    This function is essentially like map, but f returns Resource[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3: List[A2]) -&gt; Callable[[A2], List[A2]]:
+        def do_it(a2: A2) -&gt; List[A2]:
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r</code></pre>
 </details>
 </section>
 <section>
@@ -678,6 +709,51 @@ given to run.</p>
     Please note that the contra_map_read method can transform this value r.
     &#34;&#34;&#34;
     return liftIO(io.read())</code></pre>
+</details>
+</dd>
+<dt id="raffiot.resource.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>l: Iterable[A], f: Callable[[A], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A2]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A2]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function <code>f</code> to every element of the iterable.
+The resulting Resource creates the list of all the resources.</p>
+<p>This function is essentially like map, but f returns Resource[R,E,A2] instead of A2.</p>
+<p>:param l: the elements to apply to f
+:param f: the function for each element.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(
+    l: Iterable[A], f: Callable[[A], Resource[R, E, A2]]
+) -&gt; Resource[R, E, List[A2]]:
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting Resource creates the list of all the resources.
+
+    This function is essentially like map, but f returns Resource[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3: List[A2]) -&gt; Callable[[A2], List[A2]]:
+        def do_it(a2: A2) -&gt; List[A2]:
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r</code></pre>
 </details>
 </dd>
 </dl>
@@ -1380,6 +1456,7 @@ def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
 <li><code><a title="raffiot.resource.panic" href="#raffiot.resource.panic">panic</a></code></li>
 <li><code><a title="raffiot.resource.pure" href="#raffiot.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.resource.read" href="#raffiot.resource.read">read</a></code></li>
+<li><code><a title="raffiot.resource.traverse" href="#raffiot.resource.traverse">traverse</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

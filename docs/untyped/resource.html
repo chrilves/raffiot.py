@@ -373,7 +373,36 @@ def from_with(expr):
         exit = type(manager).__exit__
         (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
 
-    return Resource(io.defer(manager_handler))</code></pre>
+    return Resource(io.defer(manager_handler))
+
+
+def traverse(l, f):
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting Resource creates the list of all the resources.
+
+    This function is essentially like map, but f returns Resource[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3):
+        def do_it(a2):
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r</code></pre>
 </details>
 </section>
 <section>
@@ -633,6 +662,49 @@ given to run.</p>
     Please note that the contra_map_read method can transform this value r.
     &#34;&#34;&#34;
     return liftIO(io.read())</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>l, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function <code>f</code> to every element of the iterable.
+The resulting Resource creates the list of all the resources.</p>
+<p>This function is essentially like map, but f returns Resource[R,E,A2] instead of A2.</p>
+<p>:param l: the elements to apply to f
+:param f: the function for each element.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(l, f):
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting Resource creates the list of all the resources.
+
+    This function is essentially like map, but f returns Resource[R,E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def append(l3):
+        def do_it(a2):
+            l3.append(a2)
+            return l3
+
+        return do_it
+
+    r = pure([])
+
+    def dumb(r, a):
+        return r.flat_map(lambda l2: f(a).map(append(l2)))
+
+    for a in l:
+        r = dumb(r, a)
+    return r</code></pre>
 </details>
 </dd>
 </dl>
@@ -1278,6 +1350,7 @@ its releasing IO). The return value if the result of fun(a).</p>
 <li><code><a title="raffiot.untyped.resource.panic" href="#raffiot.untyped.resource.panic">panic</a></code></li>
 <li><code><a title="raffiot.untyped.resource.pure" href="#raffiot.untyped.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.resource.read" href="#raffiot.untyped.resource.read">read</a></code></li>
+<li><code><a title="raffiot.untyped.resource.traverse" href="#raffiot.untyped.resource.traverse">traverse</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
