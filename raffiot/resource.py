@@ -5,9 +5,10 @@ Ensure that create resources are always nicely released after use.
 
 from __future__ import annotations
 from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
+from collections import abc
 from typing_extensions import final
 from dataclasses import dataclass
-from raffiot import result, io
+from raffiot import result, io, _MatchError
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
 
@@ -129,17 +130,28 @@ class Resource(Generic[R, E, A]):
         return self.flat_map(lambda _: rs)
 
     @final
-    def ap(
-        self: Resource[R, E, Callable[[X], A2]], rs: Resource[R, E, X]
-    ) -> Resource[R, E, A2]:
+    def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
         """
-        Noting functions from X to A: `X -> A`
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
 
-        If self computes a function `f: X -> A`
-        and arg computes a value `x: X`,
-        then `self.ap(arg)` computes `f(x): A`
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
         """
-        return self.flat_map(lambda f: rs.map(f))
+        return zip((self, *rs))
+
+    @final
+    def ap(
+        self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
+    ) -> Resource[R, E, A]:
+        """
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -> A`.
+
+        If self computes a function `f: [X1,...,XN] -> A`
+        and arg computes a value `x1: X1`,...,`xn: Xn`
+        then self.ap(arg) computes `f(x1,...,xn): A`.
+        """
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
     @final
     def flatten(self: Resource[R, E, Resource[R, E, A]]) -> Resource[R, E, A]:
@@ -386,9 +398,52 @@ def from_with(expr: Callable[[], Any]) -> Resource[R, E, A]:
     return Resource(io.defer(manager_handler))
 
 
+def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
+    """
+    Transform a list of Resource into a Resource creating a list
+    of all resources.
+
+    If once resource creation fails, the whole creation fails.
+    The resources opened are then released.
+    :param rs: the list of resources to pack.
+    :return:
+    """
+    if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
+        args = rs[0]
+    else:
+        args = rs
+
+    def process(l: Result[E, A]):
+        close = []
+        args = []
+        level = 0
+        error = None
+
+        for arg in l:
+            if arg.is_ok():
+                args.append(arg.success[0])
+                close.append(arg.success[1])
+            elif arg.is_error() and level < 1:
+                error = arg
+                level = 1
+            elif arg.is_panic() and level < 2:
+                error = arg
+                level = 2
+            else:
+                level = 2
+                error = Panic(_MatchError(f"{arg} should be a Result "))
+
+        if level == 0:
+            return io.pure((args, io.run_all(close)))
+        else:
+            return io.run_all(close).attempt().then(io.from_result(error))
+
+    return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))
+
+
 def traverse(
     l: Iterable[A], f: Callable[[A], Resource[R, E, A2]]
-) -> Resource[R, E, List[A2]]:
+) -> Resource[R, E, Iterable[A2]]:
     """
     Apply the function `f` to every element of the iterable.
     The resulting Resource creates the list of all the resources.

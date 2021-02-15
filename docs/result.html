@@ -36,6 +36,7 @@ from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 from dataclasses import dataclass
 from raffiot import _MatchError
+from collections import abc
 
 E = TypeVar(&#34;E&#34;)
 A = TypeVar(&#34;A&#34;)
@@ -290,27 +291,42 @@ class Result(Generic[E, A]):
         return self.unsafe_map(f)
 
     @final
-    def unsafe_ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -&gt; Result[E, A]:
+    def zip(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -&gt; Result[E, List[A]]:
         &#34;&#34;&#34;
-        Noting functions from X to A: `X -&gt; A`.
+        Transform a list of Result (including self) into a Result of list.
 
-        If this result represent a computation returning a function `f: X -&gt; A`
-        and arg represent a computation returning a value `x: X`, then
-        `self.ap(arg)` represents the computation returning `f(x): A`.
+        Is Ok is all results are Ok.
+        Is Error some are Ok, but at least one is an error but no panics.
+        Is Panic is there is at least one panic.
         &#34;&#34;&#34;
-        return self.unsafe_flat_map(lambda f: arg.unsafe_map(f))
+        return zip((self, *arg))
+
+    @final
+    def unsafe_ap(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        Noting functions from X to A: `[X1, ..., Xn] -&gt; A`.
+
+        If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+        and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
 
     @final
     @safe
-    def ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -&gt; Result[E, A]:
+    def ap(self: Result[E, Callable[[X], A]], *arg: Result[E, X]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        Noting functions from X to A: `X -&gt; A`.
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
 
-        If this result represent a computation returning a function `f: X -&gt; A`
-        and arg represent a computation returning a value `x: X`, then
-        `self.ap(arg)` represents the computation returning `f(x): A`.
+        If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+        and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.unsafe_ap(arg)
+        return self.unsafe_ap(*arg)
 
     @final
     def flatten(self: Result[E, Result[E, A]]) -&gt; Result[E, A]:
@@ -503,6 +519,29 @@ def traverse(l: Iterable[A], f: Callable[[A], Result[E, A2]]) -&gt; Result[E, Li
     return r
 
 
+def zip(*l: Iterable[Result[E, A]]) -&gt; Result[E, List[A]]:
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        args = l[0]
+    else:
+        args = l
+
+    values = []
+    error = None
+
+    for arg in args:
+        if arg.is_ok():
+            values.append(arg.success)
+        elif arg.is_error() and error is None:
+            error = arg
+        elif arg.is_panic():
+            return arg
+
+    if error is None:
+        return Ok(values)
+    else:
+        return error
+
+
 def returns_result(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E, A]]:
     &#34;&#34;&#34;
     Decorator that transform a function f returning A,
@@ -654,6 +693,38 @@ instead return a panic. This decorator make sure of it.</p>
         return Panic(exception)</code></pre>
 </details>
 </dd>
+<dt id="raffiot.result.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>*l: Iterable[<a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip(*l: Iterable[Result[E, A]]) -&gt; Result[E, List[A]]:
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        args = l[0]
+    else:
+        args = l
+
+    values = []
+    error = None
+
+    for arg in args:
+        if arg.is_ok():
+            values.append(arg.success)
+        elif arg.is_error() and error is None:
+            error = arg
+        elif arg.is_panic():
+            return arg
+
+    if error is None:
+        return Ok(values)
+    else:
+        return error</code></pre>
+</details>
+</dd>
 </dl>
 </section>
 <section>
@@ -711,6 +782,7 @@ class Error(Result[E, A]):
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_recover" href="#raffiot.result.Result.unsafe_recover">unsafe_recover</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_tri_map" href="#raffiot.result.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.result.Result.zip" href="#raffiot.result.Result.zip">zip</a></code></li>
 </ul>
 </li>
 </ul>
@@ -765,6 +837,7 @@ class Ok(Result[E, A]):
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_recover" href="#raffiot.result.Result.unsafe_recover">unsafe_recover</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_tri_map" href="#raffiot.result.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.result.Result.zip" href="#raffiot.result.Result.zip">zip</a></code></li>
 </ul>
 </li>
 </ul>
@@ -821,6 +894,7 @@ class Panic(Result[E, A]):
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_recover" href="#raffiot.result.Result.unsafe_recover">unsafe_recover</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_tri_map" href="#raffiot.result.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.result.Result.zip" href="#raffiot.result.Result.zip">zip</a></code></li>
 </ul>
 </li>
 </ul>
@@ -1085,27 +1159,42 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         return self.unsafe_map(f)
 
     @final
-    def unsafe_ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -&gt; Result[E, A]:
+    def zip(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -&gt; Result[E, List[A]]:
         &#34;&#34;&#34;
-        Noting functions from X to A: `X -&gt; A`.
+        Transform a list of Result (including self) into a Result of list.
 
-        If this result represent a computation returning a function `f: X -&gt; A`
-        and arg represent a computation returning a value `x: X`, then
-        `self.ap(arg)` represents the computation returning `f(x): A`.
+        Is Ok is all results are Ok.
+        Is Error some are Ok, but at least one is an error but no panics.
+        Is Panic is there is at least one panic.
         &#34;&#34;&#34;
-        return self.unsafe_flat_map(lambda f: arg.unsafe_map(f))
+        return zip((self, *arg))
+
+    @final
+    def unsafe_ap(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        Noting functions from X to A: `[X1, ..., Xn] -&gt; A`.
+
+        If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+        and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
 
     @final
     @safe
-    def ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -&gt; Result[E, A]:
+    def ap(self: Result[E, Callable[[X], A]], *arg: Result[E, X]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        Noting functions from X to A: `X -&gt; A`.
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
 
-        If this result represent a computation returning a function `f: X -&gt; A`
-        and arg represent a computation returning a value `x: X`, then
-        `self.ap(arg)` represents the computation returning `f(x): A`.
+        If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+        and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.unsafe_ap(arg)
+        return self.unsafe_ap(*arg)
 
     @final
     def flatten(self: Result[E, Result[E, A]]) -&gt; Result[E, A]:
@@ -1481,27 +1570,29 @@ def raise_on_panic(self) -&gt; Result[E, A]:
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_ap"><code class="name flex">
-<span>def <span class="ident">unsafe_ap</span></span>(<span>self: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, Callable[[X], A]], arg: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, X]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
+<span>def <span class="ident">unsafe_ap</span></span>(<span>self: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, Callable[[X], A]], *arg: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, X]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Noting functions from X to A: <code>X -&gt; A</code>.</p>
-<p>If this result represent a computation returning a function <code>f: X -&gt; A</code>
-and arg represent a computation returning a value <code>x: X</code>, then
-<code>self.ap(arg)</code> represents the computation returning <code>f(x): A</code>.</p></div>
+<div class="desc"><p>Noting functions from X to A: <code>[X1, ..., Xn] -&gt; A</code>.</p>
+<p>If this result represent a computation returning a function <code>f: [X1,...,XN] -&gt; A</code>
+and arg represent a computation returning a value <code>x1: X1</code>,&hellip;,<code>xn: Xn</code>, then
+<code>self.ap(arg)</code> represents the computation returning <code>f(x1,...,xn): A</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-def unsafe_ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -&gt; Result[E, A]:
+def unsafe_ap(
+    self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+) -&gt; Result[E, A]:
     &#34;&#34;&#34;
-    Noting functions from X to A: `X -&gt; A`.
+    Noting functions from X to A: `[X1, ..., Xn] -&gt; A`.
 
-    If this result represent a computation returning a function `f: X -&gt; A`
-    and arg represent a computation returning a value `x: X`, then
-    `self.ap(arg)` represents the computation returning `f(x): A`.
+    If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+    and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
+    `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.unsafe_flat_map(lambda f: arg.unsafe_map(f))</code></pre>
+    return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_catch"><code class="name flex">
@@ -1761,6 +1852,32 @@ def unsafe_tri_map(
     )</code></pre>
 </details>
 </dd>
+<dt id="raffiot.result.Result.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, Callable[[X], A]], *arg: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, X]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform a list of Result (including self) into a Result of list.</p>
+<p>Is Ok is all results are Ok.
+Is Error some are Ok, but at least one is an error but no panics.
+Is Panic is there is at least one panic.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def zip(
+    self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+) -&gt; Result[E, List[A]]:
+    &#34;&#34;&#34;
+    Transform a list of Result (including self) into a Result of list.
+
+    Is Ok is all results are Ok.
+    Is Error some are Ok, but at least one is an error but no panics.
+    Is Panic is there is at least one panic.
+    &#34;&#34;&#34;
+    return zip((self, *arg))</code></pre>
+</details>
+</dd>
 </dl>
 </dd>
 </dl>
@@ -1785,6 +1902,7 @@ def unsafe_tri_map(
 <li><code><a title="raffiot.result.returns_result" href="#raffiot.result.returns_result">returns_result</a></code></li>
 <li><code><a title="raffiot.result.safe" href="#raffiot.result.safe">safe</a></code></li>
 <li><code><a title="raffiot.result.traverse" href="#raffiot.result.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.result.zip" href="#raffiot.result.zip">zip</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -1835,6 +1953,7 @@ def unsafe_tri_map(
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_recover" href="#raffiot.result.Result.unsafe_recover">unsafe_recover</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_tri_map" href="#raffiot.result.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.result.Result.zip" href="#raffiot.result.Result.zip">zip</a></code></li>
 </ul>
 </li>
 </ul>

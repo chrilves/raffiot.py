@@ -4,6 +4,7 @@ Data structure representing a computation.
 
 from __future__ import annotations
 from typing import TypeVar, Generic, Callable, Any, List, Iterable
+from collections import abc
 from typing_extensions import final
 from raffiot import result, _MatchError
 from raffiot.result import Result, Ok, Error, Panic
@@ -70,15 +71,16 @@ class IO(Generic[R, E, A]):
         return self.flat_map(lambda _: io)
 
     @final
-    def ap(self: IO[R, E, Callable[[X], A]], arg: IO[R, E, X]) -> IO[R, E, A]:
+    def zip(self: IO[R, E, A], *others: IO[R, E, X]) -> IO[R, E, Iterable[A]]:
         """
-        Noting functions from X to A: `X -> A`
+        Pack a list of IO (including self) into an IO computing the list
+        of all values.
 
-        If self computes a function `f: X -> A`
-        and arg computes a value `x: X`
-        then self.ap(arg) computes `f(x): A`
+        If one IO fails, the whole computation fails.
         """
-        return IO(3, (self, arg))
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(3, (self, *others[0]))
+        return IO(3, (self, *others))
 
     @final
     def flatten(self):
@@ -160,13 +162,12 @@ class IO(Generic[R, E, A]):
         # CONT ID        0
         # CONT MAP       1 CONT FUN
         # CONT FLATMAP1  2 CONT CONTEXT HANDLER
-        # CONT AP1       3 CONT CONTEXT IO
-        # CONT AP2       4 CONT FUN
-        # CONT FLATTEN   5 CONT CONTEXT
-        # CONT CATCH     6 CONT CONTEXT HANDLER
-        # CONT MAP_ERROR 7 CONT FUN
-        # CONT RECOVER   8 CONT CONTEXT HANDLER
-        # CONT MAP_PANIC 9 CONT FUN
+        # CONT ZIP       3 CONT CONTEXT IOS NB_IOS NEXT_IO_INDEX
+        # CONT FLATTEN   4 CONT CONTEXT
+        # CONT CATCH     5 CONT CONTEXT HANDLER
+        # CONT MAP_ERROR 6 CONT FUN
+        # CONT RECOVER   7 CONT CONTEXT HANDLER
+        # CONT MAP_PANIC 8 CONT FUN
 
         while True:
             # Eval IO
@@ -187,28 +188,36 @@ class IO(Generic[R, E, A]):
                     cont.append(2)
                     io = io.__fields[0]
                     continue
-                if tag == 3:  # AP
-                    cont.append(io.__fields[1])
+                if tag == 3:  # ZIP
+                    ios = io.__fields
+                    nb_ios = len(ios)
+                    if nb_ios == 0:
+                        arg_tag = 0
+                        arg_value = []
+                        break
+                    io = ios[0]
+                    cont.append(1)  # Next IO to evaluate in aps
+                    cont.append(nb_ios)  # LAST ARG INDEX
+                    cont.append(ios)
                     cont.append(ctxt)
                     cont.append(3)
-                    io = io.__fields[0]
                     continue
                 if tag == 4:  # FLATTEN
                     cont.append(ctxt)
-                    cont.append(5)
+                    cont.append(4)
                     io = io.__fields
                     continue
                 if tag == 5:  # DEREF
                     try:
                         arg_tag = 0
-                        arg_value = io.__fields()
+                        arg_value = io.__fields[0](*io.__fields[1], **io.__fields[2])
                     except Exception as exception:
                         arg_tag = 2
                         arg_value = exception
                     break
                 if tag == 6:  # DEREF_IO
                     try:
-                        io = io.__fields()
+                        io = io.__fields[0](*io.__fields[1], **io.__fields[2])
                         continue
                     except Exception as exception:
                         arg_tag = 2
@@ -234,12 +243,12 @@ class IO(Generic[R, E, A]):
                 if tag == 10:  # CATCH
                     cont.append(io.__fields[1])
                     cont.append(ctxt)
-                    cont.append(6)
+                    cont.append(5)
                     io = io.__fields[0]
                     continue
                 if tag == 11:  # MAP ERROR
                     cont.append(io.__fields[1])
-                    cont.append(7)
+                    cont.append(6)
                     io = io.__fields[0]
                     continue
                 if tag == 12:  # PANIC
@@ -249,12 +258,12 @@ class IO(Generic[R, E, A]):
                 if tag == 13:  # RECOVER
                     cont.append(io.__fields[1])
                     cont.append(ctxt)
-                    cont.append(8)
+                    cont.append(7)
                     io = io.__fields[0]
                     continue
                 if tag == 14:  # MAP PANIC
                     cont.append(io.__fields[1])
-                    cont.append(9)
+                    cont.append(8)
                     io = io.__fields[0]
                     continue
                 arg_tag = 2
@@ -292,30 +301,47 @@ class IO(Generic[R, E, A]):
                         arg_tag = 2
                         arg_value = exception
                     continue
-                if tag == 3:  # Cont AP1
+                if tag == 3:  # Cont ZIP
+                    # STACK:
+                    #   IO_0_VALUE
+                    #   ...
+                    #   IO_J_VALUE
+                    #   NEXT_INDEX  /!\ LOOP INVARIANT: NB IO_X_VALUE ON THE STACK = INDEX - 1/!\
+                    #   NB_IOS
+                    #   IOS
+                    #   CTXT
+
                     ctxt = cont.pop()
-                    io = cont.pop()
-                    cont.append(arg_value)
-                    cont.append(arg_tag)
-                    cont.append(4)
-                    break
-                if tag == 4:  # Cont AP2
-                    fun_tag = cont.pop()
-                    fun_value = cont.pop()
-                    try:
-                        if fun_tag == 0 and arg_tag == 0:
-                            arg_value = fun_value(arg_value)
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 5:  # Cont Flatten
+                    ios = cont.pop()
+                    nb_ios = cont.pop()
+                    index = cont.pop()
+
+                    if arg_tag == 0:
+                        cont.append(arg_value)
+                        if index < nb_ios:
+                            io = ios[index]
+                            cont.append(index + 1)
+                            cont.append(nb_ios)
+                            cont.append(ios)
+                            cont.append(ctxt)
+                            cont.append(3)
+                            break
+                        else:
+                            arg_value = cont[-nb_ios:]
+                            for i in range(nb_ios):
+                                cont.pop()
+                            continue
+                    else:
+                        for i in range(index - 1):
+                            cont.pop()
+                        continue
+                if tag == 4:  # Cont Flatten
                     ctxt = cont.pop()
                     if arg_tag == 0:
                         io = arg_value
                         break
                     continue
-                if tag == 6:  # Cont CATCH
+                if tag == 5:  # Cont CATCH
                     ctxt = cont.pop()
                     handler = cont.pop()
                     try:
@@ -326,7 +352,7 @@ class IO(Generic[R, E, A]):
                         arg_tag = 2
                         arg_value = exception
                     continue
-                if tag == 7:  # Cont MAP ERROR
+                if tag == 6:  # Cont MAP ERROR
                     fun = cont.pop()
                     try:
                         if arg_tag == 1:
@@ -335,7 +361,7 @@ class IO(Generic[R, E, A]):
                         arg_tag = 2
                         arg_value = exception
                     continue
-                if tag == 8:  # Cont RECOVER
+                if tag == 7:  # Cont RECOVER
                     ctxt = cont.pop()
                     handler = cont.pop()
                     try:
@@ -346,7 +372,7 @@ class IO(Generic[R, E, A]):
                         arg_tag = 2
                         arg_value = exception
                     continue
-                if tag == 9:  # CONT MAP PANIC
+                if tag == 8:  # CONT MAP PANIC
                     fun = cont.pop()
                     try:
                         if arg_tag == 2:
@@ -356,6 +382,17 @@ class IO(Generic[R, E, A]):
                         arg_value = exception
                     continue
                 raise _MatchError(f"{cont} should be a Cont")
+
+    @final
+    def ap(self: IO[R, E, Callable[[X], A]], *arg: IO[R, E, X]) -> IO[R, E, A]:
+        """
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -> A`.
+
+        If self computes a function `f: [X1,...,XN] -> A`
+        and arg computes a value `x1: X1`,...,`xn: Xn`
+        then self.ap(arg) computes `f(x1,...,xn): A`.
+        """
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
     @final
     def attempt(self) -> IO[R, E, Result[E, A]]:
@@ -412,11 +449,48 @@ class IO(Generic[R, E, A]):
             )
         )
 
+    @final
+    def __str__(self) -> str:
+        if self.__tag == 0:
+            return f"Pure({self.__fields})"
+        if self.__tag == 1:
+            return f"Map({self.__fields})"
+        if self.__tag == 2:
+            return f"FlatMap({self.__fields})"
+        if self.__tag == 3:
+            return f"Ap({self.__fields})"
+        if self.__tag == 4:
+            return f"Flatten({self.__fields})"
+        if self.__tag == 5:
+            return f"Defer({self.__fields})"
+        if self.__tag == 6:
+            return f"DeferIO({self.__fields})"
+        if self.__tag == 7:
+            return f"Read({self.__fields})"
+        if self.__tag == 8:
+            return f"ContraMapRead({self.__fields})"
+        if self.__tag == 9:
+            return f"Error({self.__fields})"
+        if self.__tag == 10:
+            return f"Catch({self.__fields})"
+        if self.__tag == 11:
+            return f"MapError({self.__fields})"
+        if self.__tag == 12:
+            return f"Panic({self.__fields})"
+        if self.__tag == 13:
+            return f"Recover({self.__fields})"
+        if self.__tag == 14:
+            return f"MapPanic({self.__fields})"
+
+    @final
+    def __repr__(self):
+        return str(self)
+
 
 # IO PURE             0 VALUE
 # IO MAP              1 MAIN      FUN
 # IO FLATMAP          2 MAIN      HANDLER
-# IO AP               3 FUN       ARG
+# IO ZIP              3 ARGS
 # IO FLATTEN          4 TOWER
 # IO DEFER            5 DEFERED
 # IO DEFER_IO         6 DEFERED
@@ -437,7 +511,7 @@ def pure(a: A) -> IO[R, E, A]:
     return IO(0, a)
 
 
-def defer(deferred: Callable[[], A]) -> IO[R, E, A]:
+def defer(deferred: Callable[[], A], *args, **kwargs) -> IO[R, E, A]:
     """
     Defer a computation.
 
@@ -469,10 +543,10 @@ def defer(deferred: Callable[[], A]) -> IO[R, E, A]:
         >>> hello.run(None)
         "Hello World!" is printed again
     """
-    return IO(5, deferred)
+    return IO(5, (deferred, args, kwargs))
 
 
-def defer_io(deferred: Callable[[], IO[R, E, A]]) -> IO[R, E, A]:
+def defer_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -> IO[R, E, A]:
     """
     Make a function that returns an IO, an IO itself.
 
@@ -493,7 +567,7 @@ def defer_io(deferred: Callable[[], IO[R, E, A]]) -> IO[R, E, A]:
         >>    return defer_io(lambda: f())
         >> f().run(None)
     """
-    return IO(6, deferred)
+    return IO(6, (deferred, args, kwargs))
 
 
 def read() -> IO[R, E, R]:
@@ -539,7 +613,18 @@ def from_result(r: Result[E, A]) -> IO[R, E, A]:
     return panic(_MatchError(f"{r} should be a Result"))
 
 
-def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, List[A2]]:
+def zip(*l: Iterable[IO[R, E, A]]) -> IO[R, E, Iterable[A]]:
+    """
+    Transform a list of IO into an IO of list.
+    :param l:
+    :return:
+    """
+    if len(l) == 1 and isinstance(l, abc.Iterable):
+        return IO(3, l[0])
+    return IO(3, l)
+
+
+def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, Iterable[A2]]:
     """
     Apply the function `f` to every element of the iterable.
     The resulting IO computes the list of results.
@@ -550,22 +635,22 @@ def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, List[A2
     :param f: the function for each element.
     :return:
     """
+    return zip([defer_io(f, a) for a in l])
 
-    def append(l3: List[A2]) -> Callable[[A2], List[A2]]:
-        def do_it(a2: A2) -> List[A2]:
-            l3.append(a2)
-            return l3
 
-        return do_it
+def run_all(l: Iterable[IO[R, E, A]]) -> IO[R, E, None]:
+    def f(results):
+        level = 0
+        ret = Ok(None)
+        for r in results:
+            if r.is_error() and level < 1:
+                level = 1
+                ret = r
+            elif r.is_panic() and level < 2:
+                return r
+        return ret
 
-    r = pure([])
-
-    def dumb(r, a):
-        return r.flat_map(lambda l2: f(a).map(append(l2)))
-
-    for a in l:
-        r = dumb(r, a)
-    return r
+    return pure(f).ap([x.attempt() for x in l])
 
 
 def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:

@@ -17,7 +17,7 @@ def fibo(i: int) -> int:
 
 def fibo_io(i: int) -> IO:
     if i > 1:
-        return io.defer_io(lambda: fibo_io(i - 1)).flat_map(
+        return io.defer_io(fibo_io, i - 1).flat_map(
             lambda x: fibo_io(i - 2).map(lambda y: x + y)
         )
     else:

@@ -16,9 +16,35 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_ap(self, u: str, v: str) -> None:
-        assert pure(lambda x: lambda y: x + y).ap(pure(u)).ap(pure(v)).run(
+        assert pure(lambda x, y: x + y).ap(pure(u), pure(v)).run(None) == result.Ok(
+            u + v
+        )
+
+    @given(st.text(), st.text())
+    def test_ap_error(self, u: str, v: str) -> None:
+        assert pure(lambda x, y: x + y).ap(error(u), pure(v)).run(None) == result.Error(
+            u
+        )
+
+    @given(st.text(), st.text())
+    def test_ap_panic(self, u: str, v: str) -> None:
+        assert pure(lambda x, y: x + y).ap(pure(u), panic(_MatchError(v))).run(
             None
-        ) == result.Ok(u + v)
+        ) == result.Panic(_MatchError(v))
+
+    @given(st.lists(st.text()))
+    def test_zip(self, l: List[str]) -> None:
+        assert zip([pure(s) for s in l]).run(None) == result.Ok(l)
+
+    @given(st.text(), st.text())
+    def test_zip_error(self, u: str, v: str) -> None:
+        assert zip(error(u), pure(v)).run(None) == result.Error(u)
+
+    @given(st.text(), st.text())
+    def test_zip_panic(self, u: str, v: str) -> None:
+        assert zip(pure(u), panic(_MatchError(v))).run(None) == result.Panic(
+            _MatchError(v)
+        )
 
     @given(st.text())
     def test_error(self, err: str) -> None:
@@ -153,5 +179,5 @@ class TestResource(TestCase):
         def f(x: int) -> IO[None, None, int]:
             return defer(lambda: var.append(x)).then(pure(x * 2))
 
-        assert traverse(l, f).run(None) == Ok([x * 2 for x in l])
+        assert traverse(l, f).run(None).map(list) == Ok([x * 2 for x in l])
         assert var == l

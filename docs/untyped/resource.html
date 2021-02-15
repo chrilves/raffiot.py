@@ -35,8 +35,9 @@ Ensure that create resources are always nicely released after use.
 &#34;&#34;&#34;
 
 from __future__ import annotations
+from collections import abc
 from dataclasses import dataclass
-from raffiot.untyped import result, io
+from raffiot.untyped import result, io, _MatchError
 from raffiot.untyped.io import IO
 from raffiot.untyped.result import Result, Ok, Error, Panic
 
@@ -138,15 +139,25 @@ class Resource:
         &#34;&#34;&#34;
         return self.flat_map(lambda _: rs)
 
-    def ap(self, rs):
+    def zip(self, *rs):
         &#34;&#34;&#34;
-        Noting functions from X to A: `X -&gt; A`
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
 
-        If self computes a function `f: X -&gt; A`
-        and arg computes a value `x: X`,
-        then `self.ap(arg)` computes `f(x): A`
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
         &#34;&#34;&#34;
-        return self.flat_map(lambda f: rs.map(f))
+        return zip((self, *rs))
+
+    def ap(self, *arg):
+        &#34;&#34;&#34;
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
+
+        If self computes a function `f: [X1,...,XN] -&gt; A`
+        and arg computes a value `x1: X1`,...,`xn: Xn`
+        then self.ap(arg) computes `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -374,6 +385,49 @@ def from_with(expr):
         (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
 
     return Resource(io.defer(manager_handler))
+
+
+def zip(*rs):
+    &#34;&#34;&#34;
+    Transform a list of Resource into a Resource creating a list
+    of all resources.
+
+    If once resource creation fails, the whole creation fails.
+    The resources opened are then released.
+    :param rs: the list of resources to pack.
+    :return:
+    &#34;&#34;&#34;
+    if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
+        args = rs[0]
+    else:
+        args = rs
+
+    def process(l):
+        close = []
+        args = []
+        level = 0
+        error = None
+
+        for arg in l:
+            if arg.is_ok():
+                args.append(arg.success[0])
+                close.append(arg.success[1])
+            elif arg.is_error() and level &lt; 1:
+                error = arg
+                level = 1
+            elif arg.is_panic() and level &lt; 2:
+                error = arg
+                level = 2
+            else:
+                level = 2
+                error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
+
+        if level == 0:
+            return io.pure((args, io.run_all(close)))
+        else:
+            return io.run_all(close).attempt().then(io.from_result(error))
+
+    return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))
 
 
 def traverse(l, f):
@@ -707,6 +761,63 @@ The resulting Resource creates the list of all the resources.</p>
     return r</code></pre>
 </details>
 </dd>
+<dt id="raffiot.untyped.resource.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>*rs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform a list of Resource into a Resource creating a list
+of all resources.</p>
+<p>If once resource creation fails, the whole creation fails.
+The resources opened are then released.
+:param rs: the list of resources to pack.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip(*rs):
+    &#34;&#34;&#34;
+    Transform a list of Resource into a Resource creating a list
+    of all resources.
+
+    If once resource creation fails, the whole creation fails.
+    The resources opened are then released.
+    :param rs: the list of resources to pack.
+    :return:
+    &#34;&#34;&#34;
+    if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
+        args = rs[0]
+    else:
+        args = rs
+
+    def process(l):
+        close = []
+        args = []
+        level = 0
+        error = None
+
+        for arg in l:
+            if arg.is_ok():
+                args.append(arg.success[0])
+                close.append(arg.success[1])
+            elif arg.is_error() and level &lt; 1:
+                error = arg
+                level = 1
+            elif arg.is_panic() and level &lt; 2:
+                error = arg
+                level = 2
+            else:
+                level = 2
+                error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
+
+        if level == 0:
+            return io.pure((args, io.run_all(close)))
+        else:
+            return io.run_all(close).attempt().then(io.from_result(error))
+
+    return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))</code></pre>
+</details>
+</dd>
 </dl>
 </section>
 <section>
@@ -820,15 +931,25 @@ class Resource:
         &#34;&#34;&#34;
         return self.flat_map(lambda _: rs)
 
-    def ap(self, rs):
+    def zip(self, *rs):
         &#34;&#34;&#34;
-        Noting functions from X to A: `X -&gt; A`
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
 
-        If self computes a function `f: X -&gt; A`
-        and arg computes a value `x: X`,
-        then `self.ap(arg)` computes `f(x): A`
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
         &#34;&#34;&#34;
-        return self.flat_map(lambda f: rs.map(f))
+        return zip((self, *rs))
+
+    def ap(self, *arg):
+        &#34;&#34;&#34;
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
+
+        If self computes a function `f: [X1,...,XN] -&gt; A`
+        and arg computes a value `x1: X1`,...,`xn: Xn`
+        then self.ap(arg) computes `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -957,26 +1078,26 @@ release the first value.</p>
 <h3>Methods</h3>
 <dl>
 <dt id="raffiot.untyped.resource.Resource.ap"><code class="name flex">
-<span>def <span class="ident">ap</span></span>(<span>self, rs)</span>
+<span>def <span class="ident">ap</span></span>(<span>self, *arg)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Noting functions from X to A: <code>X -&gt; A</code></p>
-<p>If self computes a function <code>f: X -&gt; A</code>
-and arg computes a value <code>x: X</code>,
-then <code>self.ap(arg)</code> computes <code>f(x): A</code></p></div>
+<div class="desc"><p>Noting functions from [X1,&hellip;,XN] to A: <code>[X1, ..., Xn] -&gt; A</code>.</p>
+<p>If self computes a function <code>f: [X1,...,XN] -&gt; A</code>
+and arg computes a value <code>x1: X1</code>,&hellip;,<code>xn: Xn</code>
+then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ap(self, rs):
+<pre><code class="python">def ap(self, *arg):
     &#34;&#34;&#34;
-    Noting functions from X to A: `X -&gt; A`
+    Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
 
-    If self computes a function `f: X -&gt; A`
-    and arg computes a value `x: X`,
-    then `self.ap(arg)` computes `f(x): A`
+    If self computes a function `f: [X1,...,XN] -&gt; A`
+    and arg computes a value `x1: X1`,...,`xn: Xn`
+    then self.ap(arg) computes `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.flat_map(lambda f: rs.map(f))</code></pre>
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.attempt"><code class="name flex">
@@ -1320,6 +1441,29 @@ its releasing IO). The return value if the result of fun(a).</p>
     return self.create.flat_map(safe_use)</code></pre>
 </details>
 </dd>
+<dt id="raffiot.untyped.resource.Resource.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>self, *rs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pack a list of resources (including self) into a Resource creating the
+list of all resources.</p>
+<p>If one resource creation fails, the whole creation fails (opened resources
+are released then).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip(self, *rs):
+    &#34;&#34;&#34;
+    Pack a list of resources (including self) into a Resource creating the
+    list of all resources.
+
+    If one resource creation fails, the whole creation fails (opened resources
+    are released then).
+    &#34;&#34;&#34;
+    return zip((self, *rs))</code></pre>
+</details>
+</dd>
 </dl>
 </dd>
 </dl>
@@ -1351,6 +1495,7 @@ its releasing IO). The return value if the result of fun(a).</p>
 <li><code><a title="raffiot.untyped.resource.pure" href="#raffiot.untyped.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.resource.read" href="#raffiot.untyped.resource.read">read</a></code></li>
 <li><code><a title="raffiot.untyped.resource.traverse" href="#raffiot.untyped.resource.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.untyped.resource.zip" href="#raffiot.untyped.resource.zip">zip</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -1373,6 +1518,7 @@ its releasing IO). The return value if the result of fun(a).</p>
 <li><code><a title="raffiot.untyped.resource.Resource.recover" href="#raffiot.untyped.resource.Resource.recover">recover</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.then" href="#raffiot.untyped.resource.Resource.then">then</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.use" href="#raffiot.untyped.resource.Resource.use">use</a></code></li>
+<li><code><a title="raffiot.untyped.resource.Resource.zip" href="#raffiot.untyped.resource.Resource.zip">zip</a></code></li>
 </ul>
 </li>
 </ul>

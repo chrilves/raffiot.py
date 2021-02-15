@@ -16,9 +16,9 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_ap(self, u: str, v: str) -> None:
-        assert pure(lambda x: lambda y: x + y).ap(pure(u)).ap(pure(v)).use(io.pure).run(
+        assert pure(lambda x, y: x + y).ap(pure(u), pure(v)).use(io.pure).run(
             None
-        ) == result.Ok(u + v)
+        ).raise_on_panic() == result.Ok(u + v)
 
     @given(st.text())
     def test_error(self, err: str) -> None:
@@ -353,3 +353,75 @@ class TestResource(TestCase):
         )
         if can_open_a and can_flat_map and can_open_b and can_use:
             assert ret.raise_on_panic() == result.Ok(i)
+
+    @given(
+        st.booleans(),
+        st.booleans(),
+        st.booleans(),
+        st.booleans(),
+        st.booleans(),
+    )
+    def test_use_zip(
+        self,
+        can_open_a: bool,
+        can_close_a: bool,
+        can_open_b: bool,
+        can_close_b: bool,
+        can_use: bool,
+    ) -> None:
+
+        ret_a = "a"
+        ret_b = "b"
+
+        opened_a = 0
+        called_a = 0
+
+        def incr_a():
+            nonlocal opened_a
+            nonlocal called_a
+            opened_a += 1
+            called_a += 1
+            return ret_a
+
+        def decr_a():
+            nonlocal opened_a
+            opened_a -= 1
+
+        open_a = io.defer(incr_a) if can_open_a else io.error("error open a")
+        close_a = io.defer(decr_a) if can_close_a else io.panic("panic close_a")
+
+        rs_a = Resource(open_a.map(lambda a: (a, close_a)))
+
+        opened_b = 0
+        called_b = 0
+
+        def incr_b():
+            nonlocal opened_b
+            nonlocal called_b
+            print("Open B")
+            opened_b += 1
+            called_b += 1
+            return ret_b
+
+        def decr_b():
+            nonlocal opened_b
+            opened_b -= 1
+
+        open_b = io.defer(incr_b) if can_open_b else io.panic("panic open b")
+        close_b = io.defer(decr_b) if can_close_b else io.error("error close b")
+
+        rs_b = Resource(open_b.map(lambda b: (b, close_b)))
+
+        def f_use(x):
+            return io.pure(x) if can_use else io.panic("panic use")
+
+        rs_a = Resource(open_a.map(lambda a: (a, close_a)))
+
+        ret = zip(rs_a, rs_b).use(f_use).run(None)
+
+        assert called_a == (1 if can_open_a else 0)
+        assert called_b == (1 if can_open_b else 0)
+        assert opened_a == (1 if can_open_a and not can_close_a else 0)
+        assert opened_b == (1 if can_open_b and not can_close_b else 0)
+        if can_open_a and can_open_b and can_use:
+            assert ret.raise_on_panic() == result.Ok([ret_a, ret_b])

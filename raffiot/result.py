@@ -7,6 +7,7 @@ from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 from dataclasses import dataclass
 from raffiot import _MatchError
+from collections import abc
 
 E = TypeVar("E")
 A = TypeVar("A")
@@ -261,27 +262,42 @@ class Result(Generic[E, A]):
         return self.unsafe_map(f)
 
     @final
-    def unsafe_ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -> Result[E, A]:
+    def zip(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -> Result[E, List[A]]:
         """
-        Noting functions from X to A: `X -> A`.
+        Transform a list of Result (including self) into a Result of list.
 
-        If this result represent a computation returning a function `f: X -> A`
-        and arg represent a computation returning a value `x: X`, then
-        `self.ap(arg)` represents the computation returning `f(x): A`.
+        Is Ok is all results are Ok.
+        Is Error some are Ok, but at least one is an error but no panics.
+        Is Panic is there is at least one panic.
         """
-        return self.unsafe_flat_map(lambda f: arg.unsafe_map(f))
+        return zip((self, *arg))
+
+    @final
+    def unsafe_ap(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -> Result[E, A]:
+        """
+        Noting functions from X to A: `[X1, ..., Xn] -> A`.
+
+        If this result represent a computation returning a function `f: [X1,...,XN] -> A`
+        and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
+        """
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
 
     @final
     @safe
-    def ap(self: Result[E, Callable[[X], A]], arg: Result[E, X]) -> Result[E, A]:
+    def ap(self: Result[E, Callable[[X], A]], *arg: Result[E, X]) -> Result[E, A]:
         """
-        Noting functions from X to A: `X -> A`.
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -> A`.
 
-        If this result represent a computation returning a function `f: X -> A`
-        and arg represent a computation returning a value `x: X`, then
-        `self.ap(arg)` represents the computation returning `f(x): A`.
+        If this result represent a computation returning a function `f: [X1,...,XN] -> A`
+        and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         """
-        return self.unsafe_ap(arg)
+        return self.unsafe_ap(*arg)
 
     @final
     def flatten(self: Result[E, Result[E, A]]) -> Result[E, A]:
@@ -472,6 +488,29 @@ def traverse(l: Iterable[A], f: Callable[[A], Result[E, A2]]) -> Result[E, List[
     for a in l:
         r = dumb(r, a)
     return r
+
+
+def zip(*l: Iterable[Result[E, A]]) -> Result[E, List[A]]:
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        args = l[0]
+    else:
+        args = l
+
+    values = []
+    error = None
+
+    for arg in args:
+        if arg.is_ok():
+            values.append(arg.success)
+        elif arg.is_error() and error is None:
+            error = arg
+        elif arg.is_panic():
+            return arg
+
+    if error is None:
+        return Ok(values)
+    else:
+        return error
 
 
 def returns_result(f: Callable[..., Result[E, A]]) -> Callable[..., Result[E, A]]:
