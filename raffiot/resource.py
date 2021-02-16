@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from raffiot import result, io, _MatchError
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
+from concurrent.futures import Executor
 
 R = TypeVar("R")
 E = TypeVar("E")
@@ -275,6 +276,17 @@ class Resource(Generic[R, E, A]):
             )
         )
 
+    @final
+    def contra_map_executor(
+        self, f: Callable[[Executor], Executor]
+    ) -> Resource[R, E, A]:
+        """
+        Change the executor running this IO.
+        :param f:
+        :return:
+        """
+        return Resource(self.create.contra_map_executor(f))
+
 
 def liftIO(mio: IO[R, E, A]) -> Resource[R, E, A]:
     """
@@ -470,3 +482,65 @@ def traverse(
     for a in l:
         r = dumb(r, a)
     return r
+
+
+def yield_() -> Resource[R, E, None]:
+    """
+    Resource implement cooperative concurrency. It means a Resource has to
+    explicitly make a break for other concurrent tasks to have a chance to
+    progress.
+    This is what `yeild_()` does, it forces the Resource to make a break,
+    letting other tasks be run on the executor until the IO start progressing
+    again.
+    :return:
+    """
+    return liftIO(io.yield_())
+
+
+def async_(
+    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None]
+) -> Resource[E, R, A]:
+    """
+    Perform an Asynchronous call. `f` is a function of the form:
+
+    >>> from concurrent.futures import Executor, Future
+    >>> def f(context: E,
+    >>>       executor: Executor,
+    >>>       callback: Callable[[Result[E,A]], None]) -> Future:
+    >>>     ...
+
+    - `f` **MUST** return a `Future`.
+    - `context` is the context of the Resource, usually the one passed to `run`
+       if not changed by `contra_map_read`.
+    - `executor` is the `Executor` where the Resource is run, usually the one
+       passed to run if not changed by `contra_map_executor`.
+    - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
+       Until `callback` is called, the Resource will be suspended waiting for the
+       asynchronous call to complete.
+       When `callback` is called, the Resource is resumed.
+       The value passed to `callback` must be the result of the asynchonous call:
+
+        - `Ok(value)` if the call was successful and returned `value`.
+        - `Error(error)` if the call failed on error `error`.
+        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+
+    For example:
+
+    >>> from raffiot.result import Ok
+    >>> from raffiot.io import async_
+    >>> def f(context, executor, callback):
+    >>>     def h():
+    >>>         print("In the asynchronous call, returning 2.")
+    >>>         callback(Ok(2))
+    >>>     return executor.submit(h)
+    >>> resource = async_(f)
+    """
+    return liftIO(io.async_(f))
+
+
+def read_executor() -> Resource[R, E, Executor]:
+    """
+    Return the executor running this IO.
+    :return:
+    """
+    return liftIO(io.read_executor())

@@ -37,6 +37,8 @@ from collections import abc
 from typing_extensions import final
 from raffiot import result, _MatchError
 from raffiot.result import Result, Ok, Error, Panic
+from concurrent.futures import Executor, ThreadPoolExecutor, wait
+from raffiot.__internal import *
 
 R = TypeVar(&#34;R&#34;)
 E = TypeVar(&#34;E&#34;)
@@ -47,6 +49,7 @@ E2 = TypeVar(&#34;E2&#34;)
 A2 = TypeVar(&#34;A2&#34;)
 
 
+@final
 class IO(Generic[R, E, A]):
     &#34;&#34;&#34;
     Represent a computation that computes a value of type A,
@@ -81,7 +84,7 @@ class IO(Generic[R, E, A]):
         Transform the computed value with f if the computation is successful.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return IO(1, (self, f))
+        return IO(IOTag.MAP, (self, f))
 
     @final
     def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, A2]:
@@ -89,15 +92,17 @@ class IO(Generic[R, E, A]):
         Chain two computations.
         The result of the first one (self) can be used in the second (f).
         &#34;&#34;&#34;
-        return IO(2, (self, f))
+        return IO(IOTag.FLATMAP, (self, f))
 
     @final
-    def then(self, io: IO[R, E, A2]) -&gt; IO[R, E, A2]:
+    def then(self, *others: IO[R, E, A2]) -&gt; IO[R, E, A2]:
         &#34;&#34;&#34;
         Chain two computations.
         The result of the first one (self) is dropped.
         &#34;&#34;&#34;
-        return self.flat_map(lambda _: io)
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.SEQUENCE, iter((self, *others[0])))
+        return IO(IOTag.SEQUENCE, iter((self, *others)))
 
     @final
     def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
@@ -108,8 +113,8 @@ class IO(Generic[R, E, A]):
         If one IO fails, the whole computation fails.
         &#34;&#34;&#34;
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(3, (self, *others[0]))
-        return IO(3, (self, *others))
+            return IO(IOTag.ZIP, iter((self, *others[0])))
+        return IO(IOTag.ZIP, iter((self, *others)))
 
     @final
     def flatten(self):
@@ -118,7 +123,7 @@ class IO(Generic[R, E, A]):
         &#34;&#34;&#34;
         if self.__tag == 0:
             return self.__fields
-        return IO(4, self)
+        return IO(IOTag.FLATTEN, self)
 
     # Reader API
 
@@ -128,7 +133,7 @@ class IO(Generic[R, E, A]):
         Transform the context with f.
         Note that f is not from R to R2 but from R2 to R!
         &#34;&#34;&#34;
-        return IO(8, (f, self))
+        return IO(IOTag.CONTRA_MAP_READ, (f, self))
 
     # Error API
 
@@ -139,7 +144,7 @@ class IO(Generic[R, E, A]):
 
         On error, call the handler with the error.
         &#34;&#34;&#34;
-        return IO(10, (self, handler))
+        return IO(IOTag.CATCH, (self, handler))
 
     @final
     def map_error(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
@@ -147,7 +152,7 @@ class IO(Generic[R, E, A]):
         Transform the stored error if the computation fails on an error.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return IO(11, (self, f))
+        return IO(IOTag.MAP_ERROR, (self, f))
 
     # Panic
 
@@ -158,7 +163,7 @@ class IO(Generic[R, E, A]):
 
         On panic, call the handler with the exception.
         &#34;&#34;&#34;
-        return IO(13, (self, handler))
+        return IO(IOTag.RECOVER, (self, handler))
 
     @final
     def map_panic(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
@@ -166,10 +171,19 @@ class IO(Generic[R, E, A]):
         Transform the exception stored if the computation fails on a panic.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return IO(14, (self, f))
+        return IO(IOTag.MAP_PANIC, (self, f))
 
     @final
-    def run(self, context: R) -&gt; Result[E, A]:
+    def contra_map_executor(self, f: Callable[[Executor], Executor]) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        Change the executor running this IO.
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+        return IO(IOTag.CONTRA_MAP_EXECUTOR, (f, self))
+
+    @final
+    def run(self, context: R, workers: int = 1) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         Run the computation.
 
@@ -183,234 +197,12 @@ class IO(Generic[R, E, A]):
         No exception will be raised by run (unless there is a bug), run will
         returns a panic instead!
         &#34;&#34;&#34;
-        ctxt = context
-        io = self
-        cont = [0]
-        arg_tag = None
-        arg_value = None
-        # CONT ID        0
-        # CONT MAP       1 CONT FUN
-        # CONT FLATMAP1  2 CONT CONTEXT HANDLER
-        # CONT ZIP       3 CONT CONTEXT IOS NB_IOS NEXT_IO_INDEX
-        # CONT FLATTEN   4 CONT CONTEXT
-        # CONT CATCH     5 CONT CONTEXT HANDLER
-        # CONT MAP_ERROR 6 CONT FUN
-        # CONT RECOVER   7 CONT CONTEXT HANDLER
-        # CONT MAP_PANIC 8 CONT FUN
-
-        while True:
-            # Eval IO
-            while True:
-                tag = io.__tag
-                if tag == 0:  # PURE
-                    arg_tag = 0
-                    arg_value = io.__fields
-                    break
-                if tag == 1:  # MAP
-                    cont.append(io.__fields[1])
-                    cont.append(1)
-                    io = io.__fields[0]
-                    continue
-                if tag == 2:  # FLATMAP
-                    cont.append(io.__fields[1])
-                    cont.append(ctxt)
-                    cont.append(2)
-                    io = io.__fields[0]
-                    continue
-                if tag == 3:  # ZIP
-                    ios = io.__fields
-                    nb_ios = len(ios)
-                    if nb_ios == 0:
-                        arg_tag = 0
-                        arg_value = []
-                        break
-                    io = ios[0]
-                    cont.append(1)  # Next IO to evaluate in aps
-                    cont.append(nb_ios)  # LAST ARG INDEX
-                    cont.append(ios)
-                    cont.append(ctxt)
-                    cont.append(3)
-                    continue
-                if tag == 4:  # FLATTEN
-                    cont.append(ctxt)
-                    cont.append(4)
-                    io = io.__fields
-                    continue
-                if tag == 5:  # DEREF
-                    try:
-                        arg_tag = 0
-                        arg_value = io.__fields[0](*io.__fields[1], **io.__fields[2])
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    break
-                if tag == 6:  # DEREF_IO
-                    try:
-                        io = io.__fields[0](*io.__fields[1], **io.__fields[2])
-                        continue
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                        break
-                if tag == 7:  # READ
-                    arg_tag = 0
-                    arg_value = ctxt
-                    break
-                if tag == 8:  # MAP READ
-                    try:
-                        ctxt = io.__fields[0](ctxt)
-                        io = io.__fields[1]
-                        continue
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                        break
-                if tag == 9:  # RAISE
-                    arg_tag = 1
-                    arg_value = io.__fields
-                    break
-                if tag == 10:  # CATCH
-                    cont.append(io.__fields[1])
-                    cont.append(ctxt)
-                    cont.append(5)
-                    io = io.__fields[0]
-                    continue
-                if tag == 11:  # MAP ERROR
-                    cont.append(io.__fields[1])
-                    cont.append(6)
-                    io = io.__fields[0]
-                    continue
-                if tag == 12:  # PANIC
-                    arg_tag = 2
-                    arg_value = io.__fields
-                    break
-                if tag == 13:  # RECOVER
-                    cont.append(io.__fields[1])
-                    cont.append(ctxt)
-                    cont.append(7)
-                    io = io.__fields[0]
-                    continue
-                if tag == 14:  # MAP PANIC
-                    cont.append(io.__fields[1])
-                    cont.append(8)
-                    io = io.__fields[0]
-                    continue
-                arg_tag = 2
-                arg_value = _MatchError(f&#34;{io} should be an IO&#34;)
-                break
-
-            # Eval Cont
-            while True:
-                tag = cont.pop()
-                if tag == 0:  # Cont ID
-                    if arg_tag == 0:
-                        return Ok(arg_value)
-                    if arg_tag == 1:
-                        return Error(arg_value)
-                    if arg_tag == 2:
-                        return Panic(arg_value)
-                    raise _MatchError(f&#34;Wrong result tag {arg_tag}&#34;)
-                if tag == 1:  # Cont MAP
-                    fun = cont.pop()
-                    try:
-                        if arg_tag == 0:
-                            arg_value = fun(arg_value)
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 2:  # Cont FLATMAP
-                    ctxt = cont.pop()
-                    f = cont.pop()
-                    try:
-                        if arg_tag == 0:
-                            io = f(arg_value)
-                            break
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 3:  # Cont ZIP
-                    # STACK:
-                    #   IO_0_VALUE
-                    #   ...
-                    #   IO_J_VALUE
-                    #   NEXT_INDEX  /!\ LOOP INVARIANT: NB IO_X_VALUE ON THE STACK = INDEX - 1/!\
-                    #   NB_IOS
-                    #   IOS
-                    #   CTXT
-
-                    ctxt = cont.pop()
-                    ios = cont.pop()
-                    nb_ios = cont.pop()
-                    index = cont.pop()
-
-                    if arg_tag == 0:
-                        cont.append(arg_value)
-                        if index &lt; nb_ios:
-                            io = ios[index]
-                            cont.append(index + 1)
-                            cont.append(nb_ios)
-                            cont.append(ios)
-                            cont.append(ctxt)
-                            cont.append(3)
-                            break
-                        else:
-                            arg_value = cont[-nb_ios:]
-                            for i in range(nb_ios):
-                                cont.pop()
-                            continue
-                    else:
-                        for i in range(index - 1):
-                            cont.pop()
-                        continue
-                if tag == 4:  # Cont Flatten
-                    ctxt = cont.pop()
-                    if arg_tag == 0:
-                        io = arg_value
-                        break
-                    continue
-                if tag == 5:  # Cont CATCH
-                    ctxt = cont.pop()
-                    handler = cont.pop()
-                    try:
-                        if arg_tag == 1:
-                            io = handler(arg_value)
-                            break
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 6:  # Cont MAP ERROR
-                    fun = cont.pop()
-                    try:
-                        if arg_tag == 1:
-                            arg_value = fun(arg_value)
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 7:  # Cont RECOVER
-                    ctxt = cont.pop()
-                    handler = cont.pop()
-                    try:
-                        if arg_tag == 2:
-                            io = handler(arg_value)
-                            break
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 8:  # CONT MAP PANIC
-                    fun = cont.pop()
-                    try:
-                        if arg_tag == 2:
-                            arg_value = fun(arg_value)
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                raise _MatchError(f&#34;{cont} should be a Cont&#34;)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            fiber = Fiber(self, context, executor)
+            fiber.schedule()
+            while fiber.status != FiberStatus.FINISHED:
+                fiber.future.result()
+        return fiber.result
 
     @final
     def ap(self: IO[R, E, Callable[[X], A]], *arg: IO[R, E, X]) -&gt; IO[R, E, A]:
@@ -480,64 +272,57 @@ class IO(Generic[R, E, A]):
 
     @final
     def __str__(self) -&gt; str:
-        if self.__tag == 0:
+        if self.__tag == IOTag.PURE:
             return f&#34;Pure({self.__fields})&#34;
-        if self.__tag == 1:
+        if self.__tag == IOTag.MAP:
             return f&#34;Map({self.__fields})&#34;
-        if self.__tag == 2:
+        if self.__tag == IOTag.FLATMAP:
             return f&#34;FlatMap({self.__fields})&#34;
-        if self.__tag == 3:
-            return f&#34;Ap({self.__fields})&#34;
-        if self.__tag == 4:
+        if self.__tag == IOTag.SEQUENCE:
+            return f&#34;Sequence({self.__fields})&#34;
+        if self.__tag == IOTag.ZIP:
+            return f&#34;Zip({self.__fields})&#34;
+        if self.__tag == IOTag.FLATTEN:
             return f&#34;Flatten({self.__fields})&#34;
-        if self.__tag == 5:
+        if self.__tag == IOTag.DEFER:
             return f&#34;Defer({self.__fields})&#34;
-        if self.__tag == 6:
+        if self.__tag == IOTag.DEFER_IO:
             return f&#34;DeferIO({self.__fields})&#34;
-        if self.__tag == 7:
+        if self.__tag == IOTag.READ:
             return f&#34;Read({self.__fields})&#34;
-        if self.__tag == 8:
+        if self.__tag == IOTag.CONTRA_MAP_READ:
             return f&#34;ContraMapRead({self.__fields})&#34;
-        if self.__tag == 9:
+        if self.__tag == IOTag.ERROR:
             return f&#34;Error({self.__fields})&#34;
-        if self.__tag == 10:
+        if self.__tag == IOTag.CATCH:
             return f&#34;Catch({self.__fields})&#34;
-        if self.__tag == 11:
+        if self.__tag == IOTag.MAP_ERROR:
             return f&#34;MapError({self.__fields})&#34;
-        if self.__tag == 12:
+        if self.__tag == IOTag.PANIC:
             return f&#34;Panic({self.__fields})&#34;
-        if self.__tag == 13:
+        if self.__tag == IOTag.RECOVER:
             return f&#34;Recover({self.__fields})&#34;
-        if self.__tag == 14:
+        if self.__tag == IOTag.MAP_PANIC:
             return f&#34;MapPanic({self.__fields})&#34;
+        if self.__tag == IOTag.YIELD:
+            return f&#34;Yield({self.__fields})&#34;
+        if self.__tag == IOTag.ASYNC:
+            return f&#34;Async({self.__fields})&#34;
+        if self.__tag == IOTag.EXECUTOR:
+            return f&#34;Executor({self.__fields})&#34;
+        if self.__tag == IOTag.CONTRA_MAP_EXECUTOR:
+            return f&#34;ContraMapExecutor({self.__fields})&#34;
 
     @final
     def __repr__(self):
         return str(self)
 
 
-# IO PURE             0 VALUE
-# IO MAP              1 MAIN      FUN
-# IO FLATMAP          2 MAIN      HANDLER
-# IO ZIP              3 ARGS
-# IO FLATTEN          4 TOWER
-# IO DEFER            5 DEFERED
-# IO DEFER_IO         6 DEFERED
-# IO READ             7
-# IO CONTRA_MAP_READ  8 FUN       MAIN
-# IO RAISE            9 ERROR
-# IO CATCH           10 MAIN      HANDLER
-# IO MAP_ERROR       11 MAIN      FUN
-# IO PANIC           12 EXCEPTION
-# IO RECOVER         13 MAIN      HANDLER
-# IO MAP_PANIC       14 MAIN      FUN
-
-
 def pure(a: A) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     An always successful computation returning a.
     &#34;&#34;&#34;
-    return IO(0, a)
+    return IO(IOTag.PURE, a)
 
 
 def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; IO[R, E, A]:
@@ -572,7 +357,7 @@ def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; IO[R, E, A]:
         &gt;&gt;&gt; hello.run(None)
         &#34;Hello World!&#34; is printed again
     &#34;&#34;&#34;
-    return IO(5, (deferred, args, kwargs))
+    return IO(IOTag.DEFER, (deferred, args, kwargs))
 
 
 def defer_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -&gt; IO[R, E, A]:
@@ -596,7 +381,7 @@ def defer_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -&gt; IO[R, E
         &gt;&gt;    return defer_io(lambda: f())
         &gt;&gt; f().run(None)
     &#34;&#34;&#34;
-    return IO(6, (deferred, args, kwargs))
+    return IO(IOTag.DEFER_IO, (deferred, args, kwargs))
 
 
 def read() -&gt; IO[R, E, R]:
@@ -609,21 +394,21 @@ def read() -&gt; IO[R, E, R]:
 
     Please note that the contra_map_read method can transform this value r.
     &#34;&#34;&#34;
-    return IO(7, None)
+    return IO(IOTag.READ, None)
 
 
 def error(err: E) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails on the error err.
     &#34;&#34;&#34;
-    return IO(9, err)
+    return IO(IOTag.ERROR, err)
 
 
 def panic(exception: Exception) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails with the panic exception.
     &#34;&#34;&#34;
-    return IO(12, exception)
+    return IO(IOTag.PANIC, exception)
 
 
 def from_result(r: Result[E, A]) -&gt; IO[R, E, A]:
@@ -648,9 +433,83 @@ def zip(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
     :param l:
     :return:
     &#34;&#34;&#34;
-    if len(l) == 1 and isinstance(l, abc.Iterable):
-        return IO(3, l[0])
-    return IO(3, l)
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.ZIP, iter(l[0]))
+    return IO(IOTag.ZIP, iter(l))
+
+
+def sequence(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
+    &#34;&#34;&#34;
+    Run these ios in sequence
+    :param l:
+    :return:
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.SEQUENCE, iter(l[0]))
+    return IO(IOTag.SEQUENCE, iter(l))
+
+
+def yield_() -&gt; IO[R, E, None]:
+    &#34;&#34;&#34;
+    IO implement cooperative concurrency. It means an IO has to explicitly
+    make a break for other concurrent tasks to have a chance to progress.
+    This is what `yeild_()` does, it forces the IO to make a break, letting
+    other tasks be run on the executor until the IO start progressing again.
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.YIELD, None)
+
+
+def async_(
+    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None]
+) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Perform an Asynchronous call. `f` is a function of the form:
+
+    &gt;&gt;&gt; from concurrent.futures import Executor, Future
+    &gt;&gt;&gt; def f(context: E,
+    &gt;&gt;&gt;       executor: Executor,
+    &gt;&gt;&gt;       callback: Callable[[Result[E,A]], None]) -&gt; Future:
+    &gt;&gt;&gt;     ...
+
+    - `f` **MUST** return a `Future`.
+    - `context` is the context of the IO, usually the one passed to `run`
+       if not changed by `contra_map_read`.
+    - `executor` is the `Executor` where the IO is run, usually the one
+       passed to run if not changed by `contra_map_executor`.
+    - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
+       Until `callback` is called, the IO will be suspended waiting for the
+       asynchronous call to complete.
+       When `callback` is called, the IO is resumed.
+       The value passed to `callback` must be the result of the asynchonous call:
+
+        - `Ok(value)` if the call was successful and returned `value`.
+        - `Error(error)` if the call failed on error `error`.
+        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+
+    For example:
+
+    &gt;&gt;&gt; from raffiot.result import Ok
+    &gt;&gt;&gt; from raffiot.io import async_
+    &gt;&gt;&gt; def f(context, executor, callback):
+    &gt;&gt;&gt;     def h():
+    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;         callback(Ok(2))
+    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; io = async_(f)
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.ASYNC, f)
+
+
+def read_executor() -&gt; IO[R, E, Executor]:
+    &#34;&#34;&#34;
+    Return the executor running this IO.
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.EXECUTOR, None)
 
 
 def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, Iterable[A2]]:
@@ -668,6 +527,17 @@ def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, Iter
 
 
 def run_all(l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, None]:
+    &#34;&#34;&#34;
+    Ensures that all the IO are executed (in the iterable order!)
+
+    If at least one panics, it panics.
+    If no IO panic but at least one raise an error, it raise one of the error
+    (the first one in the iterable order).
+    If there is neither panics not error, it succeed and return None.
+    :param l: the iterable of all IOs to run.
+    :return:
+    &#34;&#34;&#34;
+
     def f(results):
         level = 0
         ret = Ok(None)
@@ -701,6 +571,96 @@ def safe(f: Callable[..., IO[R, E, A]]) -&gt; Callable[..., IO[R, E, A]]:
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
+<dt id="raffiot.io.async_"><code class="name flex">
+<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform an Asynchronous call. <code>f</code> is a function of the form:</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; from concurrent.futures import Executor, Future
+&gt;&gt;&gt; def f(context: E,
+&gt;&gt;&gt;       executor: Executor,
+&gt;&gt;&gt;       callback: Callable[[Result[E,A]], None]) -&gt; Future:
+&gt;&gt;&gt;     ...
+</code></pre>
+<ul>
+<li><code>f</code> <strong>MUST</strong> return a <code>Future</code>.</li>
+<li><code>context</code> is the context of the IO, usually the one passed to <code>run</code>
+if not changed by <code>contra_map_read</code>.</li>
+<li><code>executor</code> is the <code>Executor</code> where the IO is run, usually the one
+passed to run if not changed by <code>contra_map_executor</code>.</li>
+<li>
+<p><code>callback</code> <strong>MUST ALWAYS BE CALLED EXACTLY ONCE</strong>.
+Until <code>callback</code> is called, the IO will be suspended waiting for the
+asynchronous call to complete.
+When <code>callback</code> is called, the IO is resumed.
+The value passed to <code>callback</code> must be the result of the asynchonous call:</p>
+<ul>
+<li><code>Ok(value)</code> if the call was successful and returned <code>value</code>.</li>
+<li><code>Error(<a title="raffiot.io.error" href="#raffiot.io.error">error()</a>)</code> if the call failed on error <code><a title="raffiot.io.error" href="#raffiot.io.error">error()</a></code>.</li>
+<li><code>Panic(exception)</code> if the failed unexpectedly on exception <code>exception</code>.</li>
+</ul>
+</li>
+</ul>
+<p>For example:</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; from raffiot.result import Ok
+&gt;&gt;&gt; from raffiot.io import async_
+&gt;&gt;&gt; def f(context, executor, callback):
+&gt;&gt;&gt;     def h():
+&gt;&gt;&gt;         print(&quot;In the asynchronous call, returning 2.&quot;)
+&gt;&gt;&gt;         callback(Ok(2))
+&gt;&gt;&gt;     return executor.submit(h)
+&gt;&gt;&gt; io = async_(f)
+</code></pre>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def async_(
+    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None]
+) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Perform an Asynchronous call. `f` is a function of the form:
+
+    &gt;&gt;&gt; from concurrent.futures import Executor, Future
+    &gt;&gt;&gt; def f(context: E,
+    &gt;&gt;&gt;       executor: Executor,
+    &gt;&gt;&gt;       callback: Callable[[Result[E,A]], None]) -&gt; Future:
+    &gt;&gt;&gt;     ...
+
+    - `f` **MUST** return a `Future`.
+    - `context` is the context of the IO, usually the one passed to `run`
+       if not changed by `contra_map_read`.
+    - `executor` is the `Executor` where the IO is run, usually the one
+       passed to run if not changed by `contra_map_executor`.
+    - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
+       Until `callback` is called, the IO will be suspended waiting for the
+       asynchronous call to complete.
+       When `callback` is called, the IO is resumed.
+       The value passed to `callback` must be the result of the asynchonous call:
+
+        - `Ok(value)` if the call was successful and returned `value`.
+        - `Error(error)` if the call failed on error `error`.
+        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+
+    For example:
+
+    &gt;&gt;&gt; from raffiot.result import Ok
+    &gt;&gt;&gt; from raffiot.io import async_
+    &gt;&gt;&gt; def f(context, executor, callback):
+    &gt;&gt;&gt;     def h():
+    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;         callback(Ok(2))
+    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; io = async_(f)
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.ASYNC, f)</code></pre>
+</details>
+</dd>
 <dt id="raffiot.io.defer"><code class="name flex">
 <span>def <span class="ident">defer</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
@@ -765,7 +725,7 @@ Nothing is printed
         &gt;&gt;&gt; hello.run(None)
         &#34;Hello World!&#34; is printed again
     &#34;&#34;&#34;
-    return IO(5, (deferred, args, kwargs))</code></pre>
+    return IO(IOTag.DEFER, (deferred, args, kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.defer_io"><code class="name flex">
@@ -812,7 +772,7 @@ RecursionError: maximum recursion depth exceeded
         &gt;&gt;    return defer_io(lambda: f())
         &gt;&gt; f().run(None)
     &#34;&#34;&#34;
-    return IO(6, (deferred, args, kwargs))</code></pre>
+    return IO(IOTag.DEFER_IO, (deferred, args, kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.error"><code class="name flex">
@@ -828,7 +788,7 @@ RecursionError: maximum recursion depth exceeded
     &#34;&#34;&#34;
     Computation that fails on the error err.
     &#34;&#34;&#34;
-    return IO(9, err)</code></pre>
+    return IO(IOTag.ERROR, err)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.from_result"><code class="name flex">
@@ -872,7 +832,7 @@ RecursionError: maximum recursion depth exceeded
     &#34;&#34;&#34;
     Computation that fails with the panic exception.
     &#34;&#34;&#34;
-    return IO(12, exception)</code></pre>
+    return IO(IOTag.PANIC, exception)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.pure"><code class="name flex">
@@ -888,7 +848,7 @@ RecursionError: maximum recursion depth exceeded
     &#34;&#34;&#34;
     An always successful computation returning a.
     &#34;&#34;&#34;
-    return IO(0, a)</code></pre>
+    return IO(IOTag.PURE, a)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.read"><code class="name flex">
@@ -914,19 +874,54 @@ given to run.</p>
 
     Please note that the contra_map_read method can transform this value r.
     &#34;&#34;&#34;
-    return IO(7, None)</code></pre>
+    return IO(IOTag.READ, None)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.io.read_executor"><code class="name flex">
+<span>def <span class="ident">read_executor</span></span>(<span>) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, concurrent.futures._base.Executor]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Return the executor running this IO.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def read_executor() -&gt; IO[R, E, Executor]:
+    &#34;&#34;&#34;
+    Return the executor running this IO.
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.EXECUTOR, None)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.run_all"><code class="name flex">
 <span>def <span class="ident">run_all</span></span>(<span>l: Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, NoneType]</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Ensures that all the IO are executed (in the iterable order!)</p>
+<p>If at least one panics, it panics.
+If no IO panic but at least one raise an error, it raise one of the error
+(the first one in the iterable order).
+If there is neither panics not error, it succeed and return None.
+:param l: the iterable of all IOs to run.
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def run_all(l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, None]:
+    &#34;&#34;&#34;
+    Ensures that all the IO are executed (in the iterable order!)
+
+    If at least one panics, it panics.
+    If no IO panic but at least one raise an error, it raise one of the error
+    (the first one in the iterable order).
+    If there is neither panics not error, it succeed and return None.
+    :param l: the iterable of all IOs to run.
+    :return:
+    &#34;&#34;&#34;
+
     def f(results):
         level = 0
         ret = Ok(None)
@@ -963,6 +958,28 @@ panic instead.</p></div>
     return wrapper</code></pre>
 </details>
 </dd>
+<dt id="raffiot.io.sequence"><code class="name flex">
+<span>def <span class="ident">sequence</span></span>(<span>*l: Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run these ios in sequence
+:param l:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sequence(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
+    &#34;&#34;&#34;
+    Run these ios in sequence
+    :param l:
+    :return:
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.SEQUENCE, iter(l[0]))
+    return IO(IOTag.SEQUENCE, iter(l))</code></pre>
+</details>
+</dd>
 <dt id="raffiot.io.traverse"><code class="name flex">
 <span>def <span class="ident">traverse</span></span>(<span>l: Iterable[A], f: Callable[[A], <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A2]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A2]]</span>
 </code></dt>
@@ -991,6 +1008,30 @@ The resulting IO computes the list of results.</p>
     return zip([defer_io(f, a) for a in l])</code></pre>
 </details>
 </dd>
+<dt id="raffiot.io.yield_"><code class="name flex">
+<span>def <span class="ident">yield_</span></span>(<span>) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>IO implement cooperative concurrency. It means an IO has to explicitly
+make a break for other concurrent tasks to have a chance to progress.
+This is what <code>yeild_()</code> does, it forces the IO to make a break, letting
+other tasks be run on the executor until the IO start progressing again.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def yield_() -&gt; IO[R, E, None]:
+    &#34;&#34;&#34;
+    IO implement cooperative concurrency. It means an IO has to explicitly
+    make a break for other concurrent tasks to have a chance to progress.
+    This is what `yeild_()` does, it forces the IO to make a break, letting
+    other tasks be run on the executor until the IO start progressing again.
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.YIELD, None)</code></pre>
+</details>
+</dd>
 <dt id="raffiot.io.zip"><code class="name flex">
 <span>def <span class="ident">zip</span></span>(<span>*l: Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
 </code></dt>
@@ -1008,9 +1049,9 @@ The resulting IO computes the list of results.</p>
     :param l:
     :return:
     &#34;&#34;&#34;
-    if len(l) == 1 and isinstance(l, abc.Iterable):
-        return IO(3, l[0])
-    return IO(3, l)</code></pre>
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.ZIP, iter(l[0]))
+    return IO(IOTag.ZIP, iter(l))</code></pre>
 </details>
 </dd>
 </dl>
@@ -1043,7 +1084,8 @@ use defer and defer_io to avoid stack-overflow.</li>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">class IO(Generic[R, E, A]):
+<pre><code class="python">@final
+class IO(Generic[R, E, A]):
     &#34;&#34;&#34;
     Represent a computation that computes a value of type A,
     may fail with an error (expected failure) of type E and have access
@@ -1077,7 +1119,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         Transform the computed value with f if the computation is successful.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return IO(1, (self, f))
+        return IO(IOTag.MAP, (self, f))
 
     @final
     def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, A2]:
@@ -1085,15 +1127,17 @@ use defer and defer_io to avoid stack-overflow.</li>
         Chain two computations.
         The result of the first one (self) can be used in the second (f).
         &#34;&#34;&#34;
-        return IO(2, (self, f))
+        return IO(IOTag.FLATMAP, (self, f))
 
     @final
-    def then(self, io: IO[R, E, A2]) -&gt; IO[R, E, A2]:
+    def then(self, *others: IO[R, E, A2]) -&gt; IO[R, E, A2]:
         &#34;&#34;&#34;
         Chain two computations.
         The result of the first one (self) is dropped.
         &#34;&#34;&#34;
-        return self.flat_map(lambda _: io)
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.SEQUENCE, iter((self, *others[0])))
+        return IO(IOTag.SEQUENCE, iter((self, *others)))
 
     @final
     def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
@@ -1104,8 +1148,8 @@ use defer and defer_io to avoid stack-overflow.</li>
         If one IO fails, the whole computation fails.
         &#34;&#34;&#34;
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(3, (self, *others[0]))
-        return IO(3, (self, *others))
+            return IO(IOTag.ZIP, iter((self, *others[0])))
+        return IO(IOTag.ZIP, iter((self, *others)))
 
     @final
     def flatten(self):
@@ -1114,7 +1158,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         &#34;&#34;&#34;
         if self.__tag == 0:
             return self.__fields
-        return IO(4, self)
+        return IO(IOTag.FLATTEN, self)
 
     # Reader API
 
@@ -1124,7 +1168,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         Transform the context with f.
         Note that f is not from R to R2 but from R2 to R!
         &#34;&#34;&#34;
-        return IO(8, (f, self))
+        return IO(IOTag.CONTRA_MAP_READ, (f, self))
 
     # Error API
 
@@ -1135,7 +1179,7 @@ use defer and defer_io to avoid stack-overflow.</li>
 
         On error, call the handler with the error.
         &#34;&#34;&#34;
-        return IO(10, (self, handler))
+        return IO(IOTag.CATCH, (self, handler))
 
     @final
     def map_error(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
@@ -1143,7 +1187,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         Transform the stored error if the computation fails on an error.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return IO(11, (self, f))
+        return IO(IOTag.MAP_ERROR, (self, f))
 
     # Panic
 
@@ -1154,7 +1198,7 @@ use defer and defer_io to avoid stack-overflow.</li>
 
         On panic, call the handler with the exception.
         &#34;&#34;&#34;
-        return IO(13, (self, handler))
+        return IO(IOTag.RECOVER, (self, handler))
 
     @final
     def map_panic(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
@@ -1162,10 +1206,19 @@ use defer and defer_io to avoid stack-overflow.</li>
         Transform the exception stored if the computation fails on a panic.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return IO(14, (self, f))
+        return IO(IOTag.MAP_PANIC, (self, f))
 
     @final
-    def run(self, context: R) -&gt; Result[E, A]:
+    def contra_map_executor(self, f: Callable[[Executor], Executor]) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        Change the executor running this IO.
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+        return IO(IOTag.CONTRA_MAP_EXECUTOR, (f, self))
+
+    @final
+    def run(self, context: R, workers: int = 1) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         Run the computation.
 
@@ -1179,234 +1232,12 @@ use defer and defer_io to avoid stack-overflow.</li>
         No exception will be raised by run (unless there is a bug), run will
         returns a panic instead!
         &#34;&#34;&#34;
-        ctxt = context
-        io = self
-        cont = [0]
-        arg_tag = None
-        arg_value = None
-        # CONT ID        0
-        # CONT MAP       1 CONT FUN
-        # CONT FLATMAP1  2 CONT CONTEXT HANDLER
-        # CONT ZIP       3 CONT CONTEXT IOS NB_IOS NEXT_IO_INDEX
-        # CONT FLATTEN   4 CONT CONTEXT
-        # CONT CATCH     5 CONT CONTEXT HANDLER
-        # CONT MAP_ERROR 6 CONT FUN
-        # CONT RECOVER   7 CONT CONTEXT HANDLER
-        # CONT MAP_PANIC 8 CONT FUN
-
-        while True:
-            # Eval IO
-            while True:
-                tag = io.__tag
-                if tag == 0:  # PURE
-                    arg_tag = 0
-                    arg_value = io.__fields
-                    break
-                if tag == 1:  # MAP
-                    cont.append(io.__fields[1])
-                    cont.append(1)
-                    io = io.__fields[0]
-                    continue
-                if tag == 2:  # FLATMAP
-                    cont.append(io.__fields[1])
-                    cont.append(ctxt)
-                    cont.append(2)
-                    io = io.__fields[0]
-                    continue
-                if tag == 3:  # ZIP
-                    ios = io.__fields
-                    nb_ios = len(ios)
-                    if nb_ios == 0:
-                        arg_tag = 0
-                        arg_value = []
-                        break
-                    io = ios[0]
-                    cont.append(1)  # Next IO to evaluate in aps
-                    cont.append(nb_ios)  # LAST ARG INDEX
-                    cont.append(ios)
-                    cont.append(ctxt)
-                    cont.append(3)
-                    continue
-                if tag == 4:  # FLATTEN
-                    cont.append(ctxt)
-                    cont.append(4)
-                    io = io.__fields
-                    continue
-                if tag == 5:  # DEREF
-                    try:
-                        arg_tag = 0
-                        arg_value = io.__fields[0](*io.__fields[1], **io.__fields[2])
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    break
-                if tag == 6:  # DEREF_IO
-                    try:
-                        io = io.__fields[0](*io.__fields[1], **io.__fields[2])
-                        continue
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                        break
-                if tag == 7:  # READ
-                    arg_tag = 0
-                    arg_value = ctxt
-                    break
-                if tag == 8:  # MAP READ
-                    try:
-                        ctxt = io.__fields[0](ctxt)
-                        io = io.__fields[1]
-                        continue
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                        break
-                if tag == 9:  # RAISE
-                    arg_tag = 1
-                    arg_value = io.__fields
-                    break
-                if tag == 10:  # CATCH
-                    cont.append(io.__fields[1])
-                    cont.append(ctxt)
-                    cont.append(5)
-                    io = io.__fields[0]
-                    continue
-                if tag == 11:  # MAP ERROR
-                    cont.append(io.__fields[1])
-                    cont.append(6)
-                    io = io.__fields[0]
-                    continue
-                if tag == 12:  # PANIC
-                    arg_tag = 2
-                    arg_value = io.__fields
-                    break
-                if tag == 13:  # RECOVER
-                    cont.append(io.__fields[1])
-                    cont.append(ctxt)
-                    cont.append(7)
-                    io = io.__fields[0]
-                    continue
-                if tag == 14:  # MAP PANIC
-                    cont.append(io.__fields[1])
-                    cont.append(8)
-                    io = io.__fields[0]
-                    continue
-                arg_tag = 2
-                arg_value = _MatchError(f&#34;{io} should be an IO&#34;)
-                break
-
-            # Eval Cont
-            while True:
-                tag = cont.pop()
-                if tag == 0:  # Cont ID
-                    if arg_tag == 0:
-                        return Ok(arg_value)
-                    if arg_tag == 1:
-                        return Error(arg_value)
-                    if arg_tag == 2:
-                        return Panic(arg_value)
-                    raise _MatchError(f&#34;Wrong result tag {arg_tag}&#34;)
-                if tag == 1:  # Cont MAP
-                    fun = cont.pop()
-                    try:
-                        if arg_tag == 0:
-                            arg_value = fun(arg_value)
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 2:  # Cont FLATMAP
-                    ctxt = cont.pop()
-                    f = cont.pop()
-                    try:
-                        if arg_tag == 0:
-                            io = f(arg_value)
-                            break
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 3:  # Cont ZIP
-                    # STACK:
-                    #   IO_0_VALUE
-                    #   ...
-                    #   IO_J_VALUE
-                    #   NEXT_INDEX  /!\ LOOP INVARIANT: NB IO_X_VALUE ON THE STACK = INDEX - 1/!\
-                    #   NB_IOS
-                    #   IOS
-                    #   CTXT
-
-                    ctxt = cont.pop()
-                    ios = cont.pop()
-                    nb_ios = cont.pop()
-                    index = cont.pop()
-
-                    if arg_tag == 0:
-                        cont.append(arg_value)
-                        if index &lt; nb_ios:
-                            io = ios[index]
-                            cont.append(index + 1)
-                            cont.append(nb_ios)
-                            cont.append(ios)
-                            cont.append(ctxt)
-                            cont.append(3)
-                            break
-                        else:
-                            arg_value = cont[-nb_ios:]
-                            for i in range(nb_ios):
-                                cont.pop()
-                            continue
-                    else:
-                        for i in range(index - 1):
-                            cont.pop()
-                        continue
-                if tag == 4:  # Cont Flatten
-                    ctxt = cont.pop()
-                    if arg_tag == 0:
-                        io = arg_value
-                        break
-                    continue
-                if tag == 5:  # Cont CATCH
-                    ctxt = cont.pop()
-                    handler = cont.pop()
-                    try:
-                        if arg_tag == 1:
-                            io = handler(arg_value)
-                            break
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 6:  # Cont MAP ERROR
-                    fun = cont.pop()
-                    try:
-                        if arg_tag == 1:
-                            arg_value = fun(arg_value)
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 7:  # Cont RECOVER
-                    ctxt = cont.pop()
-                    handler = cont.pop()
-                    try:
-                        if arg_tag == 2:
-                            io = handler(arg_value)
-                            break
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                if tag == 8:  # CONT MAP PANIC
-                    fun = cont.pop()
-                    try:
-                        if arg_tag == 2:
-                            arg_value = fun(arg_value)
-                    except Exception as exception:
-                        arg_tag = 2
-                        arg_value = exception
-                    continue
-                raise _MatchError(f&#34;{cont} should be a Cont&#34;)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            fiber = Fiber(self, context, executor)
+            fiber.schedule()
+            while fiber.status != FiberStatus.FINISHED:
+                fiber.future.result()
+        return fiber.result
 
     @final
     def ap(self: IO[R, E, Callable[[X], A]], *arg: IO[R, E, X]) -&gt; IO[R, E, A]:
@@ -1476,36 +1307,46 @@ use defer and defer_io to avoid stack-overflow.</li>
 
     @final
     def __str__(self) -&gt; str:
-        if self.__tag == 0:
+        if self.__tag == IOTag.PURE:
             return f&#34;Pure({self.__fields})&#34;
-        if self.__tag == 1:
+        if self.__tag == IOTag.MAP:
             return f&#34;Map({self.__fields})&#34;
-        if self.__tag == 2:
+        if self.__tag == IOTag.FLATMAP:
             return f&#34;FlatMap({self.__fields})&#34;
-        if self.__tag == 3:
-            return f&#34;Ap({self.__fields})&#34;
-        if self.__tag == 4:
+        if self.__tag == IOTag.SEQUENCE:
+            return f&#34;Sequence({self.__fields})&#34;
+        if self.__tag == IOTag.ZIP:
+            return f&#34;Zip({self.__fields})&#34;
+        if self.__tag == IOTag.FLATTEN:
             return f&#34;Flatten({self.__fields})&#34;
-        if self.__tag == 5:
+        if self.__tag == IOTag.DEFER:
             return f&#34;Defer({self.__fields})&#34;
-        if self.__tag == 6:
+        if self.__tag == IOTag.DEFER_IO:
             return f&#34;DeferIO({self.__fields})&#34;
-        if self.__tag == 7:
+        if self.__tag == IOTag.READ:
             return f&#34;Read({self.__fields})&#34;
-        if self.__tag == 8:
+        if self.__tag == IOTag.CONTRA_MAP_READ:
             return f&#34;ContraMapRead({self.__fields})&#34;
-        if self.__tag == 9:
+        if self.__tag == IOTag.ERROR:
             return f&#34;Error({self.__fields})&#34;
-        if self.__tag == 10:
+        if self.__tag == IOTag.CATCH:
             return f&#34;Catch({self.__fields})&#34;
-        if self.__tag == 11:
+        if self.__tag == IOTag.MAP_ERROR:
             return f&#34;MapError({self.__fields})&#34;
-        if self.__tag == 12:
+        if self.__tag == IOTag.PANIC:
             return f&#34;Panic({self.__fields})&#34;
-        if self.__tag == 13:
+        if self.__tag == IOTag.RECOVER:
             return f&#34;Recover({self.__fields})&#34;
-        if self.__tag == 14:
+        if self.__tag == IOTag.MAP_PANIC:
             return f&#34;MapPanic({self.__fields})&#34;
+        if self.__tag == IOTag.YIELD:
+            return f&#34;Yield({self.__fields})&#34;
+        if self.__tag == IOTag.ASYNC:
+            return f&#34;Async({self.__fields})&#34;
+        if self.__tag == IOTag.EXECUTOR:
+            return f&#34;Executor({self.__fields})&#34;
+        if self.__tag == IOTag.CONTRA_MAP_EXECUTOR:
+            return f&#34;ContraMapExecutor({self.__fields})&#34;
 
     @final
     def __repr__(self):
@@ -1601,7 +1442,28 @@ def catch(self, handler: Callable[[E], IO[R, E, A]]) -&gt; IO[R, E, A]:
 
     On error, call the handler with the error.
     &#34;&#34;&#34;
-    return IO(10, (self, handler))</code></pre>
+    return IO(IOTag.CATCH, (self, handler))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.io.IO.contra_map_executor"><code class="name flex">
+<span>def <span class="ident">contra_map_executor</span></span>(<span>self, f: Callable[[Executor], Executor]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Change the executor running this IO.
+:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def contra_map_executor(self, f: Callable[[Executor], Executor]) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Change the executor running this IO.
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.CONTRA_MAP_EXECUTOR, (f, self))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.contra_map_read"><code class="name flex">
@@ -1620,7 +1482,7 @@ def contra_map_read(self, f: Callable[[R2], R]) -&gt; IO[R2, E, A]:
     Transform the context with f.
     Note that f is not from R to R2 but from R2 to R!
     &#34;&#34;&#34;
-    return IO(8, (f, self))</code></pre>
+    return IO(IOTag.CONTRA_MAP_READ, (f, self))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.finally_"><code class="name flex">
@@ -1665,7 +1527,7 @@ def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, A2]:
     Chain two computations.
     The result of the first one (self) can be used in the second (f).
     &#34;&#34;&#34;
-    return IO(2, (self, f))</code></pre>
+    return IO(IOTag.FLATMAP, (self, f))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.flatten"><code class="name flex">
@@ -1684,7 +1546,7 @@ def flatten(self):
     &#34;&#34;&#34;
     if self.__tag == 0:
         return self.__fields
-    return IO(4, self)</code></pre>
+    return IO(IOTag.FLATTEN, self)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.map"><code class="name flex">
@@ -1703,7 +1565,7 @@ def map(self, f: Callable[[A], A2]) -&gt; IO[R, E, A2]:
     Transform the computed value with f if the computation is successful.
     Do nothing otherwise.
     &#34;&#34;&#34;
-    return IO(1, (self, f))</code></pre>
+    return IO(IOTag.MAP, (self, f))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.map_error"><code class="name flex">
@@ -1722,7 +1584,7 @@ def map_error(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
     Transform the stored error if the computation fails on an error.
     Do nothing otherwise.
     &#34;&#34;&#34;
-    return IO(11, (self, f))</code></pre>
+    return IO(IOTag.MAP_ERROR, (self, f))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.map_panic"><code class="name flex">
@@ -1741,7 +1603,7 @@ def map_panic(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
     Transform the exception stored if the computation fails on a panic.
     Do nothing otherwise.
     &#34;&#34;&#34;
-    return IO(14, (self, f))</code></pre>
+    return IO(IOTag.MAP_PANIC, (self, f))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.on_failure"><code class="name flex">
@@ -1799,11 +1661,11 @@ def recover(self, handler: Callable[[Exception], IO[R, E, A]]) -&gt; IO[R, E, A]
 
     On panic, call the handler with the exception.
     &#34;&#34;&#34;
-    return IO(13, (self, handler))</code></pre>
+    return IO(IOTag.RECOVER, (self, handler))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self, context: R) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+<span>def <span class="ident">run</span></span>(<span>self, context: R, workers: int = 1) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run the computation.</p>
@@ -1821,7 +1683,7 @@ returns a panic instead!</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-def run(self, context: R) -&gt; Result[E, A]:
+def run(self, context: R, workers: int = 1) -&gt; Result[E, A]:
     &#34;&#34;&#34;
     Run the computation.
 
@@ -1835,238 +1697,16 @@ def run(self, context: R) -&gt; Result[E, A]:
     No exception will be raised by run (unless there is a bug), run will
     returns a panic instead!
     &#34;&#34;&#34;
-    ctxt = context
-    io = self
-    cont = [0]
-    arg_tag = None
-    arg_value = None
-    # CONT ID        0
-    # CONT MAP       1 CONT FUN
-    # CONT FLATMAP1  2 CONT CONTEXT HANDLER
-    # CONT ZIP       3 CONT CONTEXT IOS NB_IOS NEXT_IO_INDEX
-    # CONT FLATTEN   4 CONT CONTEXT
-    # CONT CATCH     5 CONT CONTEXT HANDLER
-    # CONT MAP_ERROR 6 CONT FUN
-    # CONT RECOVER   7 CONT CONTEXT HANDLER
-    # CONT MAP_PANIC 8 CONT FUN
-
-    while True:
-        # Eval IO
-        while True:
-            tag = io.__tag
-            if tag == 0:  # PURE
-                arg_tag = 0
-                arg_value = io.__fields
-                break
-            if tag == 1:  # MAP
-                cont.append(io.__fields[1])
-                cont.append(1)
-                io = io.__fields[0]
-                continue
-            if tag == 2:  # FLATMAP
-                cont.append(io.__fields[1])
-                cont.append(ctxt)
-                cont.append(2)
-                io = io.__fields[0]
-                continue
-            if tag == 3:  # ZIP
-                ios = io.__fields
-                nb_ios = len(ios)
-                if nb_ios == 0:
-                    arg_tag = 0
-                    arg_value = []
-                    break
-                io = ios[0]
-                cont.append(1)  # Next IO to evaluate in aps
-                cont.append(nb_ios)  # LAST ARG INDEX
-                cont.append(ios)
-                cont.append(ctxt)
-                cont.append(3)
-                continue
-            if tag == 4:  # FLATTEN
-                cont.append(ctxt)
-                cont.append(4)
-                io = io.__fields
-                continue
-            if tag == 5:  # DEREF
-                try:
-                    arg_tag = 0
-                    arg_value = io.__fields[0](*io.__fields[1], **io.__fields[2])
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                break
-            if tag == 6:  # DEREF_IO
-                try:
-                    io = io.__fields[0](*io.__fields[1], **io.__fields[2])
-                    continue
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                    break
-            if tag == 7:  # READ
-                arg_tag = 0
-                arg_value = ctxt
-                break
-            if tag == 8:  # MAP READ
-                try:
-                    ctxt = io.__fields[0](ctxt)
-                    io = io.__fields[1]
-                    continue
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                    break
-            if tag == 9:  # RAISE
-                arg_tag = 1
-                arg_value = io.__fields
-                break
-            if tag == 10:  # CATCH
-                cont.append(io.__fields[1])
-                cont.append(ctxt)
-                cont.append(5)
-                io = io.__fields[0]
-                continue
-            if tag == 11:  # MAP ERROR
-                cont.append(io.__fields[1])
-                cont.append(6)
-                io = io.__fields[0]
-                continue
-            if tag == 12:  # PANIC
-                arg_tag = 2
-                arg_value = io.__fields
-                break
-            if tag == 13:  # RECOVER
-                cont.append(io.__fields[1])
-                cont.append(ctxt)
-                cont.append(7)
-                io = io.__fields[0]
-                continue
-            if tag == 14:  # MAP PANIC
-                cont.append(io.__fields[1])
-                cont.append(8)
-                io = io.__fields[0]
-                continue
-            arg_tag = 2
-            arg_value = _MatchError(f&#34;{io} should be an IO&#34;)
-            break
-
-        # Eval Cont
-        while True:
-            tag = cont.pop()
-            if tag == 0:  # Cont ID
-                if arg_tag == 0:
-                    return Ok(arg_value)
-                if arg_tag == 1:
-                    return Error(arg_value)
-                if arg_tag == 2:
-                    return Panic(arg_value)
-                raise _MatchError(f&#34;Wrong result tag {arg_tag}&#34;)
-            if tag == 1:  # Cont MAP
-                fun = cont.pop()
-                try:
-                    if arg_tag == 0:
-                        arg_value = fun(arg_value)
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                continue
-            if tag == 2:  # Cont FLATMAP
-                ctxt = cont.pop()
-                f = cont.pop()
-                try:
-                    if arg_tag == 0:
-                        io = f(arg_value)
-                        break
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                continue
-            if tag == 3:  # Cont ZIP
-                # STACK:
-                #   IO_0_VALUE
-                #   ...
-                #   IO_J_VALUE
-                #   NEXT_INDEX  /!\ LOOP INVARIANT: NB IO_X_VALUE ON THE STACK = INDEX - 1/!\
-                #   NB_IOS
-                #   IOS
-                #   CTXT
-
-                ctxt = cont.pop()
-                ios = cont.pop()
-                nb_ios = cont.pop()
-                index = cont.pop()
-
-                if arg_tag == 0:
-                    cont.append(arg_value)
-                    if index &lt; nb_ios:
-                        io = ios[index]
-                        cont.append(index + 1)
-                        cont.append(nb_ios)
-                        cont.append(ios)
-                        cont.append(ctxt)
-                        cont.append(3)
-                        break
-                    else:
-                        arg_value = cont[-nb_ios:]
-                        for i in range(nb_ios):
-                            cont.pop()
-                        continue
-                else:
-                    for i in range(index - 1):
-                        cont.pop()
-                    continue
-            if tag == 4:  # Cont Flatten
-                ctxt = cont.pop()
-                if arg_tag == 0:
-                    io = arg_value
-                    break
-                continue
-            if tag == 5:  # Cont CATCH
-                ctxt = cont.pop()
-                handler = cont.pop()
-                try:
-                    if arg_tag == 1:
-                        io = handler(arg_value)
-                        break
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                continue
-            if tag == 6:  # Cont MAP ERROR
-                fun = cont.pop()
-                try:
-                    if arg_tag == 1:
-                        arg_value = fun(arg_value)
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                continue
-            if tag == 7:  # Cont RECOVER
-                ctxt = cont.pop()
-                handler = cont.pop()
-                try:
-                    if arg_tag == 2:
-                        io = handler(arg_value)
-                        break
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                continue
-            if tag == 8:  # CONT MAP PANIC
-                fun = cont.pop()
-                try:
-                    if arg_tag == 2:
-                        arg_value = fun(arg_value)
-                except Exception as exception:
-                    arg_tag = 2
-                    arg_value = exception
-                continue
-            raise _MatchError(f&#34;{cont} should be a Cont&#34;)</code></pre>
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        fiber = Fiber(self, context, executor)
+        fiber.schedule()
+        while fiber.status != FiberStatus.FINISHED:
+            fiber.future.result()
+    return fiber.result</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.then"><code class="name flex">
-<span>def <span class="ident">then</span></span>(<span>self, io: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A2]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A2]</span>
+<span>def <span class="ident">then</span></span>(<span>self, *others: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A2]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A2]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Chain two computations.
@@ -2076,12 +1716,14 @@ The result of the first one (self) is dropped.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-def then(self, io: IO[R, E, A2]) -&gt; IO[R, E, A2]:
+def then(self, *others: IO[R, E, A2]) -&gt; IO[R, E, A2]:
     &#34;&#34;&#34;
     Chain two computations.
     The result of the first one (self) is dropped.
     &#34;&#34;&#34;
-    return self.flat_map(lambda _: io)</code></pre>
+    if len(others) == 1 and isinstance(others[0], abc.Iterable):
+        return IO(IOTag.SEQUENCE, iter((self, *others[0])))
+    return IO(IOTag.SEQUENCE, iter((self, *others)))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.zip"><code class="name flex">
@@ -2104,8 +1746,8 @@ def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
     If one IO fails, the whole computation fails.
     &#34;&#34;&#34;
     if len(others) == 1 and isinstance(others[0], abc.Iterable):
-        return IO(3, (self, *others[0]))
-    return IO(3, (self, *others))</code></pre>
+        return IO(IOTag.ZIP, iter((self, *others[0])))
+    return IO(IOTag.ZIP, iter((self, *others)))</code></pre>
 </details>
 </dd>
 </dl>
@@ -2126,6 +1768,7 @@ def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="two-column">
+<li><code><a title="raffiot.io.async_" href="#raffiot.io.async_">async_</a></code></li>
 <li><code><a title="raffiot.io.defer" href="#raffiot.io.defer">defer</a></code></li>
 <li><code><a title="raffiot.io.defer_io" href="#raffiot.io.defer_io">defer_io</a></code></li>
 <li><code><a title="raffiot.io.error" href="#raffiot.io.error">error</a></code></li>
@@ -2133,9 +1776,12 @@ def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
 <li><code><a title="raffiot.io.panic" href="#raffiot.io.panic">panic</a></code></li>
 <li><code><a title="raffiot.io.pure" href="#raffiot.io.pure">pure</a></code></li>
 <li><code><a title="raffiot.io.read" href="#raffiot.io.read">read</a></code></li>
+<li><code><a title="raffiot.io.read_executor" href="#raffiot.io.read_executor">read_executor</a></code></li>
 <li><code><a title="raffiot.io.run_all" href="#raffiot.io.run_all">run_all</a></code></li>
 <li><code><a title="raffiot.io.safe" href="#raffiot.io.safe">safe</a></code></li>
+<li><code><a title="raffiot.io.sequence" href="#raffiot.io.sequence">sequence</a></code></li>
 <li><code><a title="raffiot.io.traverse" href="#raffiot.io.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.io.yield_" href="#raffiot.io.yield_">yield_</a></code></li>
 <li><code><a title="raffiot.io.zip" href="#raffiot.io.zip">zip</a></code></li>
 </ul>
 </li>
@@ -2147,6 +1793,7 @@ def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
 <li><code><a title="raffiot.io.IO.ap" href="#raffiot.io.IO.ap">ap</a></code></li>
 <li><code><a title="raffiot.io.IO.attempt" href="#raffiot.io.IO.attempt">attempt</a></code></li>
 <li><code><a title="raffiot.io.IO.catch" href="#raffiot.io.IO.catch">catch</a></code></li>
+<li><code><a title="raffiot.io.IO.contra_map_executor" href="#raffiot.io.IO.contra_map_executor">contra_map_executor</a></code></li>
 <li><code><a title="raffiot.io.IO.contra_map_read" href="#raffiot.io.IO.contra_map_read">contra_map_read</a></code></li>
 <li><code><a title="raffiot.io.IO.finally_" href="#raffiot.io.IO.finally_">finally_</a></code></li>
 <li><code><a title="raffiot.io.IO.flat_map" href="#raffiot.io.IO.flat_map">flat_map</a></code></li>

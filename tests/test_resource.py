@@ -172,6 +172,69 @@ class TestResource(TestCase):
         assert traverse(l, f).use(io.pure).run(None) == Ok([x * 2 for x in l])
         assert var == l
 
+    @given(st.lists(st.integers()))
+    def test_yield(self, l: List[int]) -> None:
+        def select_io(i: int):
+            if i % 2 == 0:
+                return yield_()
+            return pure(i)
+
+        assert zip([select_io(i) for i in l]).use(io.pure).run(None) == Ok(
+            [(None if i % 2 == 0 else i) for i in l]
+        )
+
+    @given(st.text(), st.lists(st.text()))
+    def test_async(self, s: str, l: List[str]) -> None:
+
+        expected = s
+        for u in l:
+            expected += u
+
+        def get_async(v, u):
+            def f(r, executor, k):
+                def h():
+                    k(Ok(v + u))
+
+                return executor.submit(h)
+
+            return async_(f)
+
+        ret = pure(s)
+        for u in l:
+            ret = (lambda ret, u: ret.flat_map(lambda v: get_async(v, u)))(ret, u)
+
+        assert ret.use(io.pure).run(None).raise_on_panic() == Ok(expected)
+
+    def test_executor(self) -> None:
+        a = 10
+        assert pure(a).flat_map(lambda r: read_executor().then(pure(r))).use(
+            io.pure
+        ).run(None) == Ok(a)
+
+    def test_contra_map_executor_ok(self) -> None:
+        a = 10
+        assert pure(a).contra_map_executor(lambda e: e).use(io.pure).run(None) == Ok(a)
+
+    def test_contra_map_executor_fail(self) -> None:
+        a = 10
+        assert (
+            pure(a)
+            .contra_map_executor(lambda e: 1 / 0)
+            .use(io.pure)
+            .run(None)
+            .is_panic()
+        )
+
+    def test_contra_map_executor_type_error(self) -> None:
+        a = 10
+        assert (
+            pure(a)
+            .contra_map_executor(lambda e: "not an executor")
+            .use(io.pure)
+            .run(None)
+            .is_panic()
+        )
+
     @given(
         st.booleans(),
         st.booleans(),

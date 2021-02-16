@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from raffiot.untyped import result, io, _MatchError
 from raffiot.untyped.io import IO
 from raffiot.untyped.result import Result, Ok, Error, Panic
+from concurrent.futures import Executor
 
 
 @dataclass
@@ -268,6 +269,14 @@ class Resource:
             )
         )
 
+    def contra_map_executor(self, f):
+        &#34;&#34;&#34;
+        Change the executor running this IO.
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+        return Resource(self.create.contra_map_executor(f))
+
 
 def liftIO(mio):
     &#34;&#34;&#34;
@@ -456,7 +465,67 @@ def traverse(l, f):
 
     for a in l:
         r = dumb(r, a)
-    return r</code></pre>
+    return r
+
+
+def yield_():
+    &#34;&#34;&#34;
+    Resource implement cooperative concurrency. It means a Resource has to
+    explicitly make a break for other concurrent tasks to have a chance to
+    progress.
+    This is what `yeild_()` does, it forces the Resource to make a break,
+    letting other tasks be run on the executor until the IO start progressing
+    again.
+    :return:
+    &#34;&#34;&#34;
+    return liftIO(io.yield_())
+
+
+def async_(f):
+    &#34;&#34;&#34;
+    Perform an Asynchronous call. `f` is a function of the form:
+
+    &gt;&gt;&gt; from concurrent.futures import Executor, Future
+    &gt;&gt;&gt; def f(context: E,
+    &gt;&gt;&gt;       executor: Executor,
+    &gt;&gt;&gt;       callback: Callable[[Result], None]) -&gt; Future:
+    &gt;&gt;&gt;     ...
+
+    - `f` **MUST** return a `Future`.
+    - `context` is the context of the Resource, usually the one passed to `run`
+       if not changed by `contra_map_read`.
+    - `executor` is the `Executor` where the Resource is run, usually the one
+       passed to run if not changed by `contra_map_executor`.
+    - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
+       Until `callback` is called, the Resource will be suspended waiting for the
+       asynchronous call to complete.
+       When `callback` is called, the Resource is resumed.
+       The value passed to `callback` must be the result of the asynchonous call:
+
+        - `Ok(value)` if the call was successful and returned `value`.
+        - `Error(error)` if the call failed on error `error`.
+        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+
+    For example:
+
+    &gt;&gt;&gt; from raffiot.result import Ok
+    &gt;&gt;&gt; from raffiot.io import async_
+    &gt;&gt;&gt; def f(context, executor, callback):
+    &gt;&gt;&gt;     def h():
+    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;         callback(Ok(2))
+    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; resource = async_(f)
+    &#34;&#34;&#34;
+    return liftIO(io.async_(f))
+
+
+def read_executor():
+    &#34;&#34;&#34;
+    Return the executor running this IO.
+    :return:
+    &#34;&#34;&#34;
+    return liftIO(io.read_executor())</code></pre>
 </details>
 </section>
 <section>
@@ -466,6 +535,89 @@ def traverse(l, f):
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
+<dt id="raffiot.untyped.resource.async_"><code class="name flex">
+<span>def <span class="ident">async_</span></span>(<span>f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform an Asynchronous call. <code>f</code> is a function of the form:</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; from concurrent.futures import Executor, Future
+&gt;&gt;&gt; def f(context: E,
+&gt;&gt;&gt;       executor: Executor,
+&gt;&gt;&gt;       callback: Callable[[Result], None]) -&gt; Future:
+&gt;&gt;&gt;     ...
+</code></pre>
+<ul>
+<li><code>f</code> <strong>MUST</strong> return a <code>Future</code>.</li>
+<li><code>context</code> is the context of the Resource, usually the one passed to <code>run</code>
+if not changed by <code>contra_map_read</code>.</li>
+<li><code>executor</code> is the <code>Executor</code> where the Resource is run, usually the one
+passed to run if not changed by <code>contra_map_executor</code>.</li>
+<li>
+<p><code>callback</code> <strong>MUST ALWAYS BE CALLED EXACTLY ONCE</strong>.
+Until <code>callback</code> is called, the Resource will be suspended waiting for the
+asynchronous call to complete.
+When <code>callback</code> is called, the Resource is resumed.
+The value passed to <code>callback</code> must be the result of the asynchonous call:</p>
+<ul>
+<li><code>Ok(value)</code> if the call was successful and returned <code>value</code>.</li>
+<li><code>Error(<a title="raffiot.untyped.resource.error" href="#raffiot.untyped.resource.error">error()</a>)</code> if the call failed on error <code><a title="raffiot.untyped.resource.error" href="#raffiot.untyped.resource.error">error()</a></code>.</li>
+<li><code>Panic(exception)</code> if the failed unexpectedly on exception <code>exception</code>.</li>
+</ul>
+</li>
+</ul>
+<p>For example:</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; from raffiot.result import Ok
+&gt;&gt;&gt; from raffiot.io import async_
+&gt;&gt;&gt; def f(context, executor, callback):
+&gt;&gt;&gt;     def h():
+&gt;&gt;&gt;         print(&quot;In the asynchronous call, returning 2.&quot;)
+&gt;&gt;&gt;         callback(Ok(2))
+&gt;&gt;&gt;     return executor.submit(h)
+&gt;&gt;&gt; resource = async_(f)
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def async_(f):
+    &#34;&#34;&#34;
+    Perform an Asynchronous call. `f` is a function of the form:
+
+    &gt;&gt;&gt; from concurrent.futures import Executor, Future
+    &gt;&gt;&gt; def f(context: E,
+    &gt;&gt;&gt;       executor: Executor,
+    &gt;&gt;&gt;       callback: Callable[[Result], None]) -&gt; Future:
+    &gt;&gt;&gt;     ...
+
+    - `f` **MUST** return a `Future`.
+    - `context` is the context of the Resource, usually the one passed to `run`
+       if not changed by `contra_map_read`.
+    - `executor` is the `Executor` where the Resource is run, usually the one
+       passed to run if not changed by `contra_map_executor`.
+    - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
+       Until `callback` is called, the Resource will be suspended waiting for the
+       asynchronous call to complete.
+       When `callback` is called, the Resource is resumed.
+       The value passed to `callback` must be the result of the asynchonous call:
+
+        - `Ok(value)` if the call was successful and returned `value`.
+        - `Error(error)` if the call failed on error `error`.
+        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+
+    For example:
+
+    &gt;&gt;&gt; from raffiot.result import Ok
+    &gt;&gt;&gt; from raffiot.io import async_
+    &gt;&gt;&gt; def f(context, executor, callback):
+    &gt;&gt;&gt;     def h():
+    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;         callback(Ok(2))
+    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; resource = async_(f)
+    &#34;&#34;&#34;
+    return liftIO(io.async_(f))</code></pre>
+</details>
+</dd>
 <dt id="raffiot.untyped.resource.defer"><code class="name flex">
 <span>def <span class="ident">defer</span></span>(<span>deferred)</span>
 </code></dt>
@@ -718,6 +870,24 @@ given to run.</p>
     return liftIO(io.read())</code></pre>
 </details>
 </dd>
+<dt id="raffiot.untyped.resource.read_executor"><code class="name flex">
+<span>def <span class="ident">read_executor</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Return the executor running this IO.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def read_executor():
+    &#34;&#34;&#34;
+    Return the executor running this IO.
+    :return:
+    &#34;&#34;&#34;
+    return liftIO(io.read_executor())</code></pre>
+</details>
+</dd>
 <dt id="raffiot.untyped.resource.traverse"><code class="name flex">
 <span>def <span class="ident">traverse</span></span>(<span>l, f)</span>
 </code></dt>
@@ -759,6 +929,34 @@ The resulting Resource creates the list of all the resources.</p>
     for a in l:
         r = dumb(r, a)
     return r</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.yield_"><code class="name flex">
+<span>def <span class="ident">yield_</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Resource implement cooperative concurrency. It means a Resource has to
+explicitly make a break for other concurrent tasks to have a chance to
+progress.
+This is what <code>yeild_()</code> does, it forces the Resource to make a break,
+letting other tasks be run on the executor until the IO start progressing
+again.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def yield_():
+    &#34;&#34;&#34;
+    Resource implement cooperative concurrency. It means a Resource has to
+    explicitly make a break for other concurrent tasks to have a chance to
+    progress.
+    This is what `yeild_()` does, it forces the Resource to make a break,
+    letting other tasks be run on the executor until the IO start progressing
+    again.
+    :return:
+    &#34;&#34;&#34;
+    return liftIO(io.yield_())</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.zip"><code class="name flex">
@@ -1058,7 +1256,15 @@ class Resource:
                 lambda e: handler(result.error(e)),
                 lambda p: handler(result.panic(p)),
             )
-        )</code></pre>
+        )
+
+    def contra_map_executor(self, f):
+        &#34;&#34;&#34;
+        Change the executor running this IO.
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+        return Resource(self.create.contra_map_executor(f))</code></pre>
 </details>
 <h3>Class variables</h3>
 <dl>
@@ -1163,6 +1369,26 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     On error, call the handler with the error.
     &#34;&#34;&#34;
     return Resource(self.create.catch(lambda e: handler(e).create))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.Resource.contra_map_executor"><code class="name flex">
+<span>def <span class="ident">contra_map_executor</span></span>(<span>self, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Change the executor running this IO.
+:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def contra_map_executor(self, f):
+    &#34;&#34;&#34;
+    Change the executor running this IO.
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+    return Resource(self.create.contra_map_executor(f))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.contra_map_read"><code class="name flex">
@@ -1482,6 +1708,7 @@ are released then).</p></div>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="two-column">
+<li><code><a title="raffiot.untyped.resource.async_" href="#raffiot.untyped.resource.async_">async_</a></code></li>
 <li><code><a title="raffiot.untyped.resource.defer" href="#raffiot.untyped.resource.defer">defer</a></code></li>
 <li><code><a title="raffiot.untyped.resource.defer_resource" href="#raffiot.untyped.resource.defer_resource">defer_resource</a></code></li>
 <li><code><a title="raffiot.untyped.resource.error" href="#raffiot.untyped.resource.error">error</a></code></li>
@@ -1494,7 +1721,9 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.panic" href="#raffiot.untyped.resource.panic">panic</a></code></li>
 <li><code><a title="raffiot.untyped.resource.pure" href="#raffiot.untyped.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.resource.read" href="#raffiot.untyped.resource.read">read</a></code></li>
+<li><code><a title="raffiot.untyped.resource.read_executor" href="#raffiot.untyped.resource.read_executor">read_executor</a></code></li>
 <li><code><a title="raffiot.untyped.resource.traverse" href="#raffiot.untyped.resource.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.untyped.resource.yield_" href="#raffiot.untyped.resource.yield_">yield_</a></code></li>
 <li><code><a title="raffiot.untyped.resource.zip" href="#raffiot.untyped.resource.zip">zip</a></code></li>
 </ul>
 </li>
@@ -1506,6 +1735,7 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.Resource.ap" href="#raffiot.untyped.resource.Resource.ap">ap</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.attempt" href="#raffiot.untyped.resource.Resource.attempt">attempt</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.catch" href="#raffiot.untyped.resource.Resource.catch">catch</a></code></li>
+<li><code><a title="raffiot.untyped.resource.Resource.contra_map_executor" href="#raffiot.untyped.resource.Resource.contra_map_executor">contra_map_executor</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.contra_map_read" href="#raffiot.untyped.resource.Resource.contra_map_read">contra_map_read</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.create" href="#raffiot.untyped.resource.Resource.create">create</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.finally_" href="#raffiot.untyped.resource.Resource.finally_">finally_</a></code></li>
