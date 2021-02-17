@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = "0.0.6.6"
+version = "0.0.7"
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -16,7 +16,7 @@ setup(
     author="chrilves",
     author_email="calves@crans.org",
     url="https://github.com/chrilves/raffiot.py",
-    download_url=f"https://github.com/chrilves/raffiot.py/archive/v{version}.tar.gz",
+    download_url=f"https://github.com/chrilves/raffiot.py/archive/{version}.tar.gz",
     keywords=[
         "IO",
         "MONAD",

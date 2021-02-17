@@ -1,12 +1,12 @@
 {% set name = "raffiot" %}
-{% set version = "0.0.6.6" %}
+{% set version = "0.0.7" %}
 
 package:
   name: "{{ name|lower }}"
   version: "{{ version }}"
 
 source:
-  git_rev: "v{{ version }}"
+  git_rev: "{{ version }}"
   git_url: "https://github.com/chrilves/raffiot.py"
 
 build:
