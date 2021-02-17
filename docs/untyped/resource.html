@@ -41,6 +41,7 @@ from raffiot.untyped import result, io, _MatchError
 from raffiot.untyped.io import IO
 from raffiot.untyped.result import Result, Ok, Error, Panic
 from concurrent.futures import Executor
+from raffiot.untyped.__internal import *
 
 
 @dataclass
@@ -293,7 +294,7 @@ def pure(a):
     return Resource(io.pure((a, io.pure(None))))
 
 
-def defer(deferred):
+def defer(deferred, *args, **kwargs):
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -301,10 +302,10 @@ def defer(deferred):
 
     For more details, see `io.defer`
     &#34;&#34;&#34;
-    return liftIO(io.defer(deferred))
+    return liftIO(io.defer(deferred, *args, **kwargs))
 
 
-def defer_resource(deferred):
+def defer_resource(deferred, *args, **kwargs):
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
 
@@ -314,7 +315,29 @@ def defer_resource(deferred):
 
     For more information see `io.defer_io`
     &#34;&#34;&#34;
-    return Resource(io.defer(deferred).flat_map(lambda rs: rs.create))
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_io(f, *args, **kwargs))
+
+
+def defer_read(deferred, *args, **kwargs):
+    &#34;&#34;&#34;
+    Similar to io.defer_read but for Resource.
+    &#34;&#34;&#34;
+    return liftIO(io.defer_read(deferred, *args, **kwargs))
+
+
+def defer_read_resource(deferred, *args, **kwargs):
+    &#34;&#34;&#34;
+    Similar to io.defer_read_io but for Resource.
+    &#34;&#34;&#34;
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_read_io(f, *args, **kwargs))
 
 
 def read():
@@ -619,7 +642,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer"><code class="name flex">
-<span>def <span class="ident">defer</span></span>(<span>deferred)</span>
+<span>def <span class="ident">defer</span></span>(<span>deferred, *args, **kwargs)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Defer a computation.</p>
@@ -629,7 +652,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer(deferred):
+<pre><code class="python">def defer(deferred, *args, **kwargs):
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -637,11 +660,47 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 
     For more details, see `io.defer`
     &#34;&#34;&#34;
-    return liftIO(io.defer(deferred))</code></pre>
+    return liftIO(io.defer(deferred, *args, **kwargs))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.defer_read"><code class="name flex">
+<span>def <span class="ident">defer_read</span></span>(<span>deferred, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Similar to io.defer_read but for Resource.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer_read(deferred, *args, **kwargs):
+    &#34;&#34;&#34;
+    Similar to io.defer_read but for Resource.
+    &#34;&#34;&#34;
+    return liftIO(io.defer_read(deferred, *args, **kwargs))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.defer_read_resource"><code class="name flex">
+<span>def <span class="ident">defer_read_resource</span></span>(<span>deferred, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Similar to io.defer_read_io but for Resource.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer_read_resource(deferred, *args, **kwargs):
+    &#34;&#34;&#34;
+    Similar to io.defer_read_io but for Resource.
+    &#34;&#34;&#34;
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_read_io(f, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer_resource"><code class="name flex">
-<span>def <span class="ident">defer_resource</span></span>(<span>deferred)</span>
+<span>def <span class="ident">defer_resource</span></span>(<span>deferred, *args, **kwargs)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Make a function that returns an <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code>, a <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code> itself.</p>
@@ -653,7 +712,7 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_resource(deferred):
+<pre><code class="python">def defer_resource(deferred, *args, **kwargs):
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
 
@@ -663,7 +722,11 @@ eliminates stack overflow.</p>
 
     For more information see `io.defer_io`
     &#34;&#34;&#34;
-    return Resource(io.defer(deferred).flat_map(lambda rs: rs.create))</code></pre>
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_io(f, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.error"><code class="name flex">
@@ -1710,6 +1773,8 @@ are released then).</p></div>
 <ul class="two-column">
 <li><code><a title="raffiot.untyped.resource.async_" href="#raffiot.untyped.resource.async_">async_</a></code></li>
 <li><code><a title="raffiot.untyped.resource.defer" href="#raffiot.untyped.resource.defer">defer</a></code></li>
+<li><code><a title="raffiot.untyped.resource.defer_read" href="#raffiot.untyped.resource.defer_read">defer_read</a></code></li>
+<li><code><a title="raffiot.untyped.resource.defer_read_resource" href="#raffiot.untyped.resource.defer_read_resource">defer_read_resource</a></code></li>
 <li><code><a title="raffiot.untyped.resource.defer_resource" href="#raffiot.untyped.resource.defer_resource">defer_resource</a></code></li>
 <li><code><a title="raffiot.untyped.resource.error" href="#raffiot.untyped.resource.error">error</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_io_resource" href="#raffiot.untyped.resource.from_io_resource">from_io_resource</a></code></li>

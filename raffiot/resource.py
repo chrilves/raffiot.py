@@ -12,6 +12,7 @@ from raffiot import result, io, _MatchError
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
 from concurrent.futures import Executor
+from raffiot.__internal import *
 
 R = TypeVar("R")
 E = TypeVar("E")
@@ -303,7 +304,7 @@ def pure(a: A) -> Resource[R, E, A]:
     return Resource(io.pure((a, io.pure(None))))
 
 
-def defer(deferred: Callable[[], A]) -> Resource[R, E, A]:
+def defer(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
     """
     Defer a computation.
 
@@ -311,10 +312,12 @@ def defer(deferred: Callable[[], A]) -> Resource[R, E, A]:
 
     For more details, see `io.defer`
     """
-    return liftIO(io.defer(deferred))
+    return liftIO(io.defer(deferred, *args, **kwargs))
 
 
-def defer_resource(deferred: Callable[[], Resource[R, E, A]]) -> Resource[R, E, A]:
+def defer_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -> Resource[R, E, A]:
     """
     Make a function that returns an `Resource`, a `Resource` itself.
 
@@ -324,7 +327,31 @@ def defer_resource(deferred: Callable[[], Resource[R, E, A]]) -> Resource[R, E, 
 
     For more information see `io.defer_io`
     """
-    return Resource(io.defer(deferred).flat_map(lambda rs: rs.create))
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_io(f, *args, **kwargs))
+
+
+def defer_read(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
+    """
+    Similar to io.defer_read but for Resource.
+    """
+    return liftIO(io.defer_read(deferred, *args, **kwargs))
+
+
+def defer_read_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -> Resource[R, E, A]:
+    """
+    Similar to io.defer_read_io but for Resource.
+    """
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_read_io(f, *args, **kwargs))
 
 
 def read() -> Resource[R, E, R]:

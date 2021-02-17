@@ -483,6 +483,36 @@ def read_executor() -> IO[R, E, Executor]:
     return IO(IOTag.EXECUTOR, None)
 
 
+def defer_read(deferred: Callable[[], A], *args, **kwargs) -> IO[R, E, A]:
+    """
+    Like defer, but the function as first argument must be of the form:
+
+    >>> def f(context:R, executor:Executor, *args, **kwargs) -> Result[E,A]:
+
+    :param deferred: the function to defer. Its first and second positional
+                     arguments must be the context and the executor
+    :param args:
+    :param kwargs:
+    :return:
+    """
+    return IO(IOTag.DEFER_READ, (deferred, args, kwargs))
+
+
+def defer_read_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -> IO[R, E, A]:
+    """
+    Like defer, but the function as first argument must be of the form:
+
+    >>> def f(context:R, executor:Executor, *args, **kwargs) -> IO[R,E,A]:
+
+    :param deferred: the function to defer. Its first and second positional
+                     arguments must be the context and the executor
+    :param args:
+    :param kwargs:
+    :return:
+    """
+    return IO(IOTag.DEFER_READ_IO, (deferred, args, kwargs))
+
+
 def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, Iterable[A2]]:
     """
     Apply the function `f` to every element of the iterable.

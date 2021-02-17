@@ -188,6 +188,30 @@ class TestResource(TestCase):
 
         assert f(i).run(None) == Ok(2 * i)
 
+    @given(st.integers(), st.integers())
+    def test_defer_read(self, i: int, k: int) -> None:
+        def g(j: int) -> Result[E, A]:
+            if j % 3 == 0:
+                return Ok(j)
+            if j % 3 == 1:
+                return Error(j)
+            return Panic(_MatchError(j))
+
+        def f(context: R, executor: Executor, j: int) -> Result[E, A]:
+            return g(j + k)
+
+        assert defer_read(f, i).run(k) == g(i + k)
+
+    @given(st.integers(min_value=1000, max_value=2000))
+    def test_defer_read_io(self, i: int) -> None:
+        def f(context: R, executor: Executor, j: int) -> IO[Any, Any, int]:
+            if j <= 0:
+                return pure(0)
+            else:
+                return defer_read_io(f, j - 1).map(lambda x: x + 2)
+
+        assert defer_read_io(f, i).run(None) == Ok(2 * i)
+
     @given(st.integers(min_value=0, max_value=10))
     def test_recursion(self, i: int) -> None:
         def f(j: int) -> IO[Any, Any, int]:

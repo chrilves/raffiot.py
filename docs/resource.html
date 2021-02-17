@@ -43,6 +43,7 @@ from raffiot import result, io, _MatchError
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
 from concurrent.futures import Executor
+from raffiot.__internal import *
 
 R = TypeVar(&#34;R&#34;)
 E = TypeVar(&#34;E&#34;)
@@ -334,7 +335,7 @@ def pure(a: A) -&gt; Resource[R, E, A]:
     return Resource(io.pure((a, io.pure(None))))
 
 
-def defer(deferred: Callable[[], A]) -&gt; Resource[R, E, A]:
+def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -342,10 +343,12 @@ def defer(deferred: Callable[[], A]) -&gt; Resource[R, E, A]:
 
     For more details, see `io.defer`
     &#34;&#34;&#34;
-    return liftIO(io.defer(deferred))
+    return liftIO(io.defer(deferred, *args, **kwargs))
 
 
-def defer_resource(deferred: Callable[[], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+def defer_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
 
@@ -355,7 +358,31 @@ def defer_resource(deferred: Callable[[], Resource[R, E, A]]) -&gt; Resource[R, 
 
     For more information see `io.defer_io`
     &#34;&#34;&#34;
-    return Resource(io.defer(deferred).flat_map(lambda rs: rs.create))
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_io(f, *args, **kwargs))
+
+
+def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    Similar to io.defer_read but for Resource.
+    &#34;&#34;&#34;
+    return liftIO(io.defer_read(deferred, *args, **kwargs))
+
+
+def defer_read_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    Similar to io.defer_read_io but for Resource.
+    &#34;&#34;&#34;
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_read_io(f, *args, **kwargs))
 
 
 def read() -&gt; Resource[R, E, R]:
@@ -670,7 +697,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.resource.defer"><code class="name flex">
-<span>def <span class="ident">defer</span></span>(<span>deferred: Callable[[], A]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Defer a computation.</p>
@@ -680,7 +707,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer(deferred: Callable[[], A]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -688,11 +715,49 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 
     For more details, see `io.defer`
     &#34;&#34;&#34;
-    return liftIO(io.defer(deferred))</code></pre>
+    return liftIO(io.defer(deferred, *args, **kwargs))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.resource.defer_read"><code class="name flex">
+<span>def <span class="ident">defer_read</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Similar to io.defer_read but for Resource.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    Similar to io.defer_read but for Resource.
+    &#34;&#34;&#34;
+    return liftIO(io.defer_read(deferred, *args, **kwargs))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.resource.defer_read_resource"><code class="name flex">
+<span>def <span class="ident">defer_read_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Similar to io.defer_read_io but for Resource.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer_read_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    Similar to io.defer_read_io but for Resource.
+    &#34;&#34;&#34;
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_read_io(f, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.defer_resource"><code class="name flex">
-<span>def <span class="ident">defer_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Make a function that returns an <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code>, a <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code> itself.</p>
@@ -704,7 +769,9 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_resource(deferred: Callable[[], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def defer_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
 
@@ -714,7 +781,11 @@ eliminates stack overflow.</p>
 
     For more information see `io.defer_io`
     &#34;&#34;&#34;
-    return Resource(io.defer(deferred).flat_map(lambda rs: rs.create))</code></pre>
+
+    def f(*a, **kw):
+        return deferred(*a, **kw).create
+
+    return Resource(io.defer_io(f, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.error"><code class="name flex">
@@ -1832,6 +1903,8 @@ def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, Li
 <ul class="two-column">
 <li><code><a title="raffiot.resource.async_" href="#raffiot.resource.async_">async_</a></code></li>
 <li><code><a title="raffiot.resource.defer" href="#raffiot.resource.defer">defer</a></code></li>
+<li><code><a title="raffiot.resource.defer_read" href="#raffiot.resource.defer_read">defer_read</a></code></li>
+<li><code><a title="raffiot.resource.defer_read_resource" href="#raffiot.resource.defer_read_resource">defer_read_resource</a></code></li>
 <li><code><a title="raffiot.resource.defer_resource" href="#raffiot.resource.defer_resource">defer_resource</a></code></li>
 <li><code><a title="raffiot.resource.error" href="#raffiot.resource.error">error</a></code></li>
 <li><code><a title="raffiot.resource.from_io_resource" href="#raffiot.resource.from_io_resource">from_io_resource</a></code></li>

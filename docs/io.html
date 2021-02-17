@@ -512,6 +512,36 @@ def read_executor() -&gt; IO[R, E, Executor]:
     return IO(IOTag.EXECUTOR, None)
 
 
+def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Like defer, but the function as first argument must be of the form:
+
+    &gt;&gt;&gt; def f(context:R, executor:Executor, *args, **kwargs) -&gt; Result[E,A]:
+
+    :param deferred: the function to defer. Its first and second positional
+                     arguments must be the context and the executor
+    :param args:
+    :param kwargs:
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.DEFER_READ, (deferred, args, kwargs))
+
+
+def defer_read_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Like defer, but the function as first argument must be of the form:
+
+    &gt;&gt;&gt; def f(context:R, executor:Executor, *args, **kwargs) -&gt; IO[R,E,A]:
+
+    :param deferred: the function to defer. Its first and second positional
+                     arguments must be the context and the executor
+    :param args:
+    :param kwargs:
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.DEFER_READ_IO, (deferred, args, kwargs))
+
+
 def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, Iterable[A2]]:
     &#34;&#34;&#34;
     Apply the function `f` to every element of the iterable.
@@ -773,6 +803,68 @@ RecursionError: maximum recursion depth exceeded
         &gt;&gt; f().run(None)
     &#34;&#34;&#34;
     return IO(IOTag.DEFER_IO, (deferred, args, kwargs))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.io.defer_read"><code class="name flex">
+<span>def <span class="ident">defer_read</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Like defer, but the function as first argument must be of the form:</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; def f(context:R, executor:Executor, *args, **kwargs) -&gt; Result[E,A]:
+</code></pre>
+<p>:param deferred: the function to defer. Its first and second positional
+arguments must be the context and the executor
+:param args:
+:param kwargs:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Like defer, but the function as first argument must be of the form:
+
+    &gt;&gt;&gt; def f(context:R, executor:Executor, *args, **kwargs) -&gt; Result[E,A]:
+
+    :param deferred: the function to defer. Its first and second positional
+                     arguments must be the context and the executor
+    :param args:
+    :param kwargs:
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.DEFER_READ, (deferred, args, kwargs))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.io.defer_read_io"><code class="name flex">
+<span>def <span class="ident">defer_read_io</span></span>(<span>deferred: Callable[[], <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Like defer, but the function as first argument must be of the form:</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; def f(context:R, executor:Executor, *args, **kwargs) -&gt; IO[R,E,A]:
+</code></pre>
+<p>:param deferred: the function to defer. Its first and second positional
+arguments must be the context and the executor
+:param args:
+:param kwargs:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def defer_read_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Like defer, but the function as first argument must be of the form:
+
+    &gt;&gt;&gt; def f(context:R, executor:Executor, *args, **kwargs) -&gt; IO[R,E,A]:
+
+    :param deferred: the function to defer. Its first and second positional
+                     arguments must be the context and the executor
+    :param args:
+    :param kwargs:
+    :return:
+    &#34;&#34;&#34;
+    return IO(IOTag.DEFER_READ_IO, (deferred, args, kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.error"><code class="name flex">
@@ -1771,6 +1863,8 @@ def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
 <li><code><a title="raffiot.io.async_" href="#raffiot.io.async_">async_</a></code></li>
 <li><code><a title="raffiot.io.defer" href="#raffiot.io.defer">defer</a></code></li>
 <li><code><a title="raffiot.io.defer_io" href="#raffiot.io.defer_io">defer_io</a></code></li>
+<li><code><a title="raffiot.io.defer_read" href="#raffiot.io.defer_read">defer_read</a></code></li>
+<li><code><a title="raffiot.io.defer_read_io" href="#raffiot.io.defer_read_io">defer_read_io</a></code></li>
 <li><code><a title="raffiot.io.error" href="#raffiot.io.error">error</a></code></li>
 <li><code><a title="raffiot.io.from_result" href="#raffiot.io.from_result">from_result</a></code></li>
 <li><code><a title="raffiot.io.panic" href="#raffiot.io.panic">panic</a></code></li>

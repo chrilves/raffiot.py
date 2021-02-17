@@ -34,6 +34,8 @@ class IOTag(Enum):
     ASYNC = 17  # DOUBLE_NEGATION
     EXECUTOR = 18  #
     CONTRA_MAP_EXECUTOR = 19  # MAIN FUN
+    DEFER_READ = 20  # FUN ARGS KWARGS
+    DEFER_READ_IO = 21  # FUN ARGS KWARGS
 
 
 @final
@@ -248,6 +250,44 @@ class Fiber:
                                 raise Exception(f"{new_executor} is not an Executor!")
                             self.executor = new_executor
                             io = io._IO__fields[1]
+                            continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    if tag == IOTag.DEFER_READ:
+                        try:
+                            res = io._IO__fields[0](
+                                *(context, self.executor, *io._IO__fields[1]),
+                                **io._IO__fields[2],
+                            )
+                            if isinstance(res, Ok):
+                                arg_tag = ResultTag.OK
+                                arg_value = res.success
+                                break
+                            if isinstance(res, Error):
+                                arg_tag = ResultTag.ERROR
+                                arg_value = res.error
+                                break
+                            if isinstance(res, Panic):
+                                arg_tag = ResultTag.PANIC
+                                arg_value = res.exception
+                                break
+                            arg_tag = ResultTag.PANIC
+                            arg_value = Panic(
+                                _MatchError("{res} should be a Result in defer_read")
+                            )
+                            break
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        break
+                    if tag == IOTag.DEFER_READ_IO:
+                        try:
+                            io = io._IO__fields[0](
+                                *(context, self.executor, *io._IO__fields[1]),
+                                **io._IO__fields[2],
+                            )
                             continue
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
