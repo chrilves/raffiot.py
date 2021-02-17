@@ -8,8 +8,10 @@ from __future__ import annotations
 from typing_extensions import final
 from raffiot import result, _MatchError
 from raffiot.result import Ok, Error, Panic
-from concurrent.futures import Executor
+from concurrent.futures import Executor, wait
 from enum import Enum
+from queue import Queue
+import threading
 
 
 @final
@@ -36,6 +38,8 @@ class IOTag(Enum):
     CONTRA_MAP_EXECUTOR = 19  # MAIN FUN
     DEFER_READ = 20  # FUN ARGS KWARGS
     DEFER_READ_IO = 21  # FUN ARGS KWARGS
+    PARALLEL = 22  # IOS
+    WAIT = 23  # FIBERS
 
 
 @final
@@ -60,35 +64,113 @@ class ResultTag(Enum):
 
 
 @final
-class FiberStatus(Enum):
-    RUNNING = 0
-    SUSPENDED = 1
-    FINISHED = 2
+class Monitor:
+    """
+    Used to know if there is still some futures running.
+    Every future created when running fibers must be registered
+    in the monitor.
+    The monitor waits until there is no more future running.
+    """
+
+    __slots__ = ["__executor", "__lock", "__queue"]
+
+    def __init__(self, executor: Executor):
+        self.__executor = executor
+        self.__lock = threading.Lock()
+        self.__queue = []
+
+    def register_future(self, future):
+        with self.__lock:
+            self.__queue.append(future)
+
+    def wait_for_completion(self):
+        ok = True
+        while ok:
+            with self.__lock:
+                futures = self.__queue
+                self.__queue = []
+            wait(futures)
+            with self.__lock:
+                ok = not (not self.__queue)
 
 
 @final
 class Fiber:
-    __slots__ = ["io", "context", "cont", "executor", "status", "future", "result"]
+    __slots__ = [
+        "__io",
+        "__context",
+        "__cont",
+        "__executor",
+        "__monitor",
+        "result",
+        "__finish_lock",
+        "finished",
+        "__callbacks",
+        "__waiting_lock",
+        "__waiting",
+        "__nb_waiting",
+    ]
 
-    @final
-    def __init__(self, io, context, executor: Executor):
-        self.io = io
-        self.context = context
-        self.cont = [ContTag.ID]
-        self.executor = executor
-        self.status = FiberStatus.RUNNING
-        self.future = None
+    def __init__(self, io, context, executor: Executor, monitor: Monitor):
+        self.__io = io
+        self.__context = context
+        self.__cont = [ContTag.ID]
+        self.__executor = executor
+        self.__monitor = monitor
         self.result = None
 
-    @final
-    def schedule(self):
-        self.future = self.executor.submit(self.step)
+        self.__finish_lock = threading.Lock()
+        self.finished = False
+        self.__callbacks = Queue()
 
-    @final
-    def step(self):
-        context = self.context
-        io = self.io
-        cont = self.cont
+        self.__waiting_lock = threading.Lock()
+        self.__waiting = []
+        self.__nb_waiting = 0
+
+    def __schedule(self):
+        self.__monitor.register_future(self.__executor.submit(self.__step))
+
+    def __finish(self):
+        with self.__finish_lock:
+            self.finished = True
+            while not self.__callbacks.empty():
+                fiber, index = self.__callbacks.get()
+                fiber.__run_callback(index, self.result)
+
+    def __add_callback(self, fiber, index):
+        with self.__finish_lock:
+            if self.finished:
+                fiber.__run_callback(index, self.result)
+            else:
+                self.__callbacks.put((fiber, index))
+
+    def __run_callback(self, index, res):
+        with self.__waiting_lock:
+            self.__waiting[index] = res
+            self.__nb_waiting -= 1
+            if self.__nb_waiting == 0:
+                from raffiot.io import IO
+
+                self.__io = IO(IOTag.PURE, self.__waiting)
+                self.__waiting = None
+                self.__schedule()
+
+    @classmethod
+    def run(cls, io, context, executor):
+        monitor = Monitor(executor)
+        fiber = Fiber(io, context, executor, monitor)
+        fiber.__schedule()
+        monitor.wait_for_completion()
+        return fiber.result
+
+    @classmethod
+    def run_async(cls, io, context, executor):
+        return executor.submit(cls.run, io, context, executor)
+
+    def __step(self):
+        context = self.__context
+        io = self.__io
+        cont = self.__cont
 
         try:
             while True:
@@ -111,7 +193,7 @@ class Fiber:
                         io = io._IO__fields[0]
                         continue
                     if tag == IOTag.SEQUENCE:
-                        ios = io._IO__fields
+                        ios = iter(io._IO__fields)
                         try:
                             io = next(ios)
                         except StopIteration:
@@ -126,7 +208,7 @@ class Fiber:
                         cont.append(ContTag.SEQUENCE)
                         continue
                     if tag == IOTag.ZIP:
-                        ios = io._IO__fields
+                        ios = iter(io._IO__fields)
                         try:
                             io = next(ios)
                         except StopIteration:
@@ -213,42 +295,39 @@ class Fiber:
                     if tag == IOTag.YIELD:
                         from raffiot.io import IO
 
-                        self.io = IO(IOTag.PURE, None)
-                        self.context = context
-                        self.cont = cont
-                        self.schedule()
+                        self.__io = IO(IOTag.PURE, None)
+                        self.__context = context
+                        self.__cont = cont
+                        self.__schedule()
                         return
                     if tag == IOTag.ASYNC:
                         from raffiot.io import from_result
 
                         def callback(r):
-                            self.status = FiberStatus.RUNNING
-                            self.io = from_result(r)
-                            self.schedule()
+                            self.__io = from_result(r)
+                            self.__schedule()
 
-                        self.status = FiberStatus.SUSPENDED
-                        self.context = context
-                        self.cont = cont
+                        self.__context = context
+                        self.__cont = cont
                         try:
-                            self.future = io._IO__fields(
-                                context, self.executor, callback
+                            self.__monitor.register_future(
+                                io._IO__fields(context, self.__executor, callback)
                             )
                             return
                         except Exception as exception:
-                            self.status = FiberStatus.RUNNING
                             arg_tag = ResultTag.PANIC
                             arg_value = exception
                             break
                     if tag == IOTag.EXECUTOR:
                         arg_tag = ResultTag.OK
-                        arg_value = self.executor
+                        arg_value = self.__executor
                         break
                     if tag == IOTag.CONTRA_MAP_EXECUTOR:
                         try:
-                            new_executor = io._IO__fields[0](self.executor)
+                            new_executor = io._IO__fields[0](self.__executor)
                             if not isinstance(new_executor, Executor):
                                 raise Exception(f"{new_executor} is not an Executor!")
-                            self.executor = new_executor
+                            self.__executor = new_executor
                             io = io._IO__fields[1]
                             continue
                         except Exception as exception:
@@ -258,7 +337,7 @@ class Fiber:
                     if tag == IOTag.DEFER_READ:
                         try:
                             res = io._IO__fields[0](
-                                *(context, self.executor, *io._IO__fields[1]),
+                                *(context, self.__executor, *io._IO__fields[1]),
                                 **io._IO__fields[2],
                             )
                             if isinstance(res, Ok):
@@ -285,7 +364,7 @@ class Fiber:
                     if tag == IOTag.DEFER_READ_IO:
                         try:
                             io = io._IO__fields[0](
-                                *(context, self.executor, *io._IO__fields[1]),
+                                *(context, self.__executor, *io._IO__fields[1]),
                                 **io._IO__fields[2],
                             )
                             continue
@@ -293,6 +372,25 @@ class Fiber:
                             arg_tag = ResultTag.PANIC
                             arg_value = exception
                             break
+                    if tag == IOTag.PARALLEL:
+                        arg_value = []
+                        for fio in io._IO__fields:
+                            fiber = Fiber(fio, context, self.__executor, self.__monitor)
+                            arg_value.append(fiber)
+                            fiber.__schedule()
+                        arg_tag = ResultTag.OK
+                        break
+                    if tag == IOTag.WAIT:
+                        fibers = io._IO__fields
+                        if not fibers:
+                            arg_tag = ResultTag.OK
+                            arg_value = []
+                            break
+                        self.__waiting = [None for _ in fibers]
+                        self.__nb_waiting = len(fibers)
+                        for index, fib in enumerate(fibers):
+                            fib.__add_callback(self, index)
+                        return
                     arg_tag = ResultTag.PANIC
                     arg_value = _MatchError(f"{io} should be an IO")
                     break
@@ -301,17 +399,17 @@ class Fiber:
                 while True:
                     tag = cont.pop()
                     if tag == ContTag.ID:
-                        self.status = FiberStatus.FINISHED
                         if arg_tag == ResultTag.OK:
                             self.result = Ok(arg_value)
-                            return
-                        if arg_tag == ResultTag.ERROR:
+                        elif arg_tag == ResultTag.ERROR:
                             self.result = Error(arg_value)
-                            return
-                        if arg_tag == ResultTag.PANIC:
+                        elif arg_tag == ResultTag.PANIC:
                             self.result = Panic(arg_value)
-                            return
-                        self.result = Panic(_MatchError(f"Wrong result tag {arg_tag}"))
+                        else:
+                            self.result = Panic(
+                                _MatchError(f"Wrong result tag {arg_tag}")
+                            )
+                        self.__finish()
                         return
                     if tag == ContTag.MAP:
                         fun = cont.pop()
@@ -429,5 +527,5 @@ class Fiber:
                     arg_tag = ResultTag.PANIC
                     arg_value = Panic(_MatchError(f"Invalid cont {cont + [tag]}"))
         except Exception as exception:
-            self.status = FiberStatus.FINISHED
+            self.finished = True
             self.result = Panic(exception)

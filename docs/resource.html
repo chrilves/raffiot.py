@@ -77,7 +77,6 @@ class Resource(Generic[R, E, A]):
         &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
     &#34;&#34;&#34;
 
-    @final
     def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
         &#34;&#34;&#34;
         Create a resource a:A and use it in fun.
@@ -101,7 +100,6 @@ class Resource(Generic[R, E, A]):
 
         return self.create.flat_map(safe_use)
 
-    @final
     def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Transform the created resource with f if the creation is successful.
@@ -119,7 +117,6 @@ class Resource(Generic[R, E, A]):
 
         return Resource(self.create.flat_map(safe_map))
 
-    @final
     def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
@@ -154,7 +151,6 @@ class Resource(Generic[R, E, A]):
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 
-    @final
     def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
@@ -162,7 +158,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return self.flat_map(lambda _: rs)
 
-    @final
     def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
         &#34;&#34;&#34;
         Pack a list of resources (including self) into a Resource creating the
@@ -173,7 +168,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return zip((self, *rs))
 
-    @final
     def ap(
         self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
     ) -&gt; Resource[R, E, A]:
@@ -186,7 +180,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
-    @final
     def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Concatenation function on Resource
@@ -195,7 +188,6 @@ class Resource(Generic[R, E, A]):
 
     # Reader API
 
-    @final
     def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
         &#34;&#34;&#34;
         Transform the context with f.
@@ -209,7 +201,6 @@ class Resource(Generic[R, E, A]):
 
     # Error API
 
-    @final
     def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
@@ -218,7 +209,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return Resource(self.create.catch(lambda e: handler(e).create))
 
-    @final
     def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the stored error if the resource creation fails on an error.
@@ -228,7 +218,6 @@ class Resource(Generic[R, E, A]):
 
     # Panic
 
-    @final
     def recover(
         self, handler: Callable[[Exception], Resource[R, E, A]]
     ) -&gt; Resource[R, E, A]:
@@ -239,7 +228,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return Resource(self.create.recover(lambda p: handler(p).create))
 
-    @final
     def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the exception stored if the computation fails on a panic.
@@ -249,7 +237,6 @@ class Resource(Generic[R, E, A]):
             self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
         )
 
-    @final
     def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
         &#34;&#34;&#34;
         Transform this Resource that may fail into a Resource
@@ -275,7 +262,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    @final
     def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
@@ -287,7 +273,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
 
-    @final
     def on_failure(
         self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
     ) -&gt; IO[R, E, A]:
@@ -308,7 +293,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    @final
     def contra_map_executor(
         self, f: Callable[[Executor], Executor]
     ) -&gt; Resource[R, E, A]:
@@ -1183,7 +1167,6 @@ class Resource(Generic[R, E, A]):
         &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
     &#34;&#34;&#34;
 
-    @final
     def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
         &#34;&#34;&#34;
         Create a resource a:A and use it in fun.
@@ -1207,7 +1190,6 @@ class Resource(Generic[R, E, A]):
 
         return self.create.flat_map(safe_use)
 
-    @final
     def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Transform the created resource with f if the creation is successful.
@@ -1225,7 +1207,6 @@ class Resource(Generic[R, E, A]):
 
         return Resource(self.create.flat_map(safe_map))
 
-    @final
     def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
@@ -1260,7 +1241,6 @@ class Resource(Generic[R, E, A]):
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 
-    @final
     def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
@@ -1268,7 +1248,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return self.flat_map(lambda _: rs)
 
-    @final
     def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
         &#34;&#34;&#34;
         Pack a list of resources (including self) into a Resource creating the
@@ -1279,7 +1258,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return zip((self, *rs))
 
-    @final
     def ap(
         self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
     ) -&gt; Resource[R, E, A]:
@@ -1292,7 +1270,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
-    @final
     def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Concatenation function on Resource
@@ -1301,7 +1278,6 @@ class Resource(Generic[R, E, A]):
 
     # Reader API
 
-    @final
     def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
         &#34;&#34;&#34;
         Transform the context with f.
@@ -1315,7 +1291,6 @@ class Resource(Generic[R, E, A]):
 
     # Error API
 
-    @final
     def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
@@ -1324,7 +1299,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return Resource(self.create.catch(lambda e: handler(e).create))
 
-    @final
     def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the stored error if the resource creation fails on an error.
@@ -1334,7 +1308,6 @@ class Resource(Generic[R, E, A]):
 
     # Panic
 
-    @final
     def recover(
         self, handler: Callable[[Exception], Resource[R, E, A]]
     ) -&gt; Resource[R, E, A]:
@@ -1345,7 +1318,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return Resource(self.create.recover(lambda p: handler(p).create))
 
-    @final
     def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the exception stored if the computation fails on a panic.
@@ -1355,7 +1327,6 @@ class Resource(Generic[R, E, A]):
             self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
         )
 
-    @final
     def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
         &#34;&#34;&#34;
         Transform this Resource that may fail into a Resource
@@ -1381,7 +1352,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    @final
     def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
@@ -1393,7 +1363,6 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
 
-    @final
     def on_failure(
         self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
     ) -&gt; IO[R, E, A]:
@@ -1414,7 +1383,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    @final
     def contra_map_executor(
         self, f: Callable[[Executor], Executor]
     ) -&gt; Resource[R, E, A]:
@@ -1458,8 +1426,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def ap(
+<pre><code class="python">def ap(
     self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
@@ -1492,8 +1459,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
+<pre><code class="python">def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
     &#34;&#34;&#34;
     Transform this Resource that may fail into a Resource
     that never fails but creates a Result[E,A].
@@ -1529,8 +1495,7 @@ def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
@@ -1550,8 +1515,7 @@ def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def contra_map_executor(
+<pre><code class="python">def contra_map_executor(
     self, f: Callable[[Executor], Executor]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
@@ -1572,8 +1536,7 @@ Note that f is not from R to R2 but from R2 to R!</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
+<pre><code class="python">def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
     &#34;&#34;&#34;
     Transform the context with f.
     Note that f is not from R to R2 but from R2 to R!
@@ -1598,8 +1561,7 @@ its result, like executing a lifted IO.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     After having computed self, but before returning its result,
     execute the rs Resource creation.
@@ -1621,8 +1583,7 @@ The resource created by the first one (self) can be used to create the second (f
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
+<pre><code class="python">def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
     &#34;&#34;&#34;
     Chain two Resource.
     The resource created by the first one (self) can be used to create the second (f).
@@ -1666,8 +1627,7 @@ def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Concatenation function on Resource
     &#34;&#34;&#34;
@@ -1684,8 +1644,7 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
+<pre><code class="python">def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
     &#34;&#34;&#34;
     Transform the created resource with f if the creation is successful.
     Do nothing otherwise.
@@ -1713,8 +1672,7 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
+<pre><code class="python">def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
     &#34;&#34;&#34;
     Transform the stored error if the resource creation fails on an error.
     Do nothing otherwise.
@@ -1732,8 +1690,7 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
+<pre><code class="python">def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
     &#34;&#34;&#34;
     Transform the exception stored if the computation fails on a panic.
     Do nothing otherwise.
@@ -1759,8 +1716,7 @@ Do nothing if the resource creation is successful.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def on_failure(
+<pre><code class="python">def on_failure(
     self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
 ) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
@@ -1791,8 +1747,7 @@ def on_failure(
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def recover(
+<pre><code class="python">def recover(
     self, handler: Callable[[Exception], Resource[R, E, A]]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
@@ -1813,8 +1768,7 @@ The resource created by the first one (self) is dropped.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
+<pre><code class="python">def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
     &#34;&#34;&#34;
     Chain two Resource.
     The resource created by the first one (self) is dropped.
@@ -1834,8 +1788,7 @@ its releasing IO). The return value if the result of fun(a).</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
+<pre><code class="python">def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
     &#34;&#34;&#34;
     Create a resource a:A and use it in fun.
 
@@ -1871,8 +1824,7 @@ are released then).</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
+<pre><code class="python">def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Pack a list of resources (including self) into a Resource creating the
     list of all resources.

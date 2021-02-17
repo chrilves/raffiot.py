@@ -46,7 +46,6 @@ class Resource(Generic[R, E, A]):
         >>>     lambda a: (a, io.defer(a.close))))
     """
 
-    @final
     def use(self, fun: Callable[[A], IO[R, E, X]]) -> IO[R, E, X]:
         """
         Create a resource a:A and use it in fun.
@@ -70,7 +69,6 @@ class Resource(Generic[R, E, A]):
 
         return self.create.flat_map(safe_use)
 
-    @final
     def map(self, f: Callable[[A], A2]) -> Resource[R, E, A2]:
         """
         Transform the created resource with f if the creation is successful.
@@ -88,7 +86,6 @@ class Resource(Generic[R, E, A]):
 
         return Resource(self.create.flat_map(safe_map))
 
-    @final
     def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -> Resource[R, E, A2]:
         """
         Chain two Resource.
@@ -123,7 +120,6 @@ class Resource(Generic[R, E, A]):
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 
-    @final
     def then(self, rs: Resource[R, E, A2]) -> Resource[R, E, A2]:
         """
         Chain two Resource.
@@ -131,7 +127,6 @@ class Resource(Generic[R, E, A]):
         """
         return self.flat_map(lambda _: rs)
 
-    @final
     def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
         """
         Pack a list of resources (including self) into a Resource creating the
@@ -142,7 +137,6 @@ class Resource(Generic[R, E, A]):
         """
         return zip((self, *rs))
 
-    @final
     def ap(
         self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
     ) -> Resource[R, E, A]:
@@ -155,7 +149,6 @@ class Resource(Generic[R, E, A]):
         """
         return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
-    @final
     def flatten(self: Resource[R, E, Resource[R, E, A]]) -> Resource[R, E, A]:
         """
         Concatenation function on Resource
@@ -164,7 +157,6 @@ class Resource(Generic[R, E, A]):
 
     # Reader API
 
-    @final
     def contra_map_read(self, f: Callable[[R2], R]) -> Resource[R2, E, A]:
         """
         Transform the context with f.
@@ -178,7 +170,6 @@ class Resource(Generic[R, E, A]):
 
     # Error API
 
-    @final
     def catch(self, handler: Callable[[E], Resource[R, E, A]]) -> Resource[R, E, A]:
         """
         React to errors (the except part of a try-except).
@@ -187,7 +178,6 @@ class Resource(Generic[R, E, A]):
         """
         return Resource(self.create.catch(lambda e: handler(e).create))
 
-    @final
     def map_error(self, f: Callable[[E], E2]) -> Resource[R, E2, A]:
         """
         Transform the stored error if the resource creation fails on an error.
@@ -197,7 +187,6 @@ class Resource(Generic[R, E, A]):
 
     # Panic
 
-    @final
     def recover(
         self, handler: Callable[[Exception], Resource[R, E, A]]
     ) -> Resource[R, E, A]:
@@ -208,7 +197,6 @@ class Resource(Generic[R, E, A]):
         """
         return Resource(self.create.recover(lambda p: handler(p).create))
 
-    @final
     def map_panic(self, f: Callable[[E], E2]) -> Resource[R, E2, A]:
         """
         Transform the exception stored if the computation fails on a panic.
@@ -218,7 +206,6 @@ class Resource(Generic[R, E, A]):
             self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
         )
 
-    @final
     def attempt(self) -> IO[R, Any, Result[E, A]]:
         """
         Transform this Resource that may fail into a Resource
@@ -244,7 +231,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    @final
     def finally_(self, rs: Resource[R, Any, Any]) -> Resource[R, E, A]:
         """
         After having computed self, but before returning its result,
@@ -256,7 +242,6 @@ class Resource(Generic[R, E, A]):
         """
         return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
 
-    @final
     def on_failure(
         self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
     ) -> IO[R, E, A]:
@@ -277,7 +262,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    @final
     def contra_map_executor(
         self, f: Callable[[Executor], Executor]
     ) -> Resource[R, E, A]:

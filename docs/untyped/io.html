@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections import abc
 from raffiot.untyped import result, _MatchError
 from raffiot.untyped.result import Result, Ok, Error, Panic
-from concurrent.futures import Executor, ThreadPoolExecutor, wait
+from concurrent.futures import Executor, ThreadPoolExecutor, Future
 from raffiot.untyped.__internal import *
 
 
@@ -86,8 +86,8 @@ class IO:
         The result of the first one (self) is dropped.
         &#34;&#34;&#34;
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(IOTag.SEQUENCE, iter((self, *others[0])))
-        return IO(IOTag.SEQUENCE, iter((self, *others)))
+            return IO(IOTag.SEQUENCE, list((self, *others[0])))
+        return IO(IOTag.SEQUENCE, list((self, *others)))
 
     def zip(self, *others):
         &#34;&#34;&#34;
@@ -97,8 +97,25 @@ class IO:
         If one IO fails, the whole computation fails.
         &#34;&#34;&#34;
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(IOTag.ZIP, iter((self, *others[0])))
-        return IO(IOTag.ZIP, iter((self, *others)))
+            return IO(IOTag.ZIP, list((self, *others[0])))
+        return IO(IOTag.ZIP, list((self, *others)))
+
+    def parallel(self, *others):
+        &#34;&#34;&#34;
+        Run all these IO (including self) in parallel.
+        Return the list of fibers, in the same order.
+
+        Each Fiber represent a parallel computation. Call
+
+        &gt;&gt;&gt; wait([fiber1, fiber2, ...])
+
+        to wait until the computations of fiber1, fiber2, etc are done.
+        :param l: the list of IO to run in parallel.
+        :return: the same list where each IO has been replaced by its Fiber
+        &#34;&#34;&#34;
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.PARALLEL, list((self, *others[0])))
+        return IO(IOTag.PARALLEL, list((self, *others)))
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -159,7 +176,7 @@ class IO:
         &#34;&#34;&#34;
         return IO(IOTag.CONTRA_MAP_EXECUTOR, (f, self))
 
-    def run(self, context, workers=1):
+    def run(self, context, workers=None):
         &#34;&#34;&#34;
         Run the computation.
 
@@ -174,11 +191,23 @@ class IO:
         returns a panic instead!
         &#34;&#34;&#34;
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            fiber = Fiber(self, context, executor)
-            fiber.schedule()
-            while fiber.status != FiberStatus.FINISHED:
-                fiber.future.result()
-        return fiber.result
+            return Fiber.run(self, context, executor)
+
+    def run_async(self, context, executor):
+        &#34;&#34;&#34;
+        Run the computation.
+
+        Note that a IO is a data structure, no action is performed until you
+        call run. You may view an IO value as a function declaration.
+        Declaring a function does not execute its body. Only calling the
+        function does. Likewise, declaring an IO does not execute its content,
+        only running the IO does.
+
+        Note that the return value is a  `Result`.
+        No exception will be raised by run (unless there is a bug), run will
+        returns a panic instead!
+        &#34;&#34;&#34;
+        return Fiber.run_async(self, context, executor)
 
     def ap(self, *arg):
         &#34;&#34;&#34;
@@ -281,6 +310,15 @@ class IO:
             return f&#34;Executor({self.__fields})&#34;
         if self.__tag == IOTag.CONTRA_MAP_EXECUTOR:
             return f&#34;ContraMapExecutor({self.__fields})&#34;
+
+        if self.__tag == IOTag.DEFER_READ:
+            return f&#34;DeferRead({self.__fields})&#34;
+        if self.__tag == IOTag.DEFER_READ_IO:
+            return f&#34;DeferReadIO({self.__fields})&#34;
+        if self.__tag == IOTag.PARALLEL:
+            return f&#34;Parallel({self.__fields})&#34;
+        if self.__tag == IOTag.WAIT:
+            return f&#34;Wait({self.__fields})&#34;
 
     def __repr__(self):
         return str(self)
@@ -402,8 +440,8 @@ def zip(*l):
     :return:
     &#34;&#34;&#34;
     if len(l) == 1 and isinstance(l[0], abc.Iterable):
-        return IO(IOTag.ZIP, iter(l[0]))
-    return IO(IOTag.ZIP, iter(l))
+        return IO(IOTag.ZIP, list(l[0]))
+    return IO(IOTag.ZIP, list(l))
 
 
 def sequence(*l):
@@ -413,8 +451,8 @@ def sequence(*l):
     :return:
     &#34;&#34;&#34;
     if len(l) == 1 and isinstance(l[0], abc.Iterable):
-        return IO(IOTag.SEQUENCE, iter(l[0]))
-    return IO(IOTag.SEQUENCE, iter(l))
+        return IO(IOTag.SEQUENCE, list(l[0]))
+    return IO(IOTag.SEQUENCE, list(l))
 
 
 def yield_():
@@ -520,6 +558,36 @@ def traverse(l, f):
     :return:
     &#34;&#34;&#34;
     return zip([defer_io(f, a) for a in l])
+
+
+def parallel(*l):
+    &#34;&#34;&#34;
+    Run all these IO in parallel.
+    Return the list of fibers, in the same order.
+
+    Each Fiber represent a parallel computation. Call
+
+    &gt;&gt;&gt; wait([fiber1, fiber2, ...])
+
+    to wait until the computations of fiber1, fiber2, etc are done.
+    :param l: the list of IO to run in parallel.
+    :return: the same list where each IO has been replaced by its Fiber
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.PARALLEL, list(l[0]))
+    return IO(IOTag.PARALLEL, list(l))
+
+
+def wait(*l):
+    &#34;&#34;&#34;
+    Wait until these Fibers finish. Return the list of Result
+    in the same order.
+    :param l:
+    :return:
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.WAIT, list(l[0]))
+    return IO(IOTag.WAIT, list(l))
 
 
 def run_all(l):
@@ -891,6 +959,40 @@ arguments must be the context and the executor
     return IO(IOTag.PANIC, exception)</code></pre>
 </details>
 </dd>
+<dt id="raffiot.untyped.io.parallel"><code class="name flex">
+<span>def <span class="ident">parallel</span></span>(<span>*l)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run all these IO in parallel.
+Return the list of fibers, in the same order.</p>
+<p>Each Fiber represent a parallel computation. Call</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; wait([fiber1, fiber2, ...])
+</code></pre>
+<p>to wait until the computations of fiber1, fiber2, etc are done.
+:param l: the list of IO to run in parallel.
+:return: the same list where each IO has been replaced by its Fiber</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def parallel(*l):
+    &#34;&#34;&#34;
+    Run all these IO in parallel.
+    Return the list of fibers, in the same order.
+
+    Each Fiber represent a parallel computation. Call
+
+    &gt;&gt;&gt; wait([fiber1, fiber2, ...])
+
+    to wait until the computations of fiber1, fiber2, etc are done.
+    :param l: the list of IO to run in parallel.
+    :return: the same list where each IO has been replaced by its Fiber
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.PARALLEL, list(l[0]))
+    return IO(IOTag.PARALLEL, list(l))</code></pre>
+</details>
+</dd>
 <dt id="raffiot.untyped.io.pure"><code class="name flex">
 <span>def <span class="ident">pure</span></span>(<span>a)</span>
 </code></dt>
@@ -1032,8 +1134,8 @@ panic instead.</p></div>
     :return:
     &#34;&#34;&#34;
     if len(l) == 1 and isinstance(l[0], abc.Iterable):
-        return IO(IOTag.SEQUENCE, iter(l[0]))
-    return IO(IOTag.SEQUENCE, iter(l))</code></pre>
+        return IO(IOTag.SEQUENCE, list(l[0]))
+    return IO(IOTag.SEQUENCE, list(l))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.io.traverse"><code class="name flex">
@@ -1062,6 +1164,30 @@ The resulting IO computes the list of results.</p>
     :return:
     &#34;&#34;&#34;
     return zip([defer_io(f, a) for a in l])</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.wait"><code class="name flex">
+<span>def <span class="ident">wait</span></span>(<span>*l)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Wait until these Fibers finish. Return the list of Result
+in the same order.
+:param l:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wait(*l):
+    &#34;&#34;&#34;
+    Wait until these Fibers finish. Return the list of Result
+    in the same order.
+    :param l:
+    :return:
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.WAIT, list(l[0]))
+    return IO(IOTag.WAIT, list(l))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.io.yield_"><code class="name flex">
@@ -1106,8 +1232,8 @@ other tasks be run on the executor until the IO start progressing again.
     :return:
     &#34;&#34;&#34;
     if len(l) == 1 and isinstance(l[0], abc.Iterable):
-        return IO(IOTag.ZIP, iter(l[0]))
-    return IO(IOTag.ZIP, iter(l))</code></pre>
+        return IO(IOTag.ZIP, list(l[0]))
+    return IO(IOTag.ZIP, list(l))</code></pre>
 </details>
 </dd>
 </dl>
@@ -1187,8 +1313,8 @@ use defer and defer_io to avoid stack-overflow.</li>
         The result of the first one (self) is dropped.
         &#34;&#34;&#34;
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(IOTag.SEQUENCE, iter((self, *others[0])))
-        return IO(IOTag.SEQUENCE, iter((self, *others)))
+            return IO(IOTag.SEQUENCE, list((self, *others[0])))
+        return IO(IOTag.SEQUENCE, list((self, *others)))
 
     def zip(self, *others):
         &#34;&#34;&#34;
@@ -1198,8 +1324,25 @@ use defer and defer_io to avoid stack-overflow.</li>
         If one IO fails, the whole computation fails.
         &#34;&#34;&#34;
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(IOTag.ZIP, iter((self, *others[0])))
-        return IO(IOTag.ZIP, iter((self, *others)))
+            return IO(IOTag.ZIP, list((self, *others[0])))
+        return IO(IOTag.ZIP, list((self, *others)))
+
+    def parallel(self, *others):
+        &#34;&#34;&#34;
+        Run all these IO (including self) in parallel.
+        Return the list of fibers, in the same order.
+
+        Each Fiber represent a parallel computation. Call
+
+        &gt;&gt;&gt; wait([fiber1, fiber2, ...])
+
+        to wait until the computations of fiber1, fiber2, etc are done.
+        :param l: the list of IO to run in parallel.
+        :return: the same list where each IO has been replaced by its Fiber
+        &#34;&#34;&#34;
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.PARALLEL, list((self, *others[0])))
+        return IO(IOTag.PARALLEL, list((self, *others)))
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -1260,7 +1403,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         &#34;&#34;&#34;
         return IO(IOTag.CONTRA_MAP_EXECUTOR, (f, self))
 
-    def run(self, context, workers=1):
+    def run(self, context, workers=None):
         &#34;&#34;&#34;
         Run the computation.
 
@@ -1275,11 +1418,23 @@ use defer and defer_io to avoid stack-overflow.</li>
         returns a panic instead!
         &#34;&#34;&#34;
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            fiber = Fiber(self, context, executor)
-            fiber.schedule()
-            while fiber.status != FiberStatus.FINISHED:
-                fiber.future.result()
-        return fiber.result
+            return Fiber.run(self, context, executor)
+
+    def run_async(self, context, executor):
+        &#34;&#34;&#34;
+        Run the computation.
+
+        Note that a IO is a data structure, no action is performed until you
+        call run. You may view an IO value as a function declaration.
+        Declaring a function does not execute its body. Only calling the
+        function does. Likewise, declaring an IO does not execute its content,
+        only running the IO does.
+
+        Note that the return value is a  `Result`.
+        No exception will be raised by run (unless there is a bug), run will
+        returns a panic instead!
+        &#34;&#34;&#34;
+        return Fiber.run_async(self, context, executor)
 
     def ap(self, *arg):
         &#34;&#34;&#34;
@@ -1382,6 +1537,15 @@ use defer and defer_io to avoid stack-overflow.</li>
             return f&#34;Executor({self.__fields})&#34;
         if self.__tag == IOTag.CONTRA_MAP_EXECUTOR:
             return f&#34;ContraMapExecutor({self.__fields})&#34;
+
+        if self.__tag == IOTag.DEFER_READ:
+            return f&#34;DeferRead({self.__fields})&#34;
+        if self.__tag == IOTag.DEFER_READ_IO:
+            return f&#34;DeferReadIO({self.__fields})&#34;
+        if self.__tag == IOTag.PARALLEL:
+            return f&#34;Parallel({self.__fields})&#34;
+        if self.__tag == IOTag.WAIT:
+            return f&#34;Wait({self.__fields})&#34;
 
     def __repr__(self):
         return str(self)</code></pre>
@@ -1660,6 +1824,40 @@ Do nothing if the computation is successful.</p>
     )</code></pre>
 </details>
 </dd>
+<dt id="raffiot.untyped.io.IO.parallel"><code class="name flex">
+<span>def <span class="ident">parallel</span></span>(<span>self, *others)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run all these IO (including self) in parallel.
+Return the list of fibers, in the same order.</p>
+<p>Each Fiber represent a parallel computation. Call</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; wait([fiber1, fiber2, ...])
+</code></pre>
+<p>to wait until the computations of fiber1, fiber2, etc are done.
+:param l: the list of IO to run in parallel.
+:return: the same list where each IO has been replaced by its Fiber</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def parallel(self, *others):
+    &#34;&#34;&#34;
+    Run all these IO (including self) in parallel.
+    Return the list of fibers, in the same order.
+
+    Each Fiber represent a parallel computation. Call
+
+    &gt;&gt;&gt; wait([fiber1, fiber2, ...])
+
+    to wait until the computations of fiber1, fiber2, etc are done.
+    :param l: the list of IO to run in parallel.
+    :return: the same list where each IO has been replaced by its Fiber
+    &#34;&#34;&#34;
+    if len(others) == 1 and isinstance(others[0], abc.Iterable):
+        return IO(IOTag.PARALLEL, list((self, *others[0])))
+    return IO(IOTag.PARALLEL, list((self, *others)))</code></pre>
+</details>
+</dd>
 <dt id="raffiot.untyped.io.IO.recover"><code class="name flex">
 <span>def <span class="ident">recover</span></span>(<span>self, handler)</span>
 </code></dt>
@@ -1680,7 +1878,7 @@ Do nothing if the computation is successful.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.io.IO.run"><code class="name flex">
-<span>def <span class="ident">run</span></span>(<span>self, context, workers=1)</span>
+<span>def <span class="ident">run</span></span>(<span>self, context, workers=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run the computation.</p>
@@ -1697,7 +1895,7 @@ returns a panic instead!</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def run(self, context, workers=1):
+<pre><code class="python">def run(self, context, workers=None):
     &#34;&#34;&#34;
     Run the computation.
 
@@ -1712,11 +1910,42 @@ returns a panic instead!</p></div>
     returns a panic instead!
     &#34;&#34;&#34;
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        fiber = Fiber(self, context, executor)
-        fiber.schedule()
-        while fiber.status != FiberStatus.FINISHED:
-            fiber.future.result()
-    return fiber.result</code></pre>
+        return Fiber.run(self, context, executor)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.io.IO.run_async"><code class="name flex">
+<span>def <span class="ident">run_async</span></span>(<span>self, context, executor)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run the computation.</p>
+<p>Note that a IO is a data structure, no action is performed until you
+call run. You may view an IO value as a function declaration.
+Declaring a function does not execute its body. Only calling the
+function does. Likewise, declaring an IO does not execute its content,
+only running the IO does.</p>
+<p>Note that the return value is a
+<code>Result</code>.
+No exception will be raised by run (unless there is a bug), run will
+returns a panic instead!</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run_async(self, context, executor):
+    &#34;&#34;&#34;
+    Run the computation.
+
+    Note that a IO is a data structure, no action is performed until you
+    call run. You may view an IO value as a function declaration.
+    Declaring a function does not execute its body. Only calling the
+    function does. Likewise, declaring an IO does not execute its content,
+    only running the IO does.
+
+    Note that the return value is a  `Result`.
+    No exception will be raised by run (unless there is a bug), run will
+    returns a panic instead!
+    &#34;&#34;&#34;
+    return Fiber.run_async(self, context, executor)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.io.IO.then"><code class="name flex">
@@ -1735,8 +1964,8 @@ The result of the first one (self) is dropped.</p></div>
     The result of the first one (self) is dropped.
     &#34;&#34;&#34;
     if len(others) == 1 and isinstance(others[0], abc.Iterable):
-        return IO(IOTag.SEQUENCE, iter((self, *others[0])))
-    return IO(IOTag.SEQUENCE, iter((self, *others)))</code></pre>
+        return IO(IOTag.SEQUENCE, list((self, *others[0])))
+    return IO(IOTag.SEQUENCE, list((self, *others)))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.io.IO.zip"><code class="name flex">
@@ -1758,8 +1987,8 @@ of all values.</p>
     If one IO fails, the whole computation fails.
     &#34;&#34;&#34;
     if len(others) == 1 and isinstance(others[0], abc.Iterable):
-        return IO(IOTag.ZIP, iter((self, *others[0])))
-    return IO(IOTag.ZIP, iter((self, *others)))</code></pre>
+        return IO(IOTag.ZIP, list((self, *others[0])))
+    return IO(IOTag.ZIP, list((self, *others)))</code></pre>
 </details>
 </dd>
 </dl>
@@ -1788,6 +2017,7 @@ of all values.</p>
 <li><code><a title="raffiot.untyped.io.error" href="#raffiot.untyped.io.error">error</a></code></li>
 <li><code><a title="raffiot.untyped.io.from_result" href="#raffiot.untyped.io.from_result">from_result</a></code></li>
 <li><code><a title="raffiot.untyped.io.panic" href="#raffiot.untyped.io.panic">panic</a></code></li>
+<li><code><a title="raffiot.untyped.io.parallel" href="#raffiot.untyped.io.parallel">parallel</a></code></li>
 <li><code><a title="raffiot.untyped.io.pure" href="#raffiot.untyped.io.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.io.read" href="#raffiot.untyped.io.read">read</a></code></li>
 <li><code><a title="raffiot.untyped.io.read_executor" href="#raffiot.untyped.io.read_executor">read_executor</a></code></li>
@@ -1795,6 +2025,7 @@ of all values.</p>
 <li><code><a title="raffiot.untyped.io.safe" href="#raffiot.untyped.io.safe">safe</a></code></li>
 <li><code><a title="raffiot.untyped.io.sequence" href="#raffiot.untyped.io.sequence">sequence</a></code></li>
 <li><code><a title="raffiot.untyped.io.traverse" href="#raffiot.untyped.io.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.untyped.io.wait" href="#raffiot.untyped.io.wait">wait</a></code></li>
 <li><code><a title="raffiot.untyped.io.yield_" href="#raffiot.untyped.io.yield_">yield_</a></code></li>
 <li><code><a title="raffiot.untyped.io.zip" href="#raffiot.untyped.io.zip">zip</a></code></li>
 </ul>
@@ -1816,8 +2047,10 @@ of all values.</p>
 <li><code><a title="raffiot.untyped.io.IO.map_error" href="#raffiot.untyped.io.IO.map_error">map_error</a></code></li>
 <li><code><a title="raffiot.untyped.io.IO.map_panic" href="#raffiot.untyped.io.IO.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.untyped.io.IO.on_failure" href="#raffiot.untyped.io.IO.on_failure">on_failure</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.parallel" href="#raffiot.untyped.io.IO.parallel">parallel</a></code></li>
 <li><code><a title="raffiot.untyped.io.IO.recover" href="#raffiot.untyped.io.IO.recover">recover</a></code></li>
 <li><code><a title="raffiot.untyped.io.IO.run" href="#raffiot.untyped.io.IO.run">run</a></code></li>
+<li><code><a title="raffiot.untyped.io.IO.run_async" href="#raffiot.untyped.io.IO.run_async">run_async</a></code></li>
 <li><code><a title="raffiot.untyped.io.IO.then" href="#raffiot.untyped.io.IO.then">then</a></code></li>
 <li><code><a title="raffiot.untyped.io.IO.zip" href="#raffiot.untyped.io.IO.zip">zip</a></code></li>
 </ul>

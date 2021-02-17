@@ -287,3 +287,35 @@ class TestResource(TestCase):
             .run(None)
             .is_panic()
         )
+
+    @given(st.lists(st.integers()))
+    def test_parallel(self, l: List[str]) -> None:
+        def f(j: int) -> IO[R, E, A]:
+            if j % 5 == 0:
+                return pure(j)
+            if j % 5 == 1:
+                return error(j)
+            if j % 5 == 2:
+                return panic(_MatchError(j))
+            if j % 5 == 3:
+                return defer(print, j)
+
+            def h():
+                raise _MatchError(j)
+
+            return defer(h)
+
+        def g(j: int) -> Result[E, A]:
+            if j % 5 == 0:
+                return Ok(j)
+            if j % 5 == 1:
+                return Error(j)
+            if j % 5 == 2:
+                return Panic(_MatchError(j))
+            if j % 5 == 3:
+                return Ok(None)
+            return Panic(_MatchError(j))
+
+        assert parallel([f(s) for s in l]).flat_map(wait).run(None) == Ok(
+            [g(s) for s in l]
+        )

@@ -8,7 +8,7 @@ from collections import abc
 from typing_extensions import final
 from raffiot import result, _MatchError
 from raffiot.result import Result, Ok, Error, Panic
-from concurrent.futures import Executor, ThreadPoolExecutor, wait
+from concurrent.futures import Executor, ThreadPoolExecutor, Future
 from raffiot.__internal import *
 
 R = TypeVar("R")
@@ -44,12 +44,10 @@ class IO(Generic[R, E, A]):
 
     __slots__ = "__tag", "__fields"
 
-    @final
     def __init__(self, __tag, __fields):
         self.__tag = __tag
         self.__fields = __fields
 
-    @final
     def map(self, f: Callable[[A], A2]) -> IO[R, E, A2]:
         """
         Transform the computed value with f if the computation is successful.
@@ -57,7 +55,6 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.MAP, (self, f))
 
-    @final
     def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, A2]:
         """
         Chain two computations.
@@ -65,17 +62,15 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.FLATMAP, (self, f))
 
-    @final
     def then(self, *others: IO[R, E, A2]) -> IO[R, E, A2]:
         """
         Chain two computations.
         The result of the first one (self) is dropped.
         """
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(IOTag.SEQUENCE, iter((self, *others[0])))
-        return IO(IOTag.SEQUENCE, iter((self, *others)))
+            return IO(IOTag.SEQUENCE, list((self, *others[0])))
+        return IO(IOTag.SEQUENCE, list((self, *others)))
 
-    @final
     def zip(self: IO[R, E, A], *others: IO[R, E, X]) -> IO[R, E, Iterable[A]]:
         """
         Pack a list of IO (including self) into an IO computing the list
@@ -84,10 +79,26 @@ class IO(Generic[R, E, A]):
         If one IO fails, the whole computation fails.
         """
         if len(others) == 1 and isinstance(others[0], abc.Iterable):
-            return IO(IOTag.ZIP, iter((self, *others[0])))
-        return IO(IOTag.ZIP, iter((self, *others)))
+            return IO(IOTag.ZIP, list((self, *others[0])))
+        return IO(IOTag.ZIP, list((self, *others)))
 
-    @final
+    def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -> IO[R, E, Iterable[Fiber]]:
+        """
+        Run all these IO (including self) in parallel.
+        Return the list of fibers, in the same order.
+
+        Each Fiber represent a parallel computation. Call
+
+        >>> wait([fiber1, fiber2, ...])
+
+        to wait until the computations of fiber1, fiber2, etc are done.
+        :param l: the list of IO to run in parallel.
+        :return: the same list where each IO has been replaced by its Fiber
+        """
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.PARALLEL, list((self, *others[0])))
+        return IO(IOTag.PARALLEL, list((self, *others)))
+
     def flatten(self):
         """
         Concatenation function on IO
@@ -98,7 +109,6 @@ class IO(Generic[R, E, A]):
 
     # Reader API
 
-    @final
     def contra_map_read(self, f: Callable[[R2], R]) -> IO[R2, E, A]:
         """
         Transform the context with f.
@@ -108,7 +118,6 @@ class IO(Generic[R, E, A]):
 
     # Error API
 
-    @final
     def catch(self, handler: Callable[[E], IO[R, E, A]]) -> IO[R, E, A]:
         """
         React to errors (the except part of a try-except).
@@ -117,7 +126,6 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.CATCH, (self, handler))
 
-    @final
     def map_error(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
         """
         Transform the stored error if the computation fails on an error.
@@ -127,7 +135,6 @@ class IO(Generic[R, E, A]):
 
     # Panic
 
-    @final
     def recover(self, handler: Callable[[Exception], IO[R, E, A]]) -> IO[R, E, A]:
         """
         React to panics (the except part of a try-except).
@@ -136,7 +143,6 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.RECOVER, (self, handler))
 
-    @final
     def map_panic(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
         """
         Transform the exception stored if the computation fails on a panic.
@@ -144,7 +150,6 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.MAP_PANIC, (self, f))
 
-    @final
     def contra_map_executor(self, f: Callable[[Executor], Executor]) -> IO[R, E, A]:
         """
         Change the executor running this IO.
@@ -153,8 +158,7 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.CONTRA_MAP_EXECUTOR, (f, self))
 
-    @final
-    def run(self, context: R, workers: int = 1) -> Result[E, A]:
+    def run(self, context: R, workers: int = None) -> Result[E, A]:
         """
         Run the computation.
 
@@ -169,13 +173,24 @@ class IO(Generic[R, E, A]):
         returns a panic instead!
         """
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            fiber = Fiber(self, context, executor)
-            fiber.schedule()
-            while fiber.status != FiberStatus.FINISHED:
-                fiber.future.result()
-        return fiber.result
+            return Fiber.run(self, context, executor)
 
-    @final
+    def run_async(self, context: R, executor: Executor) -> Future[Result[E, A]]:
+        """
+        Run the computation.
+
+        Note that a IO is a data structure, no action is performed until you
+        call run. You may view an IO value as a function declaration.
+        Declaring a function does not execute its body. Only calling the
+        function does. Likewise, declaring an IO does not execute its content,
+        only running the IO does.
+
+        Note that the return value is a  `Result[E,A]`.
+        No exception will be raised by run (unless there is a bug), run will
+        returns a panic instead!
+        """
+        return Fiber.run_async(self, context, executor)
+
     def ap(self: IO[R, E, Callable[[X], A]], *arg: IO[R, E, X]) -> IO[R, E, A]:
         """
         Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -> A`.
@@ -186,7 +201,6 @@ class IO(Generic[R, E, A]):
         """
         return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
-    @final
     def attempt(self) -> IO[R, E, Result[E, A]]:
         """
         Transform this computation that may fail into a computation
@@ -208,7 +222,6 @@ class IO(Generic[R, E, A]):
             .recover(lambda x: pure(Panic(x)))
         )
 
-    @final
     def finally_(self, io: IO[R, Any, Any]) -> IO[R, E, A]:
         """
         After having computed self, but before returning its result,
@@ -220,7 +233,6 @@ class IO(Generic[R, E, A]):
         """
         return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))
 
-    @final
     def on_failure(
         self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
     ) -> IO[R, E, A]:
@@ -241,7 +253,6 @@ class IO(Generic[R, E, A]):
             )
         )
 
-    @final
     def __str__(self) -> str:
         if self.__tag == IOTag.PURE:
             return f"Pure({self.__fields})"
@@ -284,7 +295,15 @@ class IO(Generic[R, E, A]):
         if self.__tag == IOTag.CONTRA_MAP_EXECUTOR:
             return f"ContraMapExecutor({self.__fields})"
 
-    @final
+        if self.__tag == IOTag.DEFER_READ:
+            return f"DeferRead({self.__fields})"
+        if self.__tag == IOTag.DEFER_READ_IO:
+            return f"DeferReadIO({self.__fields})"
+        if self.__tag == IOTag.PARALLEL:
+            return f"Parallel({self.__fields})"
+        if self.__tag == IOTag.WAIT:
+            return f"Wait({self.__fields})"
+
     def __repr__(self):
         return str(self)
 
@@ -405,8 +424,8 @@ def zip(*l: Iterable[IO[R, E, A]]) -> IO[R, E, Iterable[A]]:
     :return:
     """
     if len(l) == 1 and isinstance(l[0], abc.Iterable):
-        return IO(IOTag.ZIP, iter(l[0]))
-    return IO(IOTag.ZIP, iter(l))
+        return IO(IOTag.ZIP, list(l[0]))
+    return IO(IOTag.ZIP, list(l))
 
 
 def sequence(*l: Iterable[IO[R, E, A]]) -> IO[R, E, Iterable[A]]:
@@ -416,8 +435,8 @@ def sequence(*l: Iterable[IO[R, E, A]]) -> IO[R, E, Iterable[A]]:
     :return:
     """
     if len(l) == 1 and isinstance(l[0], abc.Iterable):
-        return IO(IOTag.SEQUENCE, iter(l[0]))
-    return IO(IOTag.SEQUENCE, iter(l))
+        return IO(IOTag.SEQUENCE, list(l[0]))
+    return IO(IOTag.SEQUENCE, list(l))
 
 
 def yield_() -> IO[R, E, None]:
@@ -525,6 +544,36 @@ def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, Iterabl
     :return:
     """
     return zip([defer_io(f, a) for a in l])
+
+
+def parallel(*l: Iterable[IO[R, E, A]]) -> IO[E, E, Iterable[Fiber[R, E, A]]]:
+    """
+    Run all these IO in parallel.
+    Return the list of fibers, in the same order.
+
+    Each Fiber represent a parallel computation. Call
+
+    >>> wait([fiber1, fiber2, ...])
+
+    to wait until the computations of fiber1, fiber2, etc are done.
+    :param l: the list of IO to run in parallel.
+    :return: the same list where each IO has been replaced by its Fiber
+    """
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.PARALLEL, list(l[0]))
+    return IO(IOTag.PARALLEL, list(l))
+
+
+def wait(*l: Iterable[Fiber]) -> IO[R, E, List[Result[R, A]]]:
+    """
+    Wait until these Fibers finish. Return the list of Result
+    in the same order.
+    :param l:
+    :return:
+    """
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        return IO(IOTag.WAIT, list(l[0]))
+    return IO(IOTag.WAIT, list(l))
 
 
 def run_all(l: Iterable[IO[R, E, A]]) -> IO[R, E, None]:
