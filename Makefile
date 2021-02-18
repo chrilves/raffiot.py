@@ -4,7 +4,7 @@ test: opt
 	python -m pytest
 
 clean:
-	./clean.sh
+	./scripts/clean.sh
 
 format:
 	black `find . -iname "*.py" -type f`
@@ -12,7 +12,7 @@ format:
 check: format test docs
 
 publish: check clean
-	./opt.sh
+	./scripts/opt.sh
 	python setup.py sdist
 	twine upload dist/*
 
@@ -24,7 +24,7 @@ docs: opt
 	git add docs/
 
 opt:
-	./opt.sh
+	./scripts/opt.sh
 env: conda/env.yml
 	conda env remove -n raffiot -y
 	conda env create -f conda/env.yml

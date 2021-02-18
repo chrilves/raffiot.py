@@ -12,7 +12,7 @@ usual functional tools. It currently provides
 For a demo, just type this in a terminal:
 
 ```shell script
-curl https://raw.githubusercontent.com/chrilves/raffiot.py/main/raffiot_demo.sh | /bin/sh
+curl https://raw.githubusercontent.com/chrilves/raffiot.py/main/demos/raffiot_demo.sh | /bin/sh
 ```
 
 This demo runs 4 computations in parallel. It demonstrates how simple concurrent
