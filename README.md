@@ -2,9 +2,23 @@
 
 *Raffiot* is small (almost) dependency-free python library providing some
 usual functional tools. It currently provides
-- an `IO` monad which is, stack-safe, fast and has many other features.
-- a `Resource` data type for easy but reliable resource management.
+- an easy-to-use `IO` monad which is **stack-safe**, **fast**, support
+  **asynchronous**, **concurrent**, **parallel** programming, has many other features.
+- a `Resource` data type for easy but reliable **resource management**.
 - a `Result` data structure to represent errors
+
+## Demo
+
+For a demo, just type this in a terminal:
+
+```shell script
+curl https://raw.githubusercontent.com/chrilves/raffiot.py/main/raffiot_demo.sh | /bin/sh
+```
+
+This demo runs 4 computations in parallel. It demonstrates how simple concurrent
+and parallel programing is in *raffiot*.
+
+**Note that this command will install raffiot in your current Python environment**
 
 ## API Documentation
 
