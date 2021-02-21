@@ -2,3 +2,6 @@
 .hypothesis/
 __pycache__/
 raffiot.egg-info/
+.vscode/
+raffiot/untyped/
+tests/test_untyped_*

@@ -14,7 +14,6 @@ from queue import Queue
 import threading
 
 
-@final
 class IOTag(Enum):
     PURE = 0  # VALUE
     MAP = 1  # MAIN FUN
@@ -24,36 +23,38 @@ class IOTag(Enum):
     ZIP = 5  # ARGS
     DEFER = 6  # DEFERED
     DEFER_IO = 7  # DEFERED
-    READ = 8  #
-    CONTRA_MAP_READ = 9  # FUN MAIN
-    ERROR = 10  # ERROR
-    CATCH = 11  # MAIN HANDLER
-    MAP_ERROR = 12  # MAIN      FUN
-    PANIC = 13  # EXCEPTION
-    RECOVER = 14  # MAIN HANDLER
-    MAP_PANIC = 15  # MAIN FUN
-    YIELD = 16  #
-    ASYNC = 17  # DOUBLE_NEGATION
-    EXECUTOR = 18  #
-    CONTRA_MAP_EXECUTOR = 19  # MAIN FUN
-    DEFER_READ = 20  # FUN ARGS KWARGS
-    DEFER_READ_IO = 21  # FUN ARGS KWARGS
-    PARALLEL = 22  # IOS
-    WAIT = 23  # FIBERS
+    ATTEMPT = 8  # IO
+    READ = 9  #
+    CONTRA_MAP_READ = 10  # FUN MAIN
+    ERROR = 11  # ERROR
+    CATCH = 12  # MAIN HANDLER
+    MAP_ERROR = 13  # MAIN      FUN
+    PANIC = 14  # EXCEPTION
+    RECOVER = 15  # MAIN HANDLER
+    MAP_PANIC = 16  # MAIN FUN
+    YIELD = 17  #
+    ASYNC = 18  # DOUBLE_NEGATION
+    EXECUTOR = 19  #
+    CONTRA_MAP_EXECUTOR = 20  # MAIN FUN
+    DEFER_READ = 21  # FUN ARGS KWARGS
+    DEFER_READ_IO = 22  # FUN ARGS KWARGS
+    PARALLEL = 23  # IOS
+    WAIT = 24  # FIBERS
+    REC = 25  # FUN
 
 
-@final
 class ContTag(Enum):
-    ID = 0  #
-    MAP = 1  # FUN
-    FLATMAP = 2  # CONTEXT HANDLER
-    FLATTEN = 3  # CONTEXT
-    SEQUENCE = 4  # CONTEXT IOS
-    ZIP = 5  # CONTEXT IOS NB_IOS NEXT_IO_INDEX
+    MAP = 0  # FUN
+    FLATMAP = 1  # CONTEXT HANDLER
+    FLATTEN = 2  # CONTEXT
+    SEQUENCE = 3  # CONTEXT IOS
+    ZIP = 4  # CONTEXT IOS NB_IOS NEXT_IO_INDEX
+    ATTEMPT = 5  #
     CATCH = 6  # CONTEXT HANDLER
     MAP_ERROR = 7  # FUN
     RECOVER = 8  # CONTEXT HANDLER
     MAP_PANIC = 9  # FUN
+    ID = 10  #
 
 
 @final
@@ -249,6 +250,10 @@ class Fiber:
                             arg_tag = ResultTag.PANIC
                             arg_value = exception
                             break
+                    if tag == IOTag.ATTEMPT:
+                        io = io._IO__fields
+                        cont.append(ContTag.ATTEMPT)
+                        continue
                     if tag == IOTag.READ:
                         arg_tag = ResultTag.OK
                         arg_value = context
@@ -311,7 +316,13 @@ class Fiber:
                         self.__cont = cont
                         try:
                             self.__monitor.register_future(
-                                io._IO__fields(context, self.__executor, callback)
+                                io._IO__fields[0](
+                                    context,
+                                    self.__executor,
+                                    callback,
+                                    *io._IO__fields[1],
+                                    **io._IO__fields[2],
+                                )
                             )
                             return
                         except Exception as exception:
@@ -391,6 +402,14 @@ class Fiber:
                         for index, fib in enumerate(fibers):
                             fib.__add_callback(self, index)
                         return
+                    if tag == IOTag.REC:
+                        try:
+                            io = io._IO__fields(io)
+                            continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
                     arg_tag = ResultTag.PANIC
                     arg_value = _MatchError(f"{io} should be an IO")
                     break
@@ -398,19 +417,6 @@ class Fiber:
                 # Eval Cont
                 while True:
                     tag = cont.pop()
-                    if tag == ContTag.ID:
-                        if arg_tag == ResultTag.OK:
-                            self.result = Ok(arg_value)
-                        elif arg_tag == ResultTag.ERROR:
-                            self.result = Error(arg_value)
-                        elif arg_tag == ResultTag.PANIC:
-                            self.result = Panic(arg_value)
-                        else:
-                            self.result = Panic(
-                                _MatchError(f"Wrong result tag {arg_tag}")
-                            )
-                        self.__finish()
-                        return
                     if tag == ContTag.MAP:
                         fun = cont.pop()
                         try:
@@ -484,6 +490,21 @@ class Fiber:
                             io = arg_value
                             break
                         continue
+                    if tag == ContTag.ATTEMPT:
+                        if arg_tag == ResultTag.OK:
+                            arg_value = Ok(arg_value)
+                            continue
+                        if arg_tag == ResultTag.ERROR:
+                            arg_tag = ResultTag.OK
+                            arg_value = Error(arg_value)
+                            continue
+                        if arg_tag == ResultTag.PANIC:
+                            arg_tag = ResultTag.OK
+                            arg_value = Panic(arg_value)
+                            continue
+                        arg_tag = ResultTag.OK
+                        arg_value = Panic(_MatchError(f"Wrong result tag {arg_tag}"))
+                        continue
                     if tag == ContTag.CATCH:
                         context = cont.pop()
                         handler = cont.pop()
@@ -524,6 +545,19 @@ class Fiber:
                             arg_tag = ResultTag.PANIC
                             arg_value = exception
                         continue
+                    if tag == ContTag.ID:
+                        if arg_tag == ResultTag.OK:
+                            self.result = Ok(arg_value)
+                        elif arg_tag == ResultTag.ERROR:
+                            self.result = Error(arg_value)
+                        elif arg_tag == ResultTag.PANIC:
+                            self.result = Panic(arg_value)
+                        else:
+                            self.result = Panic(
+                                _MatchError(f"Wrong result tag {arg_tag}")
+                            )
+                        self.__finish()
+                        return
                     arg_tag = ResultTag.PANIC
                     arg_value = Panic(_MatchError(f"Invalid cont {cont + [tag]}"))
         except Exception as exception:

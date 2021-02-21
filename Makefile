@@ -18,9 +18,9 @@ publish: check clean
 
 docs: opt
 	rm -r docs/ || true
+	cd guide && mdbook build
 	pdoc3 --html raffiot -o docs/
-	mv docs/raffiot/* docs/
-	rm -r docs/raffiot/
+	mv docs/raffiot/ docs/api/
 	git add docs/
 
 opt:

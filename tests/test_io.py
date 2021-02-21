@@ -156,7 +156,7 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_attempt_error(self, u: str) -> None:
-        assert error(u).attempt().run(None) == Ok(Error(u))
+        assert error(u).attempt().run(None).raise_on_panic() == Ok(Error(u))
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:

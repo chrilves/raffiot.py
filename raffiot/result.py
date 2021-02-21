@@ -473,21 +473,7 @@ def traverse(l: Iterable[A], f: Callable[[A], Result[E, A2]]) -> Result[E, List[
     :return:
     """
 
-    def append(l3: List[A2]) -> Callable[[A2], List[A2]]:
-        def do_it(a2: A2) -> List[A2]:
-            l3.append(a2)
-            return l3
-
-        return do_it
-
-    r = pure([])
-
-    def dumb(r, a):
-        return r.unsafe_flat_map(lambda l2: f(a).unsafe_map(append(l2)))
-
-    for a in l:
-        r = dumb(r, a)
-    return r
+    return zip([f(i) for i in l])
 
 
 def zip(*l: Iterable[Result[E, A]]) -> Result[E, List[A]]:

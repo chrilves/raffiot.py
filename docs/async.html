@@ -1,0 +1,475 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js rust">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Asynchronous Computing - RAFFIOT Guide</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="favicon.png">
+        
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        
+        <link rel="stylesheet" href="css/print.css" media="print">
+        
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "rust";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html" class="active"><strong aria-hidden="true">6.</strong> Asynchronous Computing</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">RAFFIOT Guide</h1>
+
+                    <div class="right-buttons">
+                        
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#asynchronous-computing" id="asynchronous-computing">Asynchronous Computing</a></h1>
+<p>For now you know that an <code>IO</code> is very nice for stack safety,
+dependency injection, failure management, and code-as-date manipulations.
+There is another big feature <code>IO</code> has: simple asynchronous and
+concurrent programming.</p>
+<p>A call to some function is called synchronous when the thread making
+the call actually waits for the call to return a value. This is annoying
+because the thread could be used to perform useful computations instead
+of just waiting.</p>
+<p>On the contrary, a call is said asynchronous when the tread making the
+call does not wait for the call to finish but run useful computations
+in the mean time.</p>
+<p>The notorious expression <a href="http://callbackhell.com/">callback Hell</a> kindly
+expresses how asynchronous programming can be error-prone, hard to write
+and hard to read.</p>
+<p>Asynchronous programming is all about callbacks, but fortunately,
+programming models were created to hide much of its complexity under
+a clean and simple interface. The famous <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">Promise</a>
+of JavaScript is such an interface. The <a href="https://docs.python.org/3/library/asyncio-task.html">async/await</a>
+syntax of many languages, including Python, is also such an interface.
+So is <em>Raffiot</em>'s <code>IO</code>. But unlike the <em>async/await</em> syntax, synchronous
+and asynchronous code can be transparently mixed with <code>IO</code>.</p>
+<h2><a class="header" href="#async_--running-something-asynchronously" id="async_--running-something-asynchronously"><code>async_</code> : running something asynchronously</a></h2>
+<p>Calling a function <code>f</code> usually looks like this:</p>
+<pre><code class="language-python">&gt;&gt;&gt; def f():
+...   print(&quot;f is running&quot;)
+...   return 3
+&gt;&gt;&gt; def main():
+...   print(&quot;f not started yet&quot;)
+...   result = f()
+...   print(f&quot;f finished and returned {result}&quot;)
+&gt;&gt;&gt; main()
+f not started yet
+f is running
+f finished and returned 3
+</code></pre>
+<p>When the function <code>main</code> calls <code>f</code>, it waits for <code>f</code> to finish.
+When <code>f</code> finishes, <code>main</code> resumes its computation with the result
+of <code>f</code>.</p>
+<p>Asynchronous functions, like
+<a href="https://docs.python.org/fr/3/library/multiprocessing.html#multiprocessing.pool.Pool.apply_async">apply_async</a>
+do not work this way.
+Calling an <em>asynchronous</em> function <code>fasync</code> usually looks like this.</p>
+<pre><code class="language-python">&gt;&gt;&gt; import time
+&gt;&gt;&gt; from multiprocessing import Pool
+
+&gt;&gt;&gt; def f():
+...  print(&quot;f is running&quot;)
+...  return 3
+
+&gt;&gt;&gt; with Pool(4) as pool: 
+...   def fasync(callback):
+...     pool.apply_async(f, callback = callback)
+... 
+...   def main():
+...     print(&quot;fasync not started yet&quot;)
+...
+...     def callback(result):
+...       print(f&quot;fasync finished and returned {result}&quot;)
+...
+...     fasync(callback)
+...     print(&quot;fasync started&quot;)
+... 
+...   main()
+...   time.sleep(0.5)
+fasync not started yet
+fasync started
+f is running
+fasync finished and returned 3
+</code></pre>
+<p>As you can seen, the function <code>main</code> does not wait that <code>f</code> finishes
+but continues its execution printing <code>fasync started</code>.
+The function <code>main</code> can not get the result of <code>f</code> so it defines
+a function, called a <strong>callback</strong>, to process the result of when it
+finishes.</p>
+<p>With <em>Raffiot</em>'s <code>IO</code> you would write:</p>
+<pre><code class="language-python">&gt;&gt;&gt; import time
+&gt;&gt;&gt; from multiprocessing import Pool
+&gt;&gt;&gt; from raffiot import io
+&gt;&gt;&gt; from raffiot.io import IO
+&gt;&gt;&gt; from raffiot.result import Result, Ok
+
+&gt;&gt;&gt; def f():
+...   print(&quot;f is running&quot;)
+...   return 3
+
+&gt;&gt;&gt; with Pool(4) as pool: 
+...   f_io : IO[None,None,int] = io.async_(lambda r, exe, k:
+...     exe.submit(lambda:
+...       pool.apply_async(f, callback = lambda r: k(Ok(r))).wait()
+...     )
+...   )
+... 
+...   main : IO[None,None,None] = io.sequence(
+...     io.defer(print, &quot;fasync not started yet&quot;),
+...     f_io.flat_map(lambda result:
+...       io.defer(print, f&quot;fasync finished and returned {result}&quot;)
+...     ),
+...     io.defer(print, &quot;fasync started&quot;)
+...   )
+... 
+...   main.run(None)
+fasync not started yet
+f is running
+fasync finished and returned 3
+fasync started
+</code></pre>
+<p>Note that we call <code>.wait()</code> on the <code>AsyncResult</code> from <code>apply_async</code>.
+But the call is still asynchronous because we start a
+<a href="https://docs.python.org/3/library/concurrent.futures.html">Future</a>
+with <code>exe.submit</code>. The reason is <em>Raffiot</em> rely on Python's futures
+for task scheduling and does not directly support <code>AsyncResult</code> yet.</p>
+<p><strong>Very important</strong>: when you use <code>async_</code>, you must always
+<strong>return a <code>Future</code></strong> and always <strong>call the callback exactly once</strong>
+(no more, no less).</p>
+<h2><a class="header" href="#run--the-second-argument" id="run--the-second-argument"><code>run</code> : the second argument.</a></h2>
+<p>An <code>IO</code> is executed on a pool of threads. Until now we only gave <code>io.run</code>
+one argument: the context. But <code>io.run</code> accepts two argument! The second
+one is the number of threads in the pool.</p>
+<p>Note that every time an <code>IO</code> calls <code>time.sleep</code> it blocks its thread
+and one thread is dedicated to the runtime system. So be sure to use
+enough threads to keep your CPU busy.
+Because of the infamous Python's
+<a href="https://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a>
+Python can not run thread in parallel.
+So if your code only uses one 100% of a single core,
+this is normal.
+You know the story: Python is single-threaded.</p>
+<p>To use <em>n</em> thread, just give <em>n</em> to <code>io.run</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; io.pure(5).run(None, 50)
+Ok(success=5)
+</code></pre>
+<h2><a class="header" href="#parallel--running-concurrent-tasks" id="parallel--running-concurrent-tasks"><code>parallel</code> : running concurrent tasks</a></h2>
+<p>The function <code>io.parallel</code> runs a list of <code>IO</code>s in parallel.
+Remember that because of Python's
+<a href="https://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a>
+only one thread executing Python's code can be running
+at any time. But your code involves a lot of primitives
+written in <em>C</em>/<em>C++</em>/etc, then you might get lucky and
+use all of your cores.</p>
+<p><code>parallel</code> returns a list of values called <strong>fibers</strong>.
+A <em>fiber</em> represents a tasks running in parallel/concurrently.
+Every <em>fiber</em> in the returned list correspond to the
+<code>IO</code> at the same location in the argument list.
+For example in</p>
+<pre><code class="language-python">io.parallel(ios).flat_map(lambda fibers: ...)
+</code></pre>
+<p>for every index <code>i</code>, <code>fibers[i]</code> is the fiber representing
+the computation of the <em>IO</em> <code>ios[i]</code> running in parallel/concurrently.</p>
+<pre><code class="language-python">&gt;&gt;&gt; import time
+&gt;&gt;&gt; def task(i: int) -&gt; IO[None,None,None] :
+&gt;&gt;&gt;   return io.defer(print, f&quot;Task {i}: Begin&quot;).then(
+...     io.defer(time.sleep, 1),
+...     io.defer(print, f&quot;Task {i}: End&quot;)
+...   )
+&gt;&gt;&gt; main : IO[None,None,None] = (
+...   io.parallel([task(i) for i in range(6)])
+...   .then(io.defer(print,&quot;Finished&quot;)))
+&gt;&gt;&gt; main.run(None)
+Task 0: Begin
+Task 1: Begin
+Task 3: Begin
+Task 4: Begin
+Task 2: Begin
+Finished
+Task 5: Begin
+Task 0: End
+Task 1: End
+Task 3: End
+Task 4: End
+Task 2: End
+Task 5: End
+Ok(success=None)
+</code></pre>
+<p>As you can see, <code>main</code> does not wait for the <code>IO</code>s running
+in parallel/concurrently to continue its execution.</p>
+<h2><a class="header" href="#wait--waiting-for-concurrent-tasks-to-end" id="wait--waiting-for-concurrent-tasks-to-end"><code>wait</code> : waiting for concurrent tasks to end</a></h2>
+<p>Sometimes you want to wait for a parallel/concurrent computation
+to finish. Remember that parallel/concurrent computation are
+represented by the <em>fibers</em> returned by <code>io.parallel</code>.</p>
+<p>To wait for some fibers to finish, just call <code>io.wait</code> with
+the list of fibers you want to wait on. The result of <code>wait</code>
+is the list of all the fibers results (of type <code>Result[E,A]</code>).
+For example, in</p>
+<pre><code class="language-python">io.wait(fibers).flat_map(lambda results: ...)
+</code></pre>
+<p>for any index <code>i</code>, <code>result[i]</code> of type <code>Result[E,A]</code> is the result
+of the computation represented by the fiber <code>fibers[i]</code>.</p>
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = (
+...   io.parallel([task(i) for i in range(6)])
+...   .flat_map(lambda fibers: io.wait(fibers))
+...   .then(io.defer(print,&quot;Finished&quot;)))
+&gt;&gt;&gt; main.run(None)
+Task 0: Begin
+Task 1: Begin
+Task 3: Begin
+Task 5: Begin
+Task 4: Begin
+Task 2: Begin
+Task 0: End
+Task 3: End
+Task 1: End
+Task 5: End
+Task 4: End
+Task 2: End
+Finished
+Ok(success=None)
+</code></pre>
+<h2><a class="header" href="#yield_--letting-other-task-progress" id="yield_--letting-other-task-progress"><code>yield_</code> : letting other task progress</a></h2>
+<p>Remember that an <code>IO</code> runs on a pool of thread.
+There there is more <code>IO</code>s to run than the number of threads to run on,
+there is a chance that some <code>IO</code> will not get executed.
+An <code>IO</code> can explicitly release its thread for a moment to let other
+tasks a chance to progress.</p>
+<p>Call <code>io.yield_()</code> to release the current thread. The <code>IO</code> will make
+a break and continue its execution later.</p>
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.defer(print, &quot;Hello&quot;).then(
+...   io.yield_(),
+...   io.defer(print, &quot;World!&quot;) 
+... )
+&gt;&gt;&gt; main.run(None)
+Hello
+World!
+Ok(success=None)
+</code></pre>
+<h2><a class="header" href="#read_executor--getting-the-executor" id="read_executor--getting-the-executor"><code>read_executor</code> : getting the executor</a></h2>
+<p>The function <code>io.read_executor</code> returns the executor on which the
+current <code>IO</code> runs.</p>
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.read_executor().map(lambda exe: exe.submit(print,&quot;Hello World!&quot;))
+Hello World!
+Ok(success=&lt;Future at 0x7f7eaa3fb1f0 state=finished returned NoneType&gt;)
+</code></pre>
+<h2><a class="header" href="#contra_map_executor--changing-the-executor" id="contra_map_executor--changing-the-executor"><code>contra_map_executor</code> : changing the executor</a></h2>
+<p>You may sometimes want to change the executor running the current <code>IO</code>.
+For example you may want a long task to be executed on a different
+thread pool:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from concurrent.futures import ThreadPoolExecutor
+&gt;&gt;&gt; with ThreadPoolExecutor() as executor2:
+...   io.pure(18).contra_map_executor(lambda _: executor2).run(None)
+Ok(success=18)
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="lists.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="resource.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="lists.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="resource.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>

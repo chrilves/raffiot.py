@@ -8,7 +8,7 @@ from collections import abc
 from typing_extensions import final
 from raffiot import result, _MatchError
 from raffiot.result import Result, Ok, Error, Panic
-from concurrent.futures import Executor, ThreadPoolExecutor, Future
+from concurrent.futures import Executor, ThreadPoolExecutor, Future, ProcessPoolExecutor
 from raffiot.__internal import *
 
 R = TypeVar("R")
@@ -216,11 +216,7 @@ class IO(Generic[R, E, A]):
         a failed computation into a successful computation returning a failure,
         thus enabling you to use map, flat_map, ... to deal with errors.
         """
-        return (
-            self.map(Ok)
-            .catch(lambda x: pure(Error(x)))
-            .recover(lambda x: pure(Panic(x)))
-        )
+        return IO(IOTag.ATTEMPT, self)
 
     def finally_(self, io: IO[R, Any, Any]) -> IO[R, E, A]:
         """
@@ -303,6 +299,8 @@ class IO(Generic[R, E, A]):
             return f"Parallel({self.__fields})"
         if self.__tag == IOTag.WAIT:
             return f"Wait({self.__fields})"
+        if self.__tag == IOTag.REC:
+            return f"Rec({self.__fields})"
 
     def __repr__(self):
         return str(self)
@@ -451,7 +449,7 @@ def yield_() -> IO[R, E, None]:
 
 
 def async_(
-    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None]
+    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None], *args, **kwargs
 ) -> IO[R, E, A]:
     """
     Perform an Asynchronous call. `f` is a function of the form:
@@ -459,7 +457,9 @@ def async_(
     >>> from concurrent.futures import Executor, Future
     >>> def f(context: E,
     >>>       executor: Executor,
-    >>>       callback: Callable[[Result[E,A]], None]) -> Future:
+    >>>       callback: Callable[[Result[E,A]], None],
+    >>>       *args,
+    >>>       **kwargs) -> Future:
     >>>     ...
 
     - `f` **MUST** return a `Future`.
@@ -491,7 +491,7 @@ def async_(
     :param f:
     :return:
     """
-    return IO(IOTag.ASYNC, f)
+    return IO(IOTag.ASYNC, (f, args, kwargs))
 
 
 def read_executor() -> IO[R, E, Executor]:
@@ -576,30 +576,8 @@ def wait(*l: Iterable[Fiber]) -> IO[R, E, List[Result[R, A]]]:
     return IO(IOTag.WAIT, list(l))
 
 
-def run_all(l: Iterable[IO[R, E, A]]) -> IO[R, E, None]:
-    """
-    Ensures that all the IO are executed (in the iterable order!)
-
-    If at least one panics, it panics.
-    If no IO panic but at least one raise an error, it raise one of the error
-    (the first one in the iterable order).
-    If there is neither panics not error, it succeed and return None.
-    :param l: the iterable of all IOs to run.
-    :return:
-    """
-
-    def f(results):
-        level = 0
-        ret = Ok(None)
-        for r in results:
-            if r.is_error() and level < 1:
-                level = 1
-                ret = r
-            elif r.is_panic() and level < 2:
-                return r
-        return ret
-
-    return pure(f).ap([x.attempt() for x in l])
+def rec(f: Callable[[IO[R, E, A]], IO[R, E, A]]) -> IO[R, E, A]:
+    return IO(IOTag.REC, f)
 
 
 def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:

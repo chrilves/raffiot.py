@@ -3,8 +3,10 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Robust and Fast Functional IO Toolkit - RAFFIOT Guide</title>
+        <title></title>
         
+        
+        <base href="/">
         
 
 
@@ -163,68 +165,8 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#robust-and-fast-functional-io-toolkit" id="robust-and-fast-functional-io-toolkit">Robust and Fast Functional IO Toolkit</a></h1>
-<p><em>Raffiot</em> is small (almost) dependency-free python library providing some
-usual functional tools. It currently provides</p>
-<ul>
-<li>an easy-to-use <code>IO</code> monad which is <strong>stack-safe</strong>, <strong>fast</strong>, support
-<strong>asynchronous</strong>, <strong>concurrent</strong>, <strong>parallel</strong> programming, has many other features.</li>
-<li>a <code>Resource</code> data type for easy but reliable <strong>resource management</strong>.</li>
-<li>a <code>Result</code> data structure to represent errors</li>
-</ul>
-<h2><a class="header" href="#demo" id="demo">Demo</a></h2>
-<p>For a demo, just type this in a terminal:</p>
-<pre><code class="language-shellscript">curl https://raw.githubusercontent.com/chrilves/raffiot.py/main/demos/raffiot_demo.sh | /bin/sh
-</code></pre>
-<p>This demo runs 4 computations in parallel. It demonstrates how simple concurrent
-and parallel programing is in <em>raffiot</em>.</p>
-<p><strong>Note that this command will install raffiot in your current Python environment</strong></p>
-<h2><a class="header" href="#documentation" id="documentation">Documentation</a></h2>
-<h3><a class="header" href="#this-a-hrefindexhtmlguidea" id="this-a-hrefindexhtmlguidea">This <a href="./index.html">Guide</a></a></h3>
-<p>This guide will teach you how to use <em>Raffiot</em> through examples.
-Just use the <strong>left panel</strong> or the <strong>right arrow</strong> on this page to jump to the next section.</p>
-<h3><a class="header" href="#a-hrefapiindexhtmlapia" id="a-hrefapiindexhtmlapia"><a href="./api/index.html">API</a></a></h3>
-<p>The <a href="./api/index.html">API</a> is online at
-<a href="./api/index.html">https://chrilves.github.io/raffiot.py/api/index.html</a>.</p>
-<h2><a class="header" href="#features" id="features">Features</a></h2>
-<ul>
-<li><strong>pure python</strong>: <em>Raffiot</em> is written entirely in Python 3.7+.</li>
-<li><strong>small</strong>: it is just a few small files.</li>
-<li><strong>(almost) dependency-free</strong>: it only depends on <code>typing-extensions</code> (for the
-<code>@final</code> annotation).</li>
-<li><strong>crystal clear code</strong> </li>
-</ul>
-<h3><a class="header" href="#io" id="io">IO</a></h3>
-<ul>
-<li><strong>stack safe</strong>: you just won't run into stack overflows anymore.</li>
-<li><strong>fast</strong>: you won't notice the overhead.</li>
-<li><strong>dependency injection</strong> <em>made easy</em>: make some context visible from anywhere.</li>
-<li><em>simple</em> <strong>asynchronous</strong> <em>and</em> <strong>concurrent programming</strong>: full support of synchronous,
-asynchronous and concurrent programming <em>with the same simple API</em>.</li>
-<li><strong>railway-oriented programming</strong>: clean and simple failure management.</li>
-<li><strong>distinction</strong> <em>between</em> <strong>expected and unexpected failures</strong>: some failures are part
-of your program's normal behaviour (errors) while others are show something
-terribly wrong happened (panics). Yes, that's heavily inspired by <em>Rust</em>.</li>
-</ul>
-<h3><a class="header" href="#resource" id="resource">Resource</a></h3>
-<p>Python has the <code>with</code> construction, but <code>Resource</code> goes a step further.</p>
-<ul>
-<li><strong>easy user-defined resource creation</strong>: just provide some open and close
-function.</li>
-<li><strong>composability</strong>: the resource you want to create depends on another resource?
-Not a problem, you can compose resources the way you want. It scales.</li>
-<li><strong>failures handling in resources</strong>: <code>Resource</code> has everything <code>IO</code> has, including
-its wonderful failure management.</li>
-</ul>
-<h3><a class="header" href="#result" id="result">Result</a></h3>
-<p>Did I mention <strong>Railway-Oriented Programming</strong>? <code>Result</code> is represent the 3 possible
-result of a computation:</p>
-<ul>
-<li><code>Ok(value)</code>: the computation successfully computed the this <code>value</code>.</li>
-<li><code>Error(error)</code>: the computation failed on some expected failure <code>error</code>, probably
-from the business domain.</li>
-<li><code>Panic(exception)</code>: the computation failed on some unexpected failure <code>exception</code>.</li>
-</ul>
+                        <h1><a class="header" href="#document-not-found-404" id="document-not-found-404">Document not found (404)</a></h1>
+<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
 
                     </main>
 
@@ -232,10 +174,6 @@ from the business domain.</li>
                         <!-- Mobile navigation buttons -->
                         
 
-                        
-                            <a rel="next" href="first_steps.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
-                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -246,10 +184,6 @@ from the business domain.</li>
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
 
-                
-                    <a rel="next" href="first_steps.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
-                    </a>
                 
             </nav>
 

@@ -1,0 +1,15 @@
+[book]
+authors = ["chrilves"]
+language = "en"
+multilingual = false
+src = "src"
+title = "RAFFIOT Guide"
+
+[output.html]
+theme = "rust"
+default-theme = "rust"
+preferred-dark-theme = "navy"
+
+[build]
+build-dir = "../docs/"
+create-missing = true

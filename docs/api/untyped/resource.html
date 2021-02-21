@@ -265,8 +265,8 @@ class Resource:
         return self.attempt().flat_map(
             lambda r: r.fold(
                 pure,
-                lambda e: handler(result.error(e)),
-                lambda p: handler(result.panic(p)),
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
             )
         )
 
@@ -279,7 +279,7 @@ class Resource:
         return Resource(self.create.contra_map_executor(f))
 
 
-def liftIO(mio):
+def lift_io(mio):
     &#34;&#34;&#34;
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
@@ -302,7 +302,7 @@ def defer(deferred, *args, **kwargs):
 
     For more details, see `io.defer`
     &#34;&#34;&#34;
-    return liftIO(io.defer(deferred, *args, **kwargs))
+    return lift_io(io.defer(deferred, *args, **kwargs))
 
 
 def defer_resource(deferred, *args, **kwargs):
@@ -326,7 +326,7 @@ def defer_read(deferred, *args, **kwargs):
     &#34;&#34;&#34;
     Similar to io.defer_read but for Resource.
     &#34;&#34;&#34;
-    return liftIO(io.defer_read(deferred, *args, **kwargs))
+    return lift_io(io.defer_read(deferred, *args, **kwargs))
 
 
 def defer_read_resource(deferred, *args, **kwargs):
@@ -350,7 +350,7 @@ def read():
 
     Please note that the contra_map_read method can transform this value r.
     &#34;&#34;&#34;
-    return liftIO(io.read())
+    return lift_io(io.read())
 
 
 def error(err):
@@ -395,28 +395,27 @@ def from_open_close(open, close):
     &#34;&#34;&#34;
     Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
-    return Resource(io.defer(open).map(lambda a: (a, io.pure(a).map(close))))
+    return Resource(io.defer(open).map(lambda a: (a, io.defer(close, a))))
 
 
-def from_with(expr):
+def from_with(the_io):
     &#34;&#34;&#34;
     Create a Resource from &#34;with&#34; python expression:
 
-    &gt;&gt; with expr as x:
+    &gt;&gt; with expr() as x:
     &gt;&gt;     body
 
     is equivalent to
 
-    &gt;&gt; from_with(lambda: expr)
+    &gt;&gt; from_with(io.defer(expr))
     &#34;&#34;&#34;
 
-    def manager_handler():
-        manager = expr()
+    def manager_handler(manager):
         enter = type(manager).__enter__
         exit = type(manager).__exit__
-        (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
+        return (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
 
-    return Resource(io.defer(manager_handler))
+    return Resource(the_io.map(manager_handler))
 
 
 def zip(*rs):
@@ -443,7 +442,7 @@ def zip(*rs):
         for arg in l:
             if arg.is_ok():
                 args.append(arg.success[0])
-                close.append(arg.success[1])
+                close.append(arg.success[1].attempt())
             elif arg.is_error() and level &lt; 1:
                 error = arg
                 level = 1
@@ -455,9 +454,9 @@ def zip(*rs):
                 error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
 
         if level == 0:
-            return io.pure((args, io.run_all(close)))
+            return io.pure((args, io.sequence(close)))
         else:
-            return io.run_all(close).attempt().then(io.from_result(error))
+            return io.sequence(close).attempt().then(io.from_result(error))
 
     return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))
 
@@ -474,21 +473,7 @@ def traverse(l, f):
     :return:
     &#34;&#34;&#34;
 
-    def append(l3):
-        def do_it(a2):
-            l3.append(a2)
-            return l3
-
-        return do_it
-
-    r = pure([])
-
-    def dumb(r, a):
-        return r.flat_map(lambda l2: f(a).map(append(l2)))
-
-    for a in l:
-        r = dumb(r, a)
-    return r
+    return zip([defer_resource(f, i) for i in l])
 
 
 def yield_():
@@ -501,17 +486,19 @@ def yield_():
     again.
     :return:
     &#34;&#34;&#34;
-    return liftIO(io.yield_())
+    return lift_io(io.yield_())
 
 
-def async_(f):
+def async_(f, *args, **kwargs):
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
 
     &gt;&gt;&gt; from concurrent.futures import Executor, Future
     &gt;&gt;&gt; def f(context: E,
     &gt;&gt;&gt;       executor: Executor,
-    &gt;&gt;&gt;       callback: Callable[[Result], None]) -&gt; Future:
+    &gt;&gt;&gt;       callback: Callable[[Result], None],
+    &gt;&gt;&gt;       *args,
+    &gt;&gt;&gt;       **kwargs) -&gt; Future:
     &gt;&gt;&gt;     ...
 
     - `f` **MUST** return a `Future`.
@@ -540,7 +527,7 @@ def async_(f):
     &gt;&gt;&gt;     return executor.submit(h)
     &gt;&gt;&gt; resource = async_(f)
     &#34;&#34;&#34;
-    return liftIO(io.async_(f))
+    return lift_io(io.async_(f, *args, **kwargs))
 
 
 def read_executor():
@@ -548,7 +535,7 @@ def read_executor():
     Return the executor running this IO.
     :return:
     &#34;&#34;&#34;
-    return liftIO(io.read_executor())</code></pre>
+    return lift_io(io.read_executor())</code></pre>
 </details>
 </section>
 <section>
@@ -559,14 +546,16 @@ def read_executor():
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="raffiot.untyped.resource.async_"><code class="name flex">
-<span>def <span class="ident">async_</span></span>(<span>f)</span>
+<span>def <span class="ident">async_</span></span>(<span>f, *args, **kwargs)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Perform an Asynchronous call. <code>f</code> is a function of the form:</p>
 <pre><code class="language-python-repl">&gt;&gt;&gt; from concurrent.futures import Executor, Future
 &gt;&gt;&gt; def f(context: E,
 &gt;&gt;&gt;       executor: Executor,
-&gt;&gt;&gt;       callback: Callable[[Result], None]) -&gt; Future:
+&gt;&gt;&gt;       callback: Callable[[Result], None],
+&gt;&gt;&gt;       *args,
+&gt;&gt;&gt;       **kwargs) -&gt; Future:
 &gt;&gt;&gt;     ...
 </code></pre>
 <ul>
@@ -602,14 +591,16 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def async_(f):
+<pre><code class="python">def async_(f, *args, **kwargs):
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
 
     &gt;&gt;&gt; from concurrent.futures import Executor, Future
     &gt;&gt;&gt; def f(context: E,
     &gt;&gt;&gt;       executor: Executor,
-    &gt;&gt;&gt;       callback: Callable[[Result], None]) -&gt; Future:
+    &gt;&gt;&gt;       callback: Callable[[Result], None],
+    &gt;&gt;&gt;       *args,
+    &gt;&gt;&gt;       **kwargs) -&gt; Future:
     &gt;&gt;&gt;     ...
 
     - `f` **MUST** return a `Future`.
@@ -638,7 +629,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
     &gt;&gt;&gt;     return executor.submit(h)
     &gt;&gt;&gt; resource = async_(f)
     &#34;&#34;&#34;
-    return liftIO(io.async_(f))</code></pre>
+    return lift_io(io.async_(f, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer"><code class="name flex">
@@ -660,7 +651,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 
     For more details, see `io.defer`
     &#34;&#34;&#34;
-    return liftIO(io.defer(deferred, *args, **kwargs))</code></pre>
+    return lift_io(io.defer(deferred, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer_read"><code class="name flex">
@@ -676,7 +667,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
     &#34;&#34;&#34;
     Similar to io.defer_read but for Resource.
     &#34;&#34;&#34;
-    return liftIO(io.defer_read(deferred, *args, **kwargs))</code></pre>
+    return lift_io(io.defer_read(deferred, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer_read_resource"><code class="name flex">
@@ -774,7 +765,7 @@ eliminates stack overflow.</p>
     &#34;&#34;&#34;
     Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
-    return Resource(io.defer(open).map(lambda a: (a, io.pure(a).map(close))))</code></pre>
+    return Resource(io.defer(open).map(lambda a: (a, io.defer(close, a))))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_open_close_io"><code class="name flex">
@@ -816,49 +807,48 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_with"><code class="name flex">
-<span>def <span class="ident">from_with</span></span>(<span>expr)</span>
+<span>def <span class="ident">from_with</span></span>(<span>the_io)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Create a Resource from "with" python expression:</p>
 <blockquote>
 <blockquote>
-<p>with expr as x:
+<p>with expr() as x:
 body</p>
 </blockquote>
 </blockquote>
 <p>is equivalent to</p>
 <blockquote>
 <blockquote>
-<p>from_with(lambda: expr)</p>
+<p>from_with(io.defer(expr))</p>
 </blockquote>
 </blockquote></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_with(expr):
+<pre><code class="python">def from_with(the_io):
     &#34;&#34;&#34;
     Create a Resource from &#34;with&#34; python expression:
 
-    &gt;&gt; with expr as x:
+    &gt;&gt; with expr() as x:
     &gt;&gt;     body
 
     is equivalent to
 
-    &gt;&gt; from_with(lambda: expr)
+    &gt;&gt; from_with(io.defer(expr))
     &#34;&#34;&#34;
 
-    def manager_handler():
-        manager = expr()
+    def manager_handler(manager):
         enter = type(manager).__enter__
         exit = type(manager).__exit__
-        (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
+        return (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
 
-    return Resource(io.defer(manager_handler))</code></pre>
+    return Resource(the_io.map(manager_handler))</code></pre>
 </details>
 </dd>
-<dt id="raffiot.untyped.resource.liftIO"><code class="name flex">
-<span>def <span class="ident">liftIO</span></span>(<span>mio)</span>
+<dt id="raffiot.untyped.resource.lift_io"><code class="name flex">
+<span>def <span class="ident">lift_io</span></span>(<span>mio)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform an IO into a Resource whose created resource if the result of the IO.
@@ -867,7 +857,7 @@ The releasing IO does nothing.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def liftIO(mio):
+<pre><code class="python">def lift_io(mio):
     &#34;&#34;&#34;
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
@@ -930,7 +920,7 @@ given to run.</p>
 
     Please note that the contra_map_read method can transform this value r.
     &#34;&#34;&#34;
-    return liftIO(io.read())</code></pre>
+    return lift_io(io.read())</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.read_executor"><code class="name flex">
@@ -948,7 +938,7 @@ given to run.</p>
     Return the executor running this IO.
     :return:
     &#34;&#34;&#34;
-    return liftIO(io.read_executor())</code></pre>
+    return lift_io(io.read_executor())</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.traverse"><code class="name flex">
@@ -977,21 +967,7 @@ The resulting Resource creates the list of all the resources.</p>
     :return:
     &#34;&#34;&#34;
 
-    def append(l3):
-        def do_it(a2):
-            l3.append(a2)
-            return l3
-
-        return do_it
-
-    r = pure([])
-
-    def dumb(r, a):
-        return r.flat_map(lambda l2: f(a).map(append(l2)))
-
-    for a in l:
-        r = dumb(r, a)
-    return r</code></pre>
+    return zip([defer_resource(f, i) for i in l])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.yield_"><code class="name flex">
@@ -1019,7 +995,7 @@ again.
     again.
     :return:
     &#34;&#34;&#34;
-    return liftIO(io.yield_())</code></pre>
+    return lift_io(io.yield_())</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.zip"><code class="name flex">
@@ -1060,7 +1036,7 @@ The resources opened are then released.
         for arg in l:
             if arg.is_ok():
                 args.append(arg.success[0])
-                close.append(arg.success[1])
+                close.append(arg.success[1].attempt())
             elif arg.is_error() and level &lt; 1:
                 error = arg
                 level = 1
@@ -1072,9 +1048,9 @@ The resources opened are then released.
                 error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
 
         if level == 0:
-            return io.pure((args, io.run_all(close)))
+            return io.pure((args, io.sequence(close)))
         else:
-            return io.run_all(close).attempt().then(io.from_result(error))
+            return io.sequence(close).attempt().then(io.from_result(error))
 
     return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))</code></pre>
 </details>
@@ -1316,8 +1292,8 @@ class Resource:
         return self.attempt().flat_map(
             lambda r: r.fold(
                 pure,
-                lambda e: handler(result.error(e)),
-                lambda p: handler(result.panic(p)),
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
             )
         )
 
@@ -1651,8 +1627,8 @@ Do nothing if the resource creation is successful.</p>
     return self.attempt().flat_map(
         lambda r: r.fold(
             pure,
-            lambda e: handler(result.error(e)),
-            lambda p: handler(result.panic(p)),
+            lambda e: handler(Error(e)),
+            lambda p: handler(Panic(p)),
         )
     )</code></pre>
 </details>
@@ -1782,7 +1758,7 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.from_open_close_io" href="#raffiot.untyped.resource.from_open_close_io">from_open_close_io</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_result" href="#raffiot.untyped.resource.from_result">from_result</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_with" href="#raffiot.untyped.resource.from_with">from_with</a></code></li>
-<li><code><a title="raffiot.untyped.resource.liftIO" href="#raffiot.untyped.resource.liftIO">liftIO</a></code></li>
+<li><code><a title="raffiot.untyped.resource.lift_io" href="#raffiot.untyped.resource.lift_io">lift_io</a></code></li>
 <li><code><a title="raffiot.untyped.resource.panic" href="#raffiot.untyped.resource.panic">panic</a></code></li>
 <li><code><a title="raffiot.untyped.resource.pure" href="#raffiot.untyped.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.resource.read" href="#raffiot.untyped.resource.read">read</a></code></li>

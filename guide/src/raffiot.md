@@ -1,4 +1,4 @@
-# Robust And Fast Functional IO Toolkit
+# Robust and Fast Functional IO Toolkit
 
 *Raffiot* is small (almost) dependency-free python library providing some
 usual functional tools. It currently provides
@@ -22,16 +22,15 @@ and parallel programing is in *raffiot*.
 
 ## Documentation
 
-### [Guide](https://chrilves.github.io/raffiot.py/index.html)
+### This [Guide](./index.html)
 
-The [guide](https://chrilves.github.io/raffiot.py/index.html) is online at
-[https://chrilves.github.io/raffiot.py/index.html](https://chrilves.github.io/raffiot.py/index.html).
+This guide will teach you how to use *Raffiot* through examples.
+Just use the **left panel** or the **right arrow** on this page to jump to the next section.
 
+### [API](./api/index.html)
 
-### [API](https://chrilves.github.io/raffiot.py/api/index.html)
-
-The [API](https://chrilves.github.io/raffiot.py/api/index.html) is online at
-[https://chrilves.github.io/raffiot.py/api/index.html](https://chrilves.github.io/raffiot.py/api/index.html).
+The [API](./api/index.html) is online at
+[https://chrilves.github.io/raffiot.py/api/index.html](./api/index.html).
 
 ## Features
 
@@ -52,6 +51,7 @@ The [API](https://chrilves.github.io/raffiot.py/api/index.html) is online at
 - **distinction** *between* **expected and unexpected failures**: some failures are part
   of your program's normal behaviour (errors) while others are show something
   terribly wrong happened (panics). Yes, that's heavily inspired by *Rust*.
+
 
 ### Resource
 

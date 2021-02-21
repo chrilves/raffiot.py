@@ -257,8 +257,8 @@ class Resource(Generic[R, E, A]):
         return self.attempt().flat_map(
             lambda r: r.fold(
                 pure,
-                lambda e: handler(result.error(e)),
-                lambda p: handler(result.panic(p)),
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
             )
         )
 
@@ -273,7 +273,7 @@ class Resource(Generic[R, E, A]):
         return Resource(self.create.contra_map_executor(f))
 
 
-def liftIO(mio: IO[R, E, A]) -> Resource[R, E, A]:
+def lift_io(mio: IO[R, E, A]) -> Resource[R, E, A]:
     """
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
@@ -296,7 +296,7 @@ def defer(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
 
     For more details, see `io.defer`
     """
-    return liftIO(io.defer(deferred, *args, **kwargs))
+    return lift_io(io.defer(deferred, *args, **kwargs))
 
 
 def defer_resource(
@@ -322,7 +322,7 @@ def defer_read(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
     """
     Similar to io.defer_read but for Resource.
     """
-    return liftIO(io.defer_read(deferred, *args, **kwargs))
+    return lift_io(io.defer_read(deferred, *args, **kwargs))
 
 
 def defer_read_resource(
@@ -348,7 +348,7 @@ def read() -> Resource[R, E, R]:
 
     Please note that the contra_map_read method can transform this value r.
     """
-    return liftIO(io.read())
+    return lift_io(io.read())
 
 
 def error(err: E) -> Resource[R, E, A]:
@@ -397,28 +397,27 @@ def from_open_close(
     """
     Construct a `Resource` from a function to open a resource and one to close it.
     """
-    return Resource(io.defer(open).map(lambda a: (a, io.pure(a).map(close))))
+    return Resource(io.defer(open).map(lambda a: (a, io.defer(close, a))))
 
 
-def from_with(expr: Callable[[], Any]) -> Resource[R, E, A]:
+def from_with(the_io: IO[R, E, Any]) -> Resource[R, E, A]:
     """
     Create a Resource from "with" python expression:
 
-    >> with expr as x:
+    >> with expr() as x:
     >>     body
 
     is equivalent to
 
-    >> from_with(lambda: expr)
+    >> from_with(io.defer(expr))
     """
 
-    def manager_handler():
-        manager = expr()
+    def manager_handler(manager):
         enter = type(manager).__enter__
         exit = type(manager).__exit__
-        (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
+        return (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
 
-    return Resource(io.defer(manager_handler))
+    return Resource(the_io.map(manager_handler))
 
 
 def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
@@ -445,7 +444,7 @@ def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
         for arg in l:
             if arg.is_ok():
                 args.append(arg.success[0])
-                close.append(arg.success[1])
+                close.append(arg.success[1].attempt())
             elif arg.is_error() and level < 1:
                 error = arg
                 level = 1
@@ -457,9 +456,9 @@ def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
                 error = Panic(_MatchError(f"{arg} should be a Result "))
 
         if level == 0:
-            return io.pure((args, io.run_all(close)))
+            return io.pure((args, io.sequence(close)))
         else:
-            return io.run_all(close).attempt().then(io.from_result(error))
+            return io.sequence(close).attempt().then(io.from_result(error))
 
     return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))
 
@@ -478,21 +477,7 @@ def traverse(
     :return:
     """
 
-    def append(l3: List[A2]) -> Callable[[A2], List[A2]]:
-        def do_it(a2: A2) -> List[A2]:
-            l3.append(a2)
-            return l3
-
-        return do_it
-
-    r = pure([])
-
-    def dumb(r, a):
-        return r.flat_map(lambda l2: f(a).map(append(l2)))
-
-    for a in l:
-        r = dumb(r, a)
-    return r
+    return zip([defer_resource(f, i) for i in l])
 
 
 def yield_() -> Resource[R, E, None]:
@@ -505,11 +490,11 @@ def yield_() -> Resource[R, E, None]:
     again.
     :return:
     """
-    return liftIO(io.yield_())
+    return lift_io(io.yield_())
 
 
 def async_(
-    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None]
+    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None], *args, **kwargs
 ) -> Resource[E, R, A]:
     """
     Perform an Asynchronous call. `f` is a function of the form:
@@ -517,7 +502,9 @@ def async_(
     >>> from concurrent.futures import Executor, Future
     >>> def f(context: E,
     >>>       executor: Executor,
-    >>>       callback: Callable[[Result[E,A]], None]) -> Future:
+    >>>       callback: Callable[[Result[E,A]], None],
+    >>>       *args,
+    >>>       **kwargs) -> Future:
     >>>     ...
 
     - `f` **MUST** return a `Future`.
@@ -546,7 +533,7 @@ def async_(
     >>>     return executor.submit(h)
     >>> resource = async_(f)
     """
-    return liftIO(io.async_(f))
+    return lift_io(io.async_(f, *args, **kwargs))
 
 
 def read_executor() -> Resource[R, E, Executor]:
@@ -554,4 +541,4 @@ def read_executor() -> Resource[R, E, Executor]:
     Return the executor running this IO.
     :return:
     """
-    return liftIO(io.read_executor())
+    return lift_io(io.read_executor())

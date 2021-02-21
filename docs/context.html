@@ -1,0 +1,405 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js rust">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Context - RAFFIOT Guide</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="favicon.png">
+        
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        
+        <link rel="stylesheet" href="css/print.css" media="print">
+        
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "rust";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html" class="active"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Asynchronous Computing</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">RAFFIOT Guide</h1>
+
+                    <div class="right-buttons">
+                        
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#context" id="context">Context</a></h1>
+<p>The time has come to talk about the third type parameter of an <code>IO</code>.
+<strong>In the type <code>IO[R,E,A]</code>, <code>R</code> is the type of the context</strong>.
+The context is a value that is always accessible to any <code>IO</code>.
+You can think of it as a local global variable.
+I assure you this sentence make sense!</p>
+<h2><a class="header" href="#run--executing-an-io-in-a-given-context" id="run--executing-an-io-in-a-given-context"><code>run</code> : executing an <code>IO</code> in a given context.</a></h2>
+<p>We have called the method <code>run</code> many times. And every time we gave it
+<code>None</code> as argument. The argument you give to <code>run</code> is actually the
+context value. You take any value you want as the context.
+Usually the context is a value you want to be accessible from everywhere.</p>
+<p>Global variables are indeed accessible from everywhere but they
+are very annoying because they can only have one value at a time.
+Furthermore every change made to the global variable by a part of
+your code will affect all other parts reading this global variable.</p>
+<p>On the opposite side, local variable are nice because every part
+of your code can have its own dedicated local variable. But they
+are annoying because to make them accessible everywhere, you have
+to pass it to every functions as parameters. This is error prone and pollutes your code.</p>
+<p>Given an <code>IO</code> named <code>main</code>, when you call <code>run</code> with some context <code>r</code>,
+the value <code>r</code> is accessible from everywhere in <code>main</code>.
+The context behaves like a global variable inside the running <code>IO</code>.
+But you can pass every call to <code>run</code> a different context.
+The context behaves like a local variable between different calls to <code>run</code>.</p>
+<h2><a class="header" href="#read--accessing-the-shared-context" id="read--accessing-the-shared-context"><code>read</code> : accessing the shared context.</a></h2>
+<p>To access the context, just call the function <code>io.read()</code>. Its result
+is the context:</p>
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[int,None,int] = io.read()
+&gt;&gt;&gt; main.run(5)
+Ok(success=5)
+&gt;&gt;&gt; main.run(77)
+Ok(success=77)
+</code></pre>
+<p>This example is indeed trivial. But imagine that <code>main</code> can be
+a very big program. You can call <code>io.read()</code> anywhere in <code>main</code> to
+get the context. It saves you the huge burden of passing the context
+from <code>run</code> to every function until it reaches the location of <code>io.read()</code>.</p>
+<h2><a class="header" href="#contra_map_read--transforming-the-shared-context" id="contra_map_read--transforming-the-shared-context"><code>contra_map_read</code> : transforming the shared context.</a></h2>
+<p>As I said, the context behaves as a local global variable.
+With <code>io.read()</code> you have seen its global behaviour.
+The method <code>contra_map_read</code> transforms the context, but only
+for the <code>IO</code> it is being called on.
+Note that the context is transformed before the <code>IO</code> is executed.</p>
+<p>The method <code>contra_map_read</code> is very useful when you need to
+alter the context. For example, your program may start with <code>None</code>
+as context, read its configuration to instantiate the services it wants
+to inject and then change to context to pass these services everywhere
+for dependency injection.</p>
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[str,None,int] = io.read().contra_map_read(lambda s: len(s))
+&gt;&gt;&gt; main.run(&quot;Hello&quot;)
+Ok(success=5)
+</code></pre>
+<h2><a class="header" href="#defer_read--doing-something-context-dependent-later" id="defer_read--doing-something-context-dependent-later"><code>defer_read</code> : doing something context-dependent later.</a></h2>
+<p>The function <code>io.defer_read</code> is useful when you it is easier to
+implement an <code>IO</code> as a normal function and then transform it into an <code>IO</code>.
+<code>io.defer_read</code>, like <code>io.defer</code>, takes as first argument the function
+you want to execute later. But unlike <code>io.defer</code>, this function:</p>
+<ul>
+<li>has access to the context</li>
+<li>has access to the executor (see the chapter about <a href="./async.html">asynchronous computing</a>)</li>
+<li>returns a <code>Result[E,A]</code></li>
+</ul>
+<p>The last point is important because it means the function can raise
+errors while <code>io.defer</code> can only raise panics.</p>
+<pre><code class="language-python">&gt;&gt;&gt; def f(context:int, executor, i:int) -&gt; Result[str,int]:
+...   if context &gt; 0:
+...     return Ok(context + i)
+...   else:
+...     return Error(&quot;Ooups!&quot;)
+&gt;&gt;&gt; main : IO[int,None,int] = io.defer_read(f, 5)
+&gt;&gt;&gt; main.run(10)
+Ok(success=15)
+&gt;&gt;&gt; main.run(-1)
+Error(error='Ooups!')
+</code></pre>
+<h2><a class="header" href="#defer_read_io--computing-a-context-dependent-io-later" id="defer_read_io--computing-a-context-dependent-io-later"><code>defer_read_io</code> : computing a context-dependent IO later.</a></h2>
+<p>The function <code>io.defer_read_io</code> is the <code>IO</code> counterpart of
+<code>io.defer_read</code>. It is useful when the context-aware function you want
+to execute later returns an <code>IO</code>.</p>
+<pre><code class="language-python">&gt;&gt;&gt; def f(context:int, executor, i:int) -&gt; IO[None,str,int]:
+...   if context &gt; 0:
+...     return io.pure(context + i)
+...   else:
+...     return io.error(&quot;Ooups!&quot;)
+&gt;&gt;&gt; main : IO[int,None,int] = io.defer_read_io(f, 5)
+&gt;&gt;&gt; main.run(10)
+Ok(success=15)
+&gt;&gt;&gt; main.run(-1)
+Error(error='Ooups!')
+</code></pre>
+<h2><a class="header" href="#use-case-dependency-injection" id="use-case-dependency-injection">Use Case: Dependency Injection</a></h2>
+<p>As a demonstration of how dependency injection works in <em>Raffiot</em>,
+create and fill the file <code>dependency_injection.py</code> as below:</p>
+<pre><code class="language-python">from raffiot import io
+from raffiot.io import IO
+
+import sys
+from dataclasses import dataclass
+from typing import List
+
+@dataclass
+class NotFound(Exception):
+  url: str
+
+class Service:
+  def get(self, path: str) -&gt; IO[None,NotFound,str]:
+    pass
+
+class HttpService(Service):
+  def __init__(self, host: str, port: int) -&gt; None:
+    self.host = host
+    self.port = port
+  
+  def get(self, path: str) -&gt; IO[None,NotFound,str]:
+    url = f&quot;http://{self.host}:{self.port}/{path}&quot;
+
+    if path == &quot;index.html&quot;:
+      response = io.pure(f&quot;HTML Content of url {url}&quot;)
+    elif path == &quot;index.md&quot;:
+      response = io.pure(f&quot;Markdown Content of url {url}&quot;)
+    else:
+      response = io.error(NotFound(url))
+    return io.defer(print, f&quot;Opening url {url}&quot;).then(response)
+
+class LocalFileSytemService(Service):
+  def get(self, path: str) -&gt; IO[None,NotFound,str]:
+    url = f&quot;/{path}&quot;
+
+    if path == &quot;index.html&quot;:
+      response = io.pure(f&quot;HTML Content of file {url}&quot;)
+    elif path == &quot;index.md&quot;:
+      response = io.pure(f&quot;Markdown Content of file {url}&quot;)
+    else:
+      response = io.error(NotFound(url))
+    return io.defer(print, f&quot;Opening file {url}&quot;).then(response)
+
+
+main : IO[Service,NotFound,List[str]] = (
+  io.read()
+  .flat_map(lambda service:
+    service.get(&quot;index.html&quot;)
+    .flat_map(lambda x:
+      service.get(&quot;index.md&quot;)
+      .flat_map(lambda y: io.defer(print, &quot;Result = &quot;, [x,y]))
+    )
+  )
+)
+
+if len(sys.argv) &gt;= 2 and sys.argv[1] == &quot;http&quot;:
+  service = HttpService(&quot;localhost&quot;, 80)
+else:
+  service = LocalFileSytemService()
+
+main.run(service)
+</code></pre>
+<p>Running the program with the <code>HTTPService</code> gives:</p>
+<pre><code class="language-shell">$ python dependency_injection.py http
+Opening url http://localhost:80/index.html
+Opening url http://localhost:80/index.md
+Result =  ['HTML Content of url http://localhost:80/index.html', 'Markdown Content of url http://localhost:80/index.md']
+</code></pre>
+<p>While running it with the <code>LocalFileSytemService</code> gives:</p>
+<pre><code class="language-shell">$ python dependency_injection.py localfs
+Opening file /index.html
+Opening file /index.md
+Result =  ['HTML Content of file /index.html', 'Markdown Content of file /index.md']
+</code></pre>
+<p>Once again, <code>main</code> is still a very short <code>IO</code>, so it may be not trivial
+how much the context is a life saver. But imagine the <code>main</code> <code>IO</code> to be
+one of your real program. It would be much bigger, and passing the
+context as global or local variables would be a much bigger problem.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="failures.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="lists.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="failures.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="lists.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>

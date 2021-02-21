@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Robust and Fast Functional IO Toolkit - RAFFIOT Guide</title>
+        <title>Combining a list of IOs - RAFFIOT Guide</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Asynchronous Computing</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html" class="active"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Asynchronous Computing</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -163,77 +163,82 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#robust-and-fast-functional-io-toolkit" id="robust-and-fast-functional-io-toolkit">Robust and Fast Functional IO Toolkit</a></h1>
-<p><em>Raffiot</em> is small (almost) dependency-free python library providing some
-usual functional tools. It currently provides</p>
-<ul>
-<li>an easy-to-use <code>IO</code> monad which is <strong>stack-safe</strong>, <strong>fast</strong>, support
-<strong>asynchronous</strong>, <strong>concurrent</strong>, <strong>parallel</strong> programming, has many other features.</li>
-<li>a <code>Resource</code> data type for easy but reliable <strong>resource management</strong>.</li>
-<li>a <code>Result</code> data structure to represent errors</li>
-</ul>
-<h2><a class="header" href="#demo" id="demo">Demo</a></h2>
-<p>For a demo, just type this in a terminal:</p>
-<pre><code class="language-shellscript">curl https://raw.githubusercontent.com/chrilves/raffiot.py/main/demos/raffiot_demo.sh | /bin/sh
+                        <h1><a class="header" href="#combining-a-list-of-ios" id="combining-a-list-of-ios">Combining a list of IOs</a></h1>
+<p>Remember that an <code>IO</code> is the description of some computation, like
+a source code. As such, it can be manipulated like any value, and
+so stored in lists. This section covers the operations you have
+on lists of <code>IO</code>s.</p>
+<h2><a class="header" href="#zip--from-a-list-of-io-to-an-io-of-list" id="zip--from-a-list-of-io-to-an-io-of-list"><code>zip</code> : from a list of IO to an IO of list</a></h2>
+<p>The <code>zip</code> function and method transform a list of <code>IO</code> into
+an <code>IO</code> returning a list. Each value of the resulting list is
+the value returned by the <code>IO</code> at the same location in the
+input list.</p>
+<p>The whole computation fails on the first failure encountered.</p>
+<pre><code class="language-python">&gt;&gt;&gt; from typing import List
+&gt;&gt;&gt; main : IO[None,None,List] = io.zip(io.pure(8), io.pure(&quot;Hello&quot;))
+&gt;&gt;&gt; main.run(None)
+Ok(success=[8, 'Hello'])
+&gt;&gt;&gt; main : IO[None,str,List] = io.zip(io.pure(8), io.error(&quot;Oups&quot;))
+&gt;&gt;&gt; main.run(None)
+Error(error='Oups')
 </code></pre>
-<p>This demo runs 4 computations in parallel. It demonstrates how simple concurrent
-and parallel programing is in <em>raffiot</em>.</p>
-<p><strong>Note that this command will install raffiot in your current Python environment</strong></p>
-<h2><a class="header" href="#documentation" id="documentation">Documentation</a></h2>
-<h3><a class="header" href="#this-a-hrefindexhtmlguidea" id="this-a-hrefindexhtmlguidea">This <a href="./index.html">Guide</a></a></h3>
-<p>This guide will teach you how to use <em>Raffiot</em> through examples.
-Just use the <strong>left panel</strong> or the <strong>right arrow</strong> on this page to jump to the next section.</p>
-<h3><a class="header" href="#a-hrefapiindexhtmlapia" id="a-hrefapiindexhtmlapia"><a href="./api/index.html">API</a></a></h3>
-<p>The <a href="./api/index.html">API</a> is online at
-<a href="./api/index.html">https://chrilves.github.io/raffiot.py/api/index.html</a>.</p>
-<h2><a class="header" href="#features" id="features">Features</a></h2>
-<ul>
-<li><strong>pure python</strong>: <em>Raffiot</em> is written entirely in Python 3.7+.</li>
-<li><strong>small</strong>: it is just a few small files.</li>
-<li><strong>(almost) dependency-free</strong>: it only depends on <code>typing-extensions</code> (for the
-<code>@final</code> annotation).</li>
-<li><strong>crystal clear code</strong> </li>
-</ul>
-<h3><a class="header" href="#io" id="io">IO</a></h3>
-<ul>
-<li><strong>stack safe</strong>: you just won't run into stack overflows anymore.</li>
-<li><strong>fast</strong>: you won't notice the overhead.</li>
-<li><strong>dependency injection</strong> <em>made easy</em>: make some context visible from anywhere.</li>
-<li><em>simple</em> <strong>asynchronous</strong> <em>and</em> <strong>concurrent programming</strong>: full support of synchronous,
-asynchronous and concurrent programming <em>with the same simple API</em>.</li>
-<li><strong>railway-oriented programming</strong>: clean and simple failure management.</li>
-<li><strong>distinction</strong> <em>between</em> <strong>expected and unexpected failures</strong>: some failures are part
-of your program's normal behaviour (errors) while others are show something
-terribly wrong happened (panics). Yes, that's heavily inspired by <em>Rust</em>.</li>
-</ul>
-<h3><a class="header" href="#resource" id="resource">Resource</a></h3>
-<p>Python has the <code>with</code> construction, but <code>Resource</code> goes a step further.</p>
-<ul>
-<li><strong>easy user-defined resource creation</strong>: just provide some open and close
-function.</li>
-<li><strong>composability</strong>: the resource you want to create depends on another resource?
-Not a problem, you can compose resources the way you want. It scales.</li>
-<li><strong>failures handling in resources</strong>: <code>Resource</code> has everything <code>IO</code> has, including
-its wonderful failure management.</li>
-</ul>
-<h3><a class="header" href="#result" id="result">Result</a></h3>
-<p>Did I mention <strong>Railway-Oriented Programming</strong>? <code>Result</code> is represent the 3 possible
-result of a computation:</p>
-<ul>
-<li><code>Ok(value)</code>: the computation successfully computed the this <code>value</code>.</li>
-<li><code>Error(error)</code>: the computation failed on some expected failure <code>error</code>, probably
-from the business domain.</li>
-<li><code>Panic(exception)</code>: the computation failed on some unexpected failure <code>exception</code>.</li>
-</ul>
+<h2><a class="header" href="#sequence--running-ios-in-sequence" id="sequence--running-ios-in-sequence"><code>sequence</code> : running IOs in sequence</a></h2>
+<p>The function <code>io.sequence</code> is like the method <code>then</code>:
+it executes a list of <code>IO</code> sequentially, returning the
+value of the last <code>IO</code> and failing on the first failure
+encountered:</p>
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,int] = io.sequence(
+...   io.defer(print, &quot;Hello&quot;),
+...   io.defer(print, &quot;World&quot;),
+...   io.pure(12)  
+... )
+&gt;&gt;&gt; main.run(None)
+Hello
+World
+Ok(success=12)
+</code></pre>
+<h2><a class="header" href="#traverse--almost-like-map" id="traverse--almost-like-map"><code>traverse</code> : almost like <code>map</code></a></h2>
+<p>The function <code>io.traverse</code> is very much like the function <code>map</code> on lists.
+Like the <code>map</code> on lists it applies a function to every element of a list.
+But unlike the <code>map</code> on lists the function it applies to every element
+returns an <code>IO</code>.</p>
+<p><code>io.traverse</code> is useful when you need to execute a function returning
+an <code>IO</code> to every element of a list. It returns an <code>IO</code> computing the
+list of values returned by each call.</p>
+<p>Like <code>zip</code> and <code>sequence</code>, it fails on the first failure encountered.</p>
+<pre><code class="language-python">&gt;&gt;&gt; from typing import List
+&gt;&gt;&gt; def add_context(i: int) -&gt; IO[int,None,int]:
+...   return io.read().flat_map(lambda c:
+...     io.defer(print, f&quot;context = {c}, argument = {i}&quot;)
+...     .then(io.pure(c + i))
+...   )
+&gt;&gt;&gt; main : IO[int,None,List[int]] = io.traverse(range(10), add_context)
+&gt;&gt;&gt; main.run(10)
+context = 10, argument = 0
+context = 10, argument = 1
+context = 10, argument = 2
+context = 10, argument = 3
+context = 10, argument = 4
+context = 10, argument = 5
+context = 10, argument = 6
+context = 10, argument = 7
+context = 10, argument = 8
+context = 10, argument = 9
+Ok(success=[10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
+                            <a rel="prev" href="context.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
 
                         
-                            <a rel="next" href="first_steps.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="async.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -245,9 +250,13 @@ from the business domain.</li>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
+                    <a rel="prev" href="context.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
 
                 
-                    <a rel="next" href="first_steps.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="async.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 
