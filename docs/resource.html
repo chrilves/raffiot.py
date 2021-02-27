@@ -163,7 +163,7 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#resource-management" id="resource-management">Resource Management</a></h1>
+                        <h1 id="resource-management"><a class="header" href="#resource-management">Resource Management</a></h1>
 <p>Resource management is the safe creation and release
 of resources: files, connection handlers, etc. Resource
 management ensures all created resources will be released
@@ -231,7 +231,7 @@ Ok(success='ZNLWSH1B')
 &gt;&gt;&gt; rnd_str.run(None)
 Ok(success='MENS91RD')
 </code></pre>
-<h2><a class="header" href="#from_open_close_io--creating-a-resource-from-openclose-ios" id="from_open_close_io--creating-a-resource-from-openclose-ios"><code>from_open_close_io</code> : Creating a <code>Resource</code> from open/close <code>IO</code>s</a></h2>
+<h2 id="from_open_close_io--creating-a-resource-from-openclose-ios"><a class="header" href="#from_open_close_io--creating-a-resource-from-openclose-ios"><code>from_open_close_io</code> : Creating a <code>Resource</code> from open/close <code>IO</code>s</a></h2>
 <p>The <code>Resource</code> we want to define will create and print a new string
 every time it is used. Releasing it will simply be printing it.
 A <code>Resource</code> is essentially two computations:</p>
@@ -256,7 +256,7 @@ to <code>resource.from_open_close_io</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_open_close_io(rs_open, rs_close)
 </code></pre>
 <p>That wasn't that hard, isn't it?</p>
-<h2><a class="header" href="#use--using-a-resource" id="use--using-a-resource"><code>use</code> : using a resource</a></h2>
+<h2 id="use--using-a-resource"><a class="header" href="#use--using-a-resource"><code>use</code> : using a resource</a></h2>
 <p>Now that we have a <code>Resource</code>, we want to use it. To do so, just
 call the method <code>use</code>. You need to give it a function taking as
 argument the resource created and retuning an <code>IO</code> that used this
@@ -283,13 +283,13 @@ Closing PSUNW6M5
 Panic(exception=Exception('BOOM!'))
 </code></pre>
 <p>If the inner <code>IO</code> panics, the string is still released too!</p>
-<h2><a class="header" href="#map-flat_map-defer-async_-and-others" id="map-flat_map-defer-async_-and-others"><code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>async_</code> and others.</a></h2>
+<h2 id="map-flat_map-defer-async_-and-others"><a class="header" href="#map-flat_map-defer-async_-and-others"><code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>async_</code> and others.</a></h2>
 <p><code>Resource</code> supports almost the same API as <code>IO</code>.
 It includes <code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>zip</code>, etc.
 It means, for example, that you can create resources in parallel,
 or simply create a list of resources (if one fails, all fails),
 etc.</p>
-<h2><a class="header" href="#lift_io--from-io-to-resource" id="lift_io--from-io-to-resource"><code>lift_io</code> : from <code>IO</code> to <code>Resource</code></a></h2>
+<h2 id="lift_io--from-io-to-resource"><a class="header" href="#lift_io--from-io-to-resource"><code>lift_io</code> : from <code>IO</code> to <code>Resource</code></a></h2>
 <p>Actually, any <code>IO[E,E,A]</code> can be lifted into a <code>Resource[R,E,A]</code>.
 The releasing function is just a no-op. It brings a lot of expressiveness
 and safety to resource creation:</p>
@@ -298,7 +298,7 @@ and safety to resource creation:</p>
 Hello World!
 Ok(success=5)
 </code></pre>
-<h2><a class="header" href="#from_open_close--resource-from-open-and-close-functions" id="from_open_close--resource-from-open-and-close-functions"><code>from_open_close</code> : Resource from open and close functions</a></h2>
+<h2 id="from_open_close--resource-from-open-and-close-functions"><a class="header" href="#from_open_close--resource-from-open-and-close-functions"><code>from_open_close</code> : Resource from open and close functions</a></h2>
 <p>Sometimes it is easier to create a <code>Resource</code> from usual Python's
 functions rather than from the open/close <code>IO</code>s. To do so, just
 use the function <code>resource.from_open_close</code>:</p>
@@ -313,13 +313,13 @@ use the function <code>resource.from_open_close</code>:</p>
 ...   print(f&quot;Closing {s}&quot;)
 &gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_open_close(rs_open, rs_close)
 </code></pre>
-<h2><a class="header" href="#from_with--resource-from-with" id="from_with--resource-from-with"><code>from_with</code> : Resource from <code>with</code></a></h2>
+<h2 id="from_with--resource-from-with"><a class="header" href="#from_with--resource-from-with"><code>from_with</code> : Resource from <code>with</code></a></h2>
 <p>If the resource you want to create already support Python's
 <code>with</code>-statement, then you're lucky: you just have to make
 one single call to <code>resource.from_with</code></p>
 <pre><code class="language-python">&gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_with(io.defer(open, &quot;hello.txt&quot;, &quot;w&quot;))
 </code></pre>
-<h2><a class="header" href="#creating-a-resource-directly" id="creating-a-resource-directly">Creating a Resource directly</a></h2>
+<h2 id="creating-a-resource-directly"><a class="header" href="#creating-a-resource-directly">Creating a Resource directly</a></h2>
 <p>A <code>Resource[R,E,A]</code> is essentially an <code>IO[R,E,Tuple[A, IO[R,Any,Any]]]</code>.
 When the <code>IO</code> runs, it returns a pair <code>Tuple[A, IO[R,Any,Any]]</code>.
 The fist member of the pair is the created resource of type <code>A</code>.
@@ -335,7 +335,7 @@ Note that the result and failures of the releasing <code>IO</code> are ignored.<
 ... )
 &gt;&gt;&gt; rs : Resource[None,None,str] = Resource(create)
 </code></pre>
-<h2><a class="header" href="#use-case--temporary-file" id="use-case--temporary-file">Use Case : Temporary File</a></h2>
+<h2 id="use-case--temporary-file"><a class="header" href="#use-case--temporary-file">Use Case : Temporary File</a></h2>
 <p>This is a complete use case of a <code>Resource</code> creating a random file.</p>
 <pre><code class="language-python">&gt;&gt;&gt; from io import TextIOWrapper
 &gt;&gt;&gt; create : IO[None,None,Tuple[TextIOWrapper, IO[None,None,None]]] = (

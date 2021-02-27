@@ -3,13 +3,20 @@ Data structure representing a computation.
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any, List, Iterable
+
+import threading
 from collections import abc
+from concurrent.futures import Executor, ThreadPoolExecutor, Future
+import concurrent.futures as fut
+from queue import Queue
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
+
 from typing_extensions import final
-from raffiot import result, _MatchError
+
+from raffiot import _MatchError
+from raffiot.__internal import IOTag, ResultTag, ContTag
 from raffiot.result import Result, Ok, Error, Panic
-from concurrent.futures import Executor, ThreadPoolExecutor, Future, ProcessPoolExecutor
-from raffiot.__internal import *
+import time
 
 R = TypeVar("R")
 E = TypeVar("E")
@@ -18,6 +25,31 @@ X = TypeVar("X")
 R2 = TypeVar("R2")
 E2 = TypeVar("E2")
 A2 = TypeVar("A2")
+
+__all__ = [
+    "IO",
+    "pure",
+    "defer",
+    "defer_io",
+    "read",
+    "error",
+    "panic",
+    "from_result",
+    "zip",
+    "sequence",
+    "yield_",
+    "async_",
+    "read_executor",
+    "defer_read",
+    "defer_read_io",
+    "traverse",
+    "parallel",
+    "wait",
+    "rec",
+    "safe",
+    "Monitor",
+    "Fiber",
+]
 
 
 @final
@@ -249,6 +281,18 @@ class IO(Generic[R, E, A]):
             )
         )
 
+    def then_keep(self, *args: IO[R, E, A]) -> IO[R, E, A]:
+        """
+        Equivalent to `then(*args) but, on success, the computed value
+        is self's one.
+
+        Used to execute some IO after a successful computation without
+        changing its value.
+        :param args:
+        :return:
+        """
+        return self.flat_map(lambda a: sequence(args).then(pure(a)))
+
     def __str__(self) -> str:
         if self.__tag == IOTag.PURE:
             return f"Pure({self.__fields})"
@@ -290,7 +334,6 @@ class IO(Generic[R, E, A]):
             return f"Executor({self.__fields})"
         if self.__tag == IOTag.CONTRA_MAP_EXECUTOR:
             return f"ContraMapExecutor({self.__fields})"
-
         if self.__tag == IOTag.DEFER_READ:
             return f"DeferRead({self.__fields})"
         if self.__tag == IOTag.DEFER_READ_IO:
@@ -590,3 +633,510 @@ def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:
         return defer_io(lambda: f(*args, **kwargs))
 
     return wrapper
+
+
+@final
+class Monitor:
+    """
+    Used to know if there is still some futures running.
+    Every future created when running fibers must be registered
+    in the monitor.
+    The monitor waits until there is no more future running.
+    """
+
+    __slots__ = ["__executor", "__lock", "__queue"]
+
+    def __init__(self, executor: Executor) -> None:
+        self.__executor = executor
+        self.__lock = threading.Lock()
+        self.__queue = []
+
+    def register_future(self, future: Future) -> None:
+        with self.__lock:
+            self.__queue.append(future)
+
+    def wait_for_completion(self) -> None:
+        ok = True
+        while ok:
+            with self.__lock:
+                futures = self.__queue
+                self.__queue = []
+            fut.wait(futures)
+            time.sleep(0)
+            with self.__lock:
+                ok = not (not self.__queue)
+
+
+@final
+class Fiber(Generic[R, E, A]):
+    __slots__ = [
+        "__io",
+        "__context",
+        "__cont",
+        "__executor",
+        "__monitor",
+        "result",
+        "__finish_lock",
+        "finished",
+        "__callbacks",
+        "__waiting_lock",
+        "__waiting",
+        "__nb_waiting",
+    ]
+
+    def __init__(
+        self, io: IO[R, E, A], context: R, executor: Executor, monitor: Monitor
+    ) -> None:
+        self.__io = io
+        self.__context = context
+        self.__cont = [ContTag.ID]
+        self.__executor = executor
+        self.__monitor = monitor
+        self.result = None
+
+        self.__finish_lock = threading.Lock()
+        self.finished = False
+        self.__callbacks = Queue()
+
+        self.__waiting_lock = threading.Lock()
+        self.__waiting = []
+        self.__nb_waiting = 0
+
+    def __schedule(self) -> None:
+        self.__monitor.register_future(self.__executor.submit(self.__step))
+
+    def __finish(self) -> None:
+        with self.__finish_lock:
+            self.finished = True
+            while not self.__callbacks.empty():
+                fiber, index = self.__callbacks.get()
+                fiber.__run_callback(index, self.result)
+
+    def __add_callback(self, fiber: Fiber[Any, Any, Any], index: int) -> None:
+        with self.__finish_lock:
+            if self.finished:
+                fiber.__run_callback(index, self.result)
+            else:
+                self.__callbacks.put((fiber, index))
+
+    def __run_callback(self, index: int, res: Result[Any, Any]) -> None:
+        with self.__waiting_lock:
+            self.__waiting[index] = res
+            self.__nb_waiting -= 1
+            if self.__nb_waiting == 0:
+                from raffiot.io import IO
+
+                self.__io = IO(IOTag.PURE, self.__waiting)
+                self.__waiting = None
+                self.__schedule()
+
+    @classmethod
+    def run(cls, io: IO[R, E, A], context: R, executor: Executor) -> Result[E, A]:
+        monitor = Monitor(executor)
+        fiber = Fiber(io, context, executor, monitor)
+        fiber.__schedule()
+        monitor.wait_for_completion()
+        return fiber.result
+
+    @classmethod
+    def run_async(
+        cls, io: IO[R, E, A], context: R, executor: Executor
+    ) -> Future[Result[E, A]]:
+        return executor.submit(cls.run, io, context, executor)
+
+    def __step(self) -> None:
+        context = self.__context
+        io = self.__io
+        cont = self.__cont
+
+        try:
+            while True:
+                # Eval IO
+                while True:
+                    tag = io._IO__tag
+                    if tag == IOTag.PURE:
+                        arg_tag = ResultTag.OK
+                        arg_value = io._IO__fields
+                        break
+                    if tag == IOTag.MAP:
+                        cont.append(io._IO__fields[1])
+                        cont.append(ContTag.MAP)
+                        io = io._IO__fields[0]
+                        continue
+                    if tag == IOTag.FLATMAP:
+                        cont.append(io._IO__fields[1])
+                        cont.append(context)
+                        cont.append(ContTag.FLATMAP)
+                        io = io._IO__fields[0]
+                        continue
+                    if tag == IOTag.SEQUENCE:
+                        ios = iter(io._IO__fields)
+                        try:
+                            io = next(ios)
+                        except StopIteration:
+                            arg_tag = ResultTag.OK
+                            arg_value = None
+                            break
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                        cont.append(ios)
+                        cont.append(context)
+                        cont.append(ContTag.SEQUENCE)
+                        continue
+                    if tag == IOTag.ZIP:
+                        ios = iter(io._IO__fields)
+                        try:
+                            io = next(ios)
+                        except StopIteration:
+                            arg_tag = ResultTag.OK
+                            arg_value = []
+                            break
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                        cont.append([])
+                        cont.append(ios)
+                        cont.append(context)
+                        cont.append(ContTag.ZIP)
+                        continue
+                    if tag == IOTag.FLATTEN:
+                        cont.append(context)
+                        cont.append(ContTag.FLATTEN)
+                        io = io._IO__fields
+                        continue
+                    if tag == IOTag.DEFER:
+                        try:
+                            arg_tag = ResultTag.OK
+                            arg_value = io._IO__fields[0](
+                                *io._IO__fields[1], **io._IO__fields[2]
+                            )
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        break
+                    if tag == IOTag.DEFER_IO:
+                        try:
+                            io = io._IO__fields[0](
+                                *io._IO__fields[1], **io._IO__fields[2]
+                            )
+                            continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    if tag == IOTag.ATTEMPT:
+                        io = io._IO__fields
+                        cont.append(ContTag.ATTEMPT)
+                        continue
+                    if tag == IOTag.READ:
+                        arg_tag = ResultTag.OK
+                        arg_value = context
+                        break
+                    if tag == IOTag.CONTRA_MAP_READ:
+                        try:
+                            context = io._IO__fields[0](context)
+                            io = io._IO__fields[1]
+                            continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    if tag == IOTag.ERROR:
+                        arg_tag = ResultTag.ERROR
+                        arg_value = io._IO__fields
+                        break
+                    if tag == IOTag.CATCH:
+                        cont.append(io._IO__fields[1])
+                        cont.append(context)
+                        cont.append(ContTag.CATCH)
+                        io = io._IO__fields[0]
+                        continue
+                    if tag == IOTag.MAP_ERROR:
+                        cont.append(io._IO__fields[1])
+                        cont.append(ContTag.MAP_ERROR)
+                        io = io._IO__fields[0]
+                        continue
+                    if tag == IOTag.PANIC:
+                        arg_tag = ResultTag.PANIC
+                        arg_value = io._IO__fields
+                        break
+                    if tag == IOTag.RECOVER:
+                        cont.append(io._IO__fields[1])
+                        cont.append(context)
+                        cont.append(ContTag.RECOVER)
+                        io = io._IO__fields[0]
+                        continue
+                    if tag == IOTag.MAP_PANIC:
+                        cont.append(io._IO__fields[1])
+                        cont.append(ContTag.MAP_PANIC)
+                        io = io._IO__fields[0]
+                        continue
+                    if tag == IOTag.YIELD:
+                        from raffiot.io import IO
+
+                        self.__io = IO(IOTag.PURE, None)
+                        self.__context = context
+                        self.__cont = cont
+                        self.__schedule()
+                        return
+                    if tag == IOTag.ASYNC:
+                        from raffiot.io import from_result
+
+                        def callback(r):
+                            self.__io = from_result(r)
+                            self.__schedule()
+
+                        self.__context = context
+                        self.__cont = cont
+                        try:
+                            self.__monitor.register_future(
+                                io._IO__fields[0](
+                                    context,
+                                    self.__executor,
+                                    callback,
+                                    *io._IO__fields[1],
+                                    **io._IO__fields[2],
+                                )
+                            )
+                            return
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    if tag == IOTag.EXECUTOR:
+                        arg_tag = ResultTag.OK
+                        arg_value = self.__executor
+                        break
+                    if tag == IOTag.CONTRA_MAP_EXECUTOR:
+                        try:
+                            new_executor = io._IO__fields[0](self.__executor)
+                            if not isinstance(new_executor, Executor):
+                                raise Exception(f"{new_executor} is not an Executor!")
+                            self.__executor = new_executor
+                            io = io._IO__fields[1]
+                            continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    if tag == IOTag.DEFER_READ:
+                        try:
+                            res = io._IO__fields[0](
+                                *(context, self.__executor, *io._IO__fields[1]),
+                                **io._IO__fields[2],
+                            )
+                            if isinstance(res, Ok):
+                                arg_tag = ResultTag.OK
+                                arg_value = res.success
+                                break
+                            if isinstance(res, Error):
+                                arg_tag = ResultTag.ERROR
+                                arg_value = res.error
+                                break
+                            if isinstance(res, Panic):
+                                arg_tag = ResultTag.PANIC
+                                arg_value = res.exception
+                                break
+                            arg_tag = ResultTag.PANIC
+                            arg_value = Panic(
+                                _MatchError("{res} should be a Result in defer_read")
+                            )
+                            break
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        break
+                    if tag == IOTag.DEFER_READ_IO:
+                        try:
+                            io = io._IO__fields[0](
+                                *(context, self.__executor, *io._IO__fields[1]),
+                                **io._IO__fields[2],
+                            )
+                            continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    if tag == IOTag.PARALLEL:
+                        arg_value = []
+                        for fio in io._IO__fields:
+                            fiber = Fiber(fio, context, self.__executor, self.__monitor)
+                            arg_value.append(fiber)
+                            fiber.__schedule()
+                        arg_tag = ResultTag.OK
+                        break
+                    if tag == IOTag.WAIT:
+                        fibers = io._IO__fields
+                        if not fibers:
+                            arg_tag = ResultTag.OK
+                            arg_value = []
+                            break
+                        self.__waiting = [None for _ in fibers]
+                        self.__nb_waiting = len(fibers)
+                        for index, fib in enumerate(fibers):
+                            fib.__add_callback(self, index)
+                        return
+                    if tag == IOTag.REC:
+                        try:
+                            io = io._IO__fields(io)
+                            continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    arg_tag = ResultTag.PANIC
+                    arg_value = _MatchError(f"{io} should be an IO")
+                    break
+
+                # Eval Cont
+                while True:
+                    tag = cont.pop()
+                    if tag == ContTag.MAP:
+                        fun = cont.pop()
+                        try:
+                            if arg_tag == ResultTag.OK:
+                                arg_value = fun(arg_value)
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        continue
+                    if tag == ContTag.FLATMAP:
+                        context = cont.pop()
+                        f = cont.pop()
+                        try:
+                            if arg_tag == ResultTag.OK:
+                                io = f(arg_value)
+                                break
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        continue
+                    if tag == ContTag.SEQUENCE:
+                        if arg_tag == ResultTag.OK:
+                            try:
+                                io = next(cont[-2])
+                            except StopIteration:
+                                cont.pop()  # CONTEXT
+                                cont.pop()  # IOS
+                                continue
+                            except Exception as exception:
+                                cont.pop()  # CONTEXT
+                                cont.pop()  # IOS
+                                arg_tag = ResultTag.PANIC
+                                arg_value = exception
+                                continue
+                            context = cont[-1]
+                            cont.append(ContTag.SEQUENCE)
+                            break
+                        # CLEANING CONT
+                        cont.pop()  # CONTEXT
+                        cont.pop()  # IOS
+                        continue
+                    if tag == ContTag.ZIP:
+                        if arg_tag == ResultTag.OK:
+                            cont[-3].append(arg_value)  # RESULT LIST
+                            try:
+                                io = next(cont[-2])  # IOS
+                            except StopIteration:
+                                cont.pop()  # CONTEXT
+                                cont.pop()  # IOS
+                                arg_tag = ResultTag.OK
+                                arg_value = cont.pop()
+                                continue
+                            except Exception as exception:
+                                cont.pop()  # CONTEXT
+                                cont.pop()  # IOS
+                                cont.pop()  # RESULT LIST
+                                arg_tag = ResultTag.PANIC
+                                arg_value = exception
+                                continue
+                            context = cont[-1]
+                            cont.append(ContTag.ZIP)
+                            break
+                        # CLEANING CONT
+                        cont.pop()  # CONTEXT
+                        cont.pop()  # IOS
+                        cont.pop()  # RESULT LIST
+                        continue
+                    if tag == ContTag.FLATTEN:
+                        context = cont.pop()
+                        if arg_tag == ResultTag.OK:
+                            io = arg_value
+                            break
+                        continue
+                    if tag == ContTag.ATTEMPT:
+                        if arg_tag == ResultTag.OK:
+                            arg_value = Ok(arg_value)
+                            continue
+                        if arg_tag == ResultTag.ERROR:
+                            arg_tag = ResultTag.OK
+                            arg_value = Error(arg_value)
+                            continue
+                        if arg_tag == ResultTag.PANIC:
+                            arg_tag = ResultTag.OK
+                            arg_value = Panic(arg_value)
+                            continue
+                        arg_tag = ResultTag.OK
+                        arg_value = Panic(_MatchError(f"Wrong result tag {arg_tag}"))
+                        continue
+                    if tag == ContTag.CATCH:
+                        context = cont.pop()
+                        handler = cont.pop()
+                        try:
+                            if arg_tag == ResultTag.ERROR:
+                                io = handler(arg_value)
+                                break
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        continue
+                    if tag == ContTag.MAP_ERROR:
+                        fun = cont.pop()
+                        try:
+                            if arg_tag == ResultTag.ERROR:
+                                arg_value = fun(arg_value)
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        continue
+                    if tag == ContTag.RECOVER:
+                        context = cont.pop()
+                        handler = cont.pop()
+                        try:
+                            if arg_tag == ResultTag.PANIC:
+                                io = handler(arg_value)
+                                break
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        continue
+                    if tag == ContTag.MAP_PANIC:
+                        fun = cont.pop()
+                        try:
+                            if arg_tag == ResultTag.PANIC:
+                                arg_value = fun(arg_value)
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                        continue
+                    if tag == ContTag.ID:
+                        if arg_tag == ResultTag.OK:
+                            self.result = Ok(arg_value)
+                        elif arg_tag == ResultTag.ERROR:
+                            self.result = Error(arg_value)
+                        elif arg_tag == ResultTag.PANIC:
+                            self.result = Panic(arg_value)
+                        else:
+                            self.result = Panic(
+                                _MatchError(f"Wrong result tag {arg_tag}")
+                            )
+                        self.__finish()
+                        return
+                    arg_tag = ResultTag.PANIC
+                    arg_value = Panic(_MatchError(f"Invalid cont {cont + [tag]}"))
+        except Exception as exception:
+            self.finished = True
+            self.result = Panic(exception)

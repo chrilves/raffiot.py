@@ -163,12 +163,12 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#combining-a-list-of-ios" id="combining-a-list-of-ios">Combining a list of IOs</a></h1>
+                        <h1 id="combining-a-list-of-ios"><a class="header" href="#combining-a-list-of-ios">Combining a list of IOs</a></h1>
 <p>Remember that an <code>IO</code> is the description of some computation, like
 a source code. As such, it can be manipulated like any value, and
 so stored in lists. This section covers the operations you have
 on lists of <code>IO</code>s.</p>
-<h2><a class="header" href="#zip--from-a-list-of-io-to-an-io-of-list" id="zip--from-a-list-of-io-to-an-io-of-list"><code>zip</code> : from a list of IO to an IO of list</a></h2>
+<h2 id="zip--from-a-list-of-io-to-an-io-of-list"><a class="header" href="#zip--from-a-list-of-io-to-an-io-of-list"><code>zip</code> : from a list of IO to an IO of list</a></h2>
 <p>The <code>zip</code> function and method transform a list of <code>IO</code> into
 an <code>IO</code> returning a list. Each value of the resulting list is
 the value returned by the <code>IO</code> at the same location in the
@@ -182,7 +182,7 @@ Ok(success=[8, 'Hello'])
 &gt;&gt;&gt; main.run(None)
 Error(error='Oups')
 </code></pre>
-<h2><a class="header" href="#sequence--running-ios-in-sequence" id="sequence--running-ios-in-sequence"><code>sequence</code> : running IOs in sequence</a></h2>
+<h2 id="sequence--running-ios-in-sequence"><a class="header" href="#sequence--running-ios-in-sequence"><code>sequence</code> : running IOs in sequence</a></h2>
 <p>The function <code>io.sequence</code> is like the method <code>then</code>:
 it executes a list of <code>IO</code> sequentially, returning the
 value of the last <code>IO</code> and failing on the first failure
@@ -197,7 +197,7 @@ Hello
 World
 Ok(success=12)
 </code></pre>
-<h2><a class="header" href="#traverse--almost-like-map" id="traverse--almost-like-map"><code>traverse</code> : almost like <code>map</code></a></h2>
+<h2 id="traverse--almost-like-map"><a class="header" href="#traverse--almost-like-map"><code>traverse</code> : almost like <code>map</code></a></h2>
 <p>The function <code>io.traverse</code> is very much like the function <code>map</code> on lists.
 Like the <code>map</code> on lists it applies a function to every element of a list.
 But unlike the <code>map</code> on lists the function it applies to every element

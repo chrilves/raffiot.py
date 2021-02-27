@@ -1,58 +1,65 @@
-from hypothesis import given
-import hypothesis.strategies as st
+from concurrent.futures import Executor
+from typing import List, Any, TypeVar
 from unittest import TestCase
-from raffiot.resource import *
+
+import hypothesis.strategies as st
+from hypothesis import given
+
 from raffiot import _MatchError
+from raffiot import io
+from raffiot.io import IO
+from raffiot.resource import *
+from raffiot.result import Result, Ok, Error, Panic
+
+R = TypeVar("R", contravariant=True)
+E = TypeVar("E", covariant=True)
+A = TypeVar("A", covariant=True)
 
 
 class TestResource(TestCase):
     @given(st.integers())
     def test_pure(self, i: int) -> None:
-        assert pure(i).use(io.pure).run(None) == result.Ok(i)
+        assert pure(i).use(io.pure).run(None) == Ok(i)
 
     @given(st.integers())
     def test_flatten(self, i: int) -> None:
-        assert pure(pure(i)).flatten().use(io.pure).run(None) == result.Ok(i)
+        assert pure(pure(i)).flatten().use(io.pure).run(None) == Ok(i)
 
     @given(st.text(), st.text())
     def test_ap(self, u: str, v: str) -> None:
         assert pure(lambda x, y: x + y).ap(pure(u), pure(v)).use(io.pure).run(
             None
-        ).raise_on_panic() == result.Ok(u + v)
+        ).raise_on_panic() == Ok(u + v)
 
     @given(st.text())
     def test_error(self, err: str) -> None:
-        assert error(err).use(io.pure).run(None) == result.Error(err)
+        assert error(err).use(io.pure).run(None) == Error(err)
 
     @given(st.text(), st.text())
     def test_map_error(self, u: str, v: str) -> None:
-        assert error(u).map_error(lambda x: x + v).use(io.pure).run(
-            None
-        ) == result.Error(u + v)
+        assert error(u).map_error(lambda x: x + v).use(io.pure).run(None) == Error(
+            u + v
+        )
 
     @given(st.text(), st.text())
     def test_catch_error(self, u: str, v: str) -> None:
-        assert error(u).catch(lambda x: pure(x + v)).use(io.pure).run(
-            None
-        ) == result.Ok(u + v)
+        assert error(u).catch(lambda x: pure(x + v)).use(io.pure).run(None) == Ok(u + v)
 
     @given(st.text(), st.text())
     def test_not_catch_ok(self, u: str, v: str) -> None:
-        assert pure(u).catch(lambda x: pure(x + v)).use(io.pure).run(None) == result.Ok(
-            u
-        )
+        assert pure(u).catch(lambda x: pure(x + v)).use(io.pure).run(None) == Ok(u)
 
     @given(st.text(), st.text())
     def test_not_catch_panic(self, u: str, v: str) -> None:
         pan = _MatchError(u)
-        assert panic(pan).catch(lambda x: pure(x + v)).use(io.pure).run(
-            None
-        ) == result.Panic(pan)
+        assert panic(pan).catch(lambda x: pure(x + v)).use(io.pure).run(None) == Panic(
+            pan
+        )
 
     @given(st.text())
     def test_panic(self, err: str) -> None:
         pan = _MatchError(err)
-        assert panic(pan).use(io.pure).run(None) == result.Panic(pan)
+        assert panic(pan).use(io.pure).run(None) == Panic(pan)
 
     @given(st.text(), st.text())
     def test_map_panic(self, u: str, v: str) -> None:
@@ -60,84 +67,78 @@ class TestResource(TestCase):
         puv = _MatchError(u + v)
         assert panic(pu).map_panic(lambda x: _MatchError(x.message + v)).use(
             io.pure
-        ).run(None) == result.Panic(puv)
+        ).run(None) == Panic(puv)
 
     @given(st.text(), st.text())
     def test_recover_panic(self, u: str, v: str) -> None:
         pu = _MatchError(u)
         assert panic(pu).recover(lambda x: pure(x.message + v)).use(io.pure).run(
             None
-        ) == result.Ok(u + v)
+        ) == Ok(u + v)
 
     @given(st.text(), st.text())
     def test_not_recover_ok(self, u: str, v: str) -> None:
-        assert pure(u).recover(lambda x: pure(v)).use(io.pure).run(None) == result.Ok(u)
+        assert pure(u).recover(lambda x: pure(v)).use(io.pure).run(None) == Ok(u)
 
     @given(st.text(), st.text())
     def test_not_catch_error(self, u: str, v: str) -> None:
-        assert error(u).catch(lambda x: pure(v)).use(io.pure).run(None) == result.Ok(v)
+        assert error(u).catch(lambda x: pure(v)).use(io.pure).run(None) == Ok(v)
 
     @given(st.text())
     def test_panic(self, pan: str) -> None:
-        assert panic(_MatchError(pan)).use(io.pure).run(None) == result.Panic(
-            _MatchError(pan)
-        )
+        assert panic(_MatchError(pan)).use(io.pure).run(None) == Panic(_MatchError(pan))
 
     @given(st.text(), st.text())
     def test_on_failure_ok(self, u: str, v: str) -> None:
-        assert pure(u).on_failure(lambda x: pure(v)).use(io.pure).run(
-            None
-        ) == result.Ok(u)
+        assert pure(u).on_failure(lambda x: pure(v)).use(io.pure).run(None) == Ok(u)
 
     @given(st.text(), st.text())
     def test_on_failure_error(self, u: str, v: str) -> None:
-        assert error(u).map(lambda _: v).on_failure(pure).use(io.pure).run(
-            None
-        ) == result.Ok(result.Error(u))
+        assert error(u).map(lambda _: v).on_failure(pure).use(io.pure).run(None) == Ok(
+            Error(u)
+        )
 
     @given(st.text(), st.text())
     def test_on_failure_panic(self, u: str, v: str) -> None:
         pu = _MatchError(u)
-        assert panic(pu).map(lambda _: v).on_failure(pure).use(io.pure).run(
-            None
-        ) == result.Ok(result.Panic(pu))
-
-    @given(st.text())
-    def test_read(self, i: st.integers()) -> None:
-        assert read().use(io.pure).run(i) == result.Ok(i)
-
-    @given(st.text(), st.text())
-    def test_map_read(self, u: str, v: str) -> None:
-        assert read().contra_map_read(lambda x: x + v).use(io.pure).run(u) == result.Ok(
-            u + v
+        assert panic(pu).map(lambda _: v).on_failure(pure).use(io.pure).run(None) == Ok(
+            Panic(pu)
         )
 
     @given(st.text())
+    def test_read(self, i: st.integers()) -> None:
+        assert read().use(io.pure).run(i) == Ok(i)
+
+    @given(st.text(), st.text())
+    def test_map_read(self, u: str, v: str) -> None:
+        assert read().contra_map_read(lambda x: x + v).use(io.pure).run(u) == Ok(u + v)
+
+    @given(st.text())
     def test_attempt_ok(self, u: str) -> None:
-        assert pure(u).attempt().use(io.pure).run(None) == result.Ok(result.Ok(u))
+        assert pure(u).attempt().use(io.pure).run(None) == Ok(Ok(u))
 
     @given(st.text())
     def test_attempt_error(self, u: str) -> None:
-        assert error(u).attempt().use(io.pure).run(None) == result.Ok(result.Error(u))
+        assert error(u).attempt().use(io.pure).run(None) == Ok(Error(u))
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:
         pu = _MatchError(u)
-        assert panic(pu).attempt().use(io.pure).run(None) == result.Ok(result.Panic(pu))
+        assert panic(pu).attempt().use(io.pure).run(None) == Ok(Panic(pu))
 
     @given(st.text())
     def test_from_ok(self, u: str) -> None:
-        x = result.Ok(u)
+        x = Ok(u)
         assert from_result(x).use(io.pure).run(None) == x
 
     @given(st.text())
     def test_from_error(self, u: str) -> None:
-        x = result.Error(u)
+        x = Error(u)
         assert from_result(x).use(io.pure).run(None) == x
 
     @given(st.text())
     def test_from_panic(self, u: str) -> None:
-        x = result.Panic(_MatchError(u))
+        x = Panic(_MatchError(u))
         assert from_result(x).use(io.pure).run(None) == x
 
     @given(st.integers(min_value=1000, max_value=2000))
@@ -148,7 +149,7 @@ class TestResource(TestCase):
             else:
                 return defer_resource(f, j - 1).map(lambda x: x + 2)
 
-        assert f(i).use(io.pure).run(None) == result.Ok(2 * i)
+        assert f(i).use(io.pure).run(None) == Ok(2 * i)
 
     @given(st.integers(), st.integers())
     def test_defer_read(self, i: int, k: int) -> None:
@@ -182,9 +183,7 @@ class TestResource(TestCase):
             else:
                 return pure(j).flat_map(lambda x: f(j - 1).map(lambda y: x + y))
 
-        assert (
-            f(i).use(io.pure).run(None) == result.Ok(i * (i + 1) / 2) if i >= 0 else 0
-        )
+        assert f(i).use(io.pure).run(None) == Ok(i * (i + 1) / 2) if i >= 0 else 0
 
     @given(st.lists(st.integers()))
     def test_traverse(self, l: List[int]) -> None:
@@ -310,7 +309,7 @@ class TestResource(TestCase):
         ret = rs.use(f_use).run(None)
         assert opened == (1 if can_open and not can_close else 0)
         if can_open and can_use:
-            assert ret == result.Ok(i)
+            assert ret == Ok(i)
 
     @given(
         st.booleans(),
@@ -367,7 +366,7 @@ class TestResource(TestCase):
         ret = rs.use(f_use).run(None)
         assert opened == (1 if can_open and not can_close else 0)
         if can_open and can_map and can_use:
-            assert ret == result.Ok(2 * i)
+            assert ret == Ok(2 * i)
 
     @given(
         st.booleans(),
@@ -439,7 +438,7 @@ class TestResource(TestCase):
             1 if can_open_a and can_flat_map and can_open_b and not can_close_b else 0
         )
         if can_open_a and can_flat_map and can_open_b and can_use:
-            assert ret.raise_on_panic() == result.Ok(i)
+            assert ret.raise_on_panic() == Ok(i)
 
     @given(
         st.booleans(),
@@ -511,4 +510,4 @@ class TestResource(TestCase):
         assert opened_a == (1 if can_open_a and not can_close_a else 0)
         assert opened_b == (1 if can_open_b and not can_close_b else 0)
         if can_open_a and can_open_b and can_use:
-            assert ret.raise_on_panic() == result.Ok([ret_a, ret_b])
+            assert ret.raise_on_panic() == Ok([ret_a, ret_b])

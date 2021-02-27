@@ -28,6 +28,10 @@
 </summary>
 <pre><code class="python">from dataclasses import dataclass
 
+__all__ = [
+    &#34;_MatchError&#34;,
+]
+
 
 @dataclass
 class _MatchError(Exception):
@@ -58,6 +62,10 @@ Ensure that create resources are always nicely released after use.</p></div>
 <dd>
 <div class="desc"></div>
 </dd>
+<dt><code class="name"><a title="raffiot.val" href="val.html">raffiot.val</a></code></dt>
+<dd>
+<div class="desc"><p>Local Variables to work around Python annoying limitations about lambdas …</p></div>
+</dd>
 </dl>
 </section>
 <section>
@@ -65,6 +73,40 @@ Ensure that create resources are always nicely released after use.</p></div>
 <section>
 </section>
 <section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="raffiot._MatchError"><code class="flex name class">
+<span>class <span class="ident">_MatchError</span></span>
+<span>(</span><span>message: str)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Exception for pattern matching errors (used internally, should NEVER happen).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@dataclass
+class _MatchError(Exception):
+    &#34;&#34;&#34;
+    Exception for pattern matching errors (used internally, should NEVER happen).
+    &#34;&#34;&#34;
+
+    message: str</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot._MatchError.message"><code class="name">var <span class="ident">message</span> : str</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -79,6 +121,17 @@ Ensure that create resources are always nicely released after use.</p></div>
 <li><code><a title="raffiot.resource" href="resource.html">raffiot.resource</a></code></li>
 <li><code><a title="raffiot.result" href="result.html">raffiot.result</a></code></li>
 <li><code><a title="raffiot.untyped" href="untyped/index.html">raffiot.untyped</a></code></li>
+<li><code><a title="raffiot.val" href="val.html">raffiot.val</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="raffiot._MatchError" href="#raffiot._MatchError">_MatchError</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot._MatchError.message" href="#raffiot._MatchError.message">message</a></code></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

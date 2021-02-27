@@ -163,7 +163,7 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#asynchronous-computing" id="asynchronous-computing">Asynchronous Computing</a></h1>
+                        <h1 id="asynchronous-computing"><a class="header" href="#asynchronous-computing">Asynchronous Computing</a></h1>
 <p>For now you know that an <code>IO</code> is very nice for stack safety,
 dependency injection, failure management, and code-as-date manipulations.
 There is another big feature <code>IO</code> has: simple asynchronous and
@@ -185,7 +185,7 @@ of JavaScript is such an interface. The <a href="https://docs.python.org/3/libra
 syntax of many languages, including Python, is also such an interface.
 So is <em>Raffiot</em>'s <code>IO</code>. But unlike the <em>async/await</em> syntax, synchronous
 and asynchronous code can be transparently mixed with <code>IO</code>.</p>
-<h2><a class="header" href="#async_--running-something-asynchronously" id="async_--running-something-asynchronously"><code>async_</code> : running something asynchronously</a></h2>
+<h2 id="async_--running-something-asynchronously"><a class="header" href="#async_--running-something-asynchronously"><code>async_</code> : running something asynchronously</a></h2>
 <p>Calling a function <code>f</code> usually looks like this:</p>
 <pre><code class="language-python">&gt;&gt;&gt; def f():
 ...   print(&quot;f is running&quot;)
@@ -278,7 +278,7 @@ for task scheduling and does not directly support <code>AsyncResult</code> yet.<
 <p><strong>Very important</strong>: when you use <code>async_</code>, you must always
 <strong>return a <code>Future</code></strong> and always <strong>call the callback exactly once</strong>
 (no more, no less).</p>
-<h2><a class="header" href="#run--the-second-argument" id="run--the-second-argument"><code>run</code> : the second argument.</a></h2>
+<h2 id="run--the-second-argument"><a class="header" href="#run--the-second-argument"><code>run</code> : the second argument.</a></h2>
 <p>An <code>IO</code> is executed on a pool of threads. Until now we only gave <code>io.run</code>
 one argument: the context. But <code>io.run</code> accepts two argument! The second
 one is the number of threads in the pool.</p>
@@ -295,7 +295,7 @@ You know the story: Python is single-threaded.</p>
 <pre><code class="language-python">&gt;&gt;&gt; io.pure(5).run(None, 50)
 Ok(success=5)
 </code></pre>
-<h2><a class="header" href="#parallel--running-concurrent-tasks" id="parallel--running-concurrent-tasks"><code>parallel</code> : running concurrent tasks</a></h2>
+<h2 id="parallel--running-concurrent-tasks"><a class="header" href="#parallel--running-concurrent-tasks"><code>parallel</code> : running concurrent tasks</a></h2>
 <p>The function <code>io.parallel</code> runs a list of <code>IO</code>s in parallel.
 Remember that because of Python's
 <a href="https://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a>
@@ -339,7 +339,7 @@ Ok(success=None)
 </code></pre>
 <p>As you can see, <code>main</code> does not wait for the <code>IO</code>s running
 in parallel/concurrently to continue its execution.</p>
-<h2><a class="header" href="#wait--waiting-for-concurrent-tasks-to-end" id="wait--waiting-for-concurrent-tasks-to-end"><code>wait</code> : waiting for concurrent tasks to end</a></h2>
+<h2 id="wait--waiting-for-concurrent-tasks-to-end"><a class="header" href="#wait--waiting-for-concurrent-tasks-to-end"><code>wait</code> : waiting for concurrent tasks to end</a></h2>
 <p>Sometimes you want to wait for a parallel/concurrent computation
 to finish. Remember that parallel/concurrent computation are
 represented by the <em>fibers</em> returned by <code>io.parallel</code>.</p>
@@ -371,7 +371,7 @@ Task 2: End
 Finished
 Ok(success=None)
 </code></pre>
-<h2><a class="header" href="#yield_--letting-other-task-progress" id="yield_--letting-other-task-progress"><code>yield_</code> : letting other task progress</a></h2>
+<h2 id="yield_--letting-other-task-progress"><a class="header" href="#yield_--letting-other-task-progress"><code>yield_</code> : letting other task progress</a></h2>
 <p>Remember that an <code>IO</code> runs on a pool of thread.
 There there is more <code>IO</code>s to run than the number of threads to run on,
 there is a chance that some <code>IO</code> will not get executed.
@@ -388,14 +388,14 @@ Hello
 World!
 Ok(success=None)
 </code></pre>
-<h2><a class="header" href="#read_executor--getting-the-executor" id="read_executor--getting-the-executor"><code>read_executor</code> : getting the executor</a></h2>
+<h2 id="read_executor--getting-the-executor"><a class="header" href="#read_executor--getting-the-executor"><code>read_executor</code> : getting the executor</a></h2>
 <p>The function <code>io.read_executor</code> returns the executor on which the
 current <code>IO</code> runs.</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.read_executor().map(lambda exe: exe.submit(print,&quot;Hello World!&quot;))
 Hello World!
 Ok(success=&lt;Future at 0x7f7eaa3fb1f0 state=finished returned NoneType&gt;)
 </code></pre>
-<h2><a class="header" href="#contra_map_executor--changing-the-executor" id="contra_map_executor--changing-the-executor"><code>contra_map_executor</code> : changing the executor</a></h2>
+<h2 id="contra_map_executor--changing-the-executor"><a class="header" href="#contra_map_executor--changing-the-executor"><code>contra_map_executor</code> : changing the executor</a></h2>
 <p>You may sometimes want to change the executor running the current <code>IO</code>.
 For example you may want a long task to be executed on a different
 thread pool:</p>

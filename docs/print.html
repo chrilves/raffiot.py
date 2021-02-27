@@ -165,7 +165,7 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#robust-and-fast-functional-io-toolkit" id="robust-and-fast-functional-io-toolkit">Robust and Fast Functional IO Toolkit</a></h1>
+                        <h1 id="robust-and-fast-functional-io-toolkit"><a class="header" href="#robust-and-fast-functional-io-toolkit">Robust and Fast Functional IO Toolkit</a></h1>
 <p><em>Raffiot</em> is small (almost) dependency-free python library providing some
 usual functional tools. It currently provides</p>
 <ul>
@@ -174,21 +174,21 @@ usual functional tools. It currently provides</p>
 <li>a <code>Resource</code> data type for easy but reliable <strong>resource management</strong>.</li>
 <li>a <code>Result</code> data structure to represent errors</li>
 </ul>
-<h2><a class="header" href="#demo" id="demo">Demo</a></h2>
+<h2 id="demo"><a class="header" href="#demo">Demo</a></h2>
 <p>For a demo, just type this in a terminal:</p>
 <pre><code class="language-shellscript">curl https://raw.githubusercontent.com/chrilves/raffiot.py/main/demos/raffiot_demo.sh | /bin/sh
 </code></pre>
 <p>This demo runs 4 computations in parallel. It demonstrates how simple concurrent
 and parallel programing is in <em>raffiot</em>.</p>
 <p><strong>Note that this command will install raffiot in your current Python environment</strong></p>
-<h2><a class="header" href="#documentation" id="documentation">Documentation</a></h2>
-<h3><a class="header" href="#this-a-hrefindexhtmlguidea" id="this-a-hrefindexhtmlguidea">This <a href="./index.html">Guide</a></a></h3>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<h3 id="this-a-hrefindexhtmlguidea"><a class="header" href="#this-a-hrefindexhtmlguidea">This <a href="./index.html">Guide</a></a></h3>
 <p>This guide will teach you how to use <em>Raffiot</em> through examples.
 Just use the <strong>left panel</strong> or the <strong>right arrow</strong> on this page to jump to the next section.</p>
-<h3><a class="header" href="#a-hrefapiindexhtmlapia" id="a-hrefapiindexhtmlapia"><a href="./api/index.html">API</a></a></h3>
+<h3 id="a-hrefapiindexhtmlapia"><a class="header" href="#a-hrefapiindexhtmlapia"><a href="./api/index.html">API</a></a></h3>
 <p>The <a href="./api/index.html">API</a> is online at
 <a href="./api/index.html">https://chrilves.github.io/raffiot.py/api/index.html</a>.</p>
-<h2><a class="header" href="#features" id="features">Features</a></h2>
+<h2 id="features"><a class="header" href="#features">Features</a></h2>
 <ul>
 <li><strong>pure python</strong>: <em>Raffiot</em> is written entirely in Python 3.7+.</li>
 <li><strong>small</strong>: it is just a few small files.</li>
@@ -196,7 +196,7 @@ Just use the <strong>left panel</strong> or the <strong>right arrow</strong> on 
 <code>@final</code> annotation).</li>
 <li><strong>crystal clear code</strong> </li>
 </ul>
-<h3><a class="header" href="#io" id="io">IO</a></h3>
+<h3 id="io"><a class="header" href="#io">IO</a></h3>
 <ul>
 <li><strong>stack safe</strong>: you just won't run into stack overflows anymore.</li>
 <li><strong>fast</strong>: you won't notice the overhead.</li>
@@ -208,7 +208,7 @@ asynchronous and concurrent programming <em>with the same simple API</em>.</li>
 of your program's normal behaviour (errors) while others are show something
 terribly wrong happened (panics). Yes, that's heavily inspired by <em>Rust</em>.</li>
 </ul>
-<h3><a class="header" href="#resource" id="resource">Resource</a></h3>
+<h3 id="resource"><a class="header" href="#resource">Resource</a></h3>
 <p>Python has the <code>with</code> construction, but <code>Resource</code> goes a step further.</p>
 <ul>
 <li><strong>easy user-defined resource creation</strong>: just provide some open and close
@@ -218,7 +218,7 @@ Not a problem, you can compose resources the way you want. It scales.</li>
 <li><strong>failures handling in resources</strong>: <code>Resource</code> has everything <code>IO</code> has, including
 its wonderful failure management.</li>
 </ul>
-<h3><a class="header" href="#result" id="result">Result</a></h3>
+<h3 id="result"><a class="header" href="#result">Result</a></h3>
 <p>Did I mention <strong>Railway-Oriented Programming</strong>? <code>Result</code> is represent the 3 possible
 result of a computation:</p>
 <ul>
@@ -227,7 +227,7 @@ result of a computation:</p>
 from the business domain.</li>
 <li><code>Panic(exception)</code>: the computation failed on some unexpected failure <code>exception</code>.</li>
 </ul>
-<h1><a class="header" href="#first-steps-with-io" id="first-steps-with-io">First Steps with IO</a></h1>
+<h1 id="first-steps-with-io"><a class="header" href="#first-steps-with-io">First Steps with IO</a></h1>
 <p><em>Raffiot</em> is available as a
 <a href="https://pypi.org/project/raffiot/"><em>pip</em> package</a>
 (and soon <em>conda</em>). For now just type this in a
@@ -245,7 +245,7 @@ Type &quot;help&quot;, &quot;copyright&quot;, &quot;credits&quot; or &quot;licen
 <pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
 &gt;&gt;&gt; from raffiot.io import IO
 </code></pre>
-<h2><a class="header" href="#hello-world" id="hello-world">Hello World!</a></h2>
+<h2 id="hello-world"><a class="header" href="#hello-world">Hello World!</a></h2>
 <p>Let's start by the classic <em>&quot;Hello World!&quot;</em>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.defer(print, &quot;Hello World!&quot;)
 </code></pre>
@@ -271,7 +271,7 @@ Ok(success=None)
 <p>As you can see, every call to <code>run</code> printed <code>Hello World!</code> and returned
 the value <code>Ok(None)</code>. <code>Ok</code> means the computation was successful, <code>None</code>
 is the return value of computation.</p>
-<h2><a class="header" href="#defer--doing-something-later" id="defer--doing-something-later"><code>defer</code> : doing something <strong>later</strong></a></h2>
+<h2 id="defer--doing-something-later"><a class="header" href="#defer--doing-something-later"><code>defer</code> : doing something <strong>later</strong></a></h2>
 <p>The first argument of <code>defer</code> is the function you want to call later.
 The following arguments are the function's normal arguments.
 For example, to call <code>datetime.now()</code> later, just create the <code>IO</code>:</p>
@@ -304,7 +304,7 @@ Ok(success=None)
 <p>This ability to represent any computation as a value is one of the main
 strength of an <code>IO</code>. It means you can work with computation like any
 other value: composing them, storing them in variables, in lists, etc.</p>
-<h2><a class="header" href="#then--doing-something-sequentially" id="then--doing-something-sequentially"><code>then</code> : doing something sequentially.</a></h2>
+<h2 id="then--doing-something-sequentially"><a class="header" href="#then--doing-something-sequentially"><code>then</code> : doing something sequentially.</a></h2>
 <p>You will often need to execute some <code>IO</code> sequentially.
 The method <code>then</code> compose some values of type <code>IO</code>, running
 them one by one. The return value is the one of the last <code>IO</code>:</p>
@@ -321,7 +321,7 @@ Ok(success=datetime.datetime(2021, 2, 20, 15, 52, 11, 205845))
 </code></pre>
 <p>You may sometimes prefer the analogous function <code>io.sequence</code>
 that behaves like the method <code>then</code>.</p>
-<h2><a class="header" href="#map--transforming-results" id="map--transforming-results"><code>map</code> : transforming results.</a></h2>
+<h2 id="map--transforming-results"><a class="header" href="#map--transforming-results"><code>map</code> : transforming results.</a></h2>
 <p>You can transform the return value of an <code>IO</code> using the <code>map</code> method.
 It is very similar to the <code>map</code> function on lists, but works on <code>IO</code>.
 Just provide <code>map</code> some function. It will use this function to transform
@@ -333,7 +333,7 @@ Map((Defer((&lt;built-in method now of type object at 0x7ff733070bc0&gt;,
 &gt;&gt;&gt; date_str.run(None)
 Ok(success='2021-02-19T23:54:46.297503')
 </code></pre>
-<h2><a class="header" href="#flat_map--chaining-ios" id="flat_map--chaining-ios"><code>flat_map</code> : chaining IOs.</a></h2>
+<h2 id="flat_map--chaining-ios"><a class="header" href="#flat_map--chaining-ios"><code>flat_map</code> : chaining IOs.</a></h2>
 <p><code>map</code> transform the return value of an <code>IO</code>. So transforming the
 return value of <code>date_str</code> with <code>print_io</code> will give you an  <code>IO</code>
 whose return value is also an <code>IO</code>. When you will run it, instead
@@ -351,7 +351,7 @@ Ok(success=None)
 </code></pre>
 <p>Here the return value of <code>date_str</code> is given to <code>print_io</code> via <code>x</code> and
 both <code>IO</code> are executed, returning the result of <code>print_io(x)</code>.</p>
-<h2><a class="header" href="#flatten--concatenating-an-io-of-io" id="flatten--concatenating-an-io-of-io"><code>flatten</code> : concatenating an IO of IO.</a></h2>
+<h2 id="flatten--concatenating-an-io-of-io"><a class="header" href="#flatten--concatenating-an-io-of-io"><code>flatten</code> : concatenating an IO of IO.</a></h2>
 <p>Instead of having used <code>flat_map</code>, you could have used <code>map</code> and then
 <code>flatten</code> to reduce the <code>IO of IO</code> into a single layer of <code>IO</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None]= date_str.map(lambda x: print_io(x)).flatten()
@@ -361,7 +361,7 @@ Ok(success=None)
 </code></pre>
 <p>Most of the time, you will use <code>flat_map</code> because it is simpler to use.
 But now you know where its name comes from: flatten of map.</p>
-<h2><a class="header" href="#pure--just-a-value" id="pure--just-a-value"><code>pure</code> : just a value.</a></h2>
+<h2 id="pure--just-a-value"><a class="header" href="#pure--just-a-value"><code>pure</code> : just a value.</a></h2>
 <p><code>pure</code> is very simple: the result of the computation is the very same
 argument of <code>pure</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,int] = io.pure(5)
@@ -372,7 +372,7 @@ Ok(success=5)
 </code></pre>
 <p>It is very useful when some functions/method expect some <code>IO</code>
 but you want to provide a constant.</p>
-<h2><a class="header" href="#defer_io--computing-an-io-later" id="defer_io--computing-an-io-later"><code>defer_io</code> : computing an IO later.</a></h2>
+<h2 id="defer_io--computing-an-io-later"><a class="header" href="#defer_io--computing-an-io-later"><code>defer_io</code> : computing an IO later.</a></h2>
 <p><code>defer_io</code> is very much like <code>defer</code> but for functions returning <code>IO</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,IO[None,None,None]] = io.defer(print_io, &quot;Hello&quot;, &quot;World&quot;, &quot;!&quot;)
 &gt;&gt;&gt; main.run(None)
@@ -384,7 +384,7 @@ Ok(success=None)
 </code></pre>
 <p>Like <code>flat_map</code> is <code>faltten</code> of <code>map</code>, <code>defer_io</code> is <code>flatten</code> of <code>defer</code>.
 It is useful to defer the call of function returning <code>IO</code>.</p>
-<h2><a class="header" href="#use-case-stack-safety" id="use-case-stack-safety">Use Case: Stack-Safety</a></h2>
+<h2 id="use-case-stack-safety"><a class="header" href="#use-case-stack-safety">Use Case: Stack-Safety</a></h2>
 <p>Let's see one of the main feature of <code>IO</code>: it is stack safe!
 When you run the following function in Python, even if the
 argument <code>times</code> is small, the computation will fail miserably
@@ -429,11 +429,11 @@ Ok(success=None)
 <p>With <code>IO</code>, you can use recursion without fear! Just remember to
 wrap your computation in an <code>IO</code> (using <code>defer</code>, <code>defer_io</code>, <code>map</code>,
 <code>flat_map</code>and others) to benefit from <code>IO</code>'s safety.</p>
-<h1><a class="header" href="#failures" id="failures">Failures</a></h1>
+<h1 id="failures"><a class="header" href="#failures">Failures</a></h1>
 <p>All the computation we have seen until now were successful.
 We will now see how <code>IO</code>'s failure management works.
 But before, I need to present you the <code>Result[E,A]</code> type.</p>
-<h2><a class="header" href="#the-resultea-type" id="the-resultea-type">The <code>Result[E,A]</code> type</a></h2>
+<h2 id="the-resultea-type"><a class="header" href="#the-resultea-type">The <code>Result[E,A]</code> type</a></h2>
 <p><code>Result[E,A]</code> represent the result of a computation.
 A computation can either be successful, returning a value of type <code>A</code>,
 or failed with an expected error of type <code>E</code>, or failed with an
@@ -457,7 +457,7 @@ it doing as little damage as possible.</p>
 <pre><code class="language-python">&gt;&gt;&gt; from raffiot import result
 &gt;&gt;&gt; from raffiot.result import Result, Ok, Error, Panic
 </code></pre>
-<h3><a class="header" href="#oksuccessa--a-success" id="oksuccessa--a-success"><code>Ok(success:A)</code> : A Success</a></h3>
+<h3 id="oksuccessa--a-success"><a class="header" href="#oksuccessa--a-success"><code>Ok(success:A)</code> : A Success</a></h3>
 <p>When a computation successfully return some value <code>a</code> of type <code>A</code>,
 it actually returns the value <code>Ok(a)</code> of type <code>Result[E,A]</code>. The
 value <code>a</code> can be obtained by <code>Ok(a).success</code>:</p>
@@ -467,7 +467,7 @@ Ok(success=5)
 &gt;&gt;&gt; result.success
 5
 </code></pre>
-<h3><a class="header" href="#errorerrore--an-expected-failure" id="errorerrore--an-expected-failure"><code>Error(error:E)</code> : An Expected Failure</a></h3>
+<h3 id="errorerrore--an-expected-failure"><a class="header" href="#errorerrore--an-expected-failure"><code>Error(error:E)</code> : An Expected Failure</a></h3>
 <p>When a computation fail because of an error <code>e</code> of type <code>E</code>,
 it actually return a value <code>Error(e)</code> of type <code>Result[E,Any]</code>.
 The type <code>E</code> can be any type you want. Choose as type <code>E</code> a type
@@ -479,7 +479,7 @@ Error(error=5)
 &gt;&gt;&gt; result.error
 5
 </code></pre>
-<h3><a class="header" href="#panicexceptionexception--an-unexpected-failure" id="panicexceptionexception--an-unexpected-failure"><code>Panic(exception:Exception)</code> : An Unexpected Failure</a></h3>
+<h3 id="panicexceptionexception--an-unexpected-failure"><a class="header" href="#panicexceptionexception--an-unexpected-failure"><code>Panic(exception:Exception)</code> : An Unexpected Failure</a></h3>
 <p>When a computation fail because of an unexpected failure,
 it actually return a value <code>Panic(p)</code> of type <code>Result[Any,Any]</code>
 where <code>p</code> is the exception encountered.
@@ -491,7 +491,7 @@ Panic(exception=Exception('BOOM!'))
 &gt;&gt;&gt; result.exception
 Exception('BOOM!')
 </code></pre>
-<h3><a class="header" href="#fold--transforming-a-resultea" id="fold--transforming-a-resultea"><code>fold</code> : transforming a <code>Result[E,A]</code></a></h3>
+<h3 id="fold--transforming-a-resultea"><a class="header" href="#fold--transforming-a-resultea"><code>fold</code> : transforming a <code>Result[E,A]</code></a></h3>
 <p>To transform a <code>Result[E,A]</code>, use the method <code>fold</code>. It takes
 as argument three functions. The first one is called when the
 result is an <code>Ok</code>. The second is called when it is an <code>Error</code>.
@@ -517,7 +517,7 @@ these function receive as argument the value/error/exception
 ... 
 'exeption: BOOM!'
 </code></pre>
-<h3><a class="header" href="#raise_on_panic--reporting-panics-as-exceptions" id="raise_on_panic--reporting-panics-as-exceptions"><code>raise_on_panic</code> : reporting panics as exceptions</a></h3>
+<h3 id="raise_on_panic--reporting-panics-as-exceptions"><a class="header" href="#raise_on_panic--reporting-panics-as-exceptions"><code>raise_on_panic</code> : reporting panics as exceptions</a></h3>
 <p><em>Raffiot</em>'s functions and methods never raise exception
 but instead return a <code>Panic</code>. When you need a failed
 computation to raise the exception, call <code>raise_on_panic</code>
@@ -546,12 +546,12 @@ Traceback (most recent call last):
     raise self.exception
 Exception: BOOM!
 </code></pre>
-<h2><a class="header" href="#errors-expected-failures-in-io" id="errors-expected-failures-in-io">Errors: Expected failures in IO</a></h2>
+<h2 id="errors-expected-failures-in-io"><a class="header" href="#errors-expected-failures-in-io">Errors: Expected failures in IO</a></h2>
 <p><code>IO</code> has built-in support errors. Remember that we call error the
 expected failures. Errors can be of any type you want. You should
 usually take as error type the one that fit your business domain
 errors the best. <strong>In the type <code>IO[R,E,A]</code>, <code>E</code> is the type of errors</strong>.</p>
-<h3><a class="header" href="#error--this-failure-was-expected-were-still-in-safe-zone" id="error--this-failure-was-expected-were-still-in-safe-zone"><code>error</code> : this failure was expected, we're still in safe zone!</a></h3>
+<h3 id="error--this-failure-was-expected-were-still-in-safe-zone"><a class="header" href="#error--this-failure-was-expected-were-still-in-safe-zone"><code>error</code> : this failure was expected, we're still in safe zone!</a></h3>
 <p>To raise an error, simply call <code>io.error</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; from typing import Any, List
 
@@ -567,7 +567,7 @@ Error(error=5)
 &gt;&gt;&gt; main_list.run(None)
 Error(error=[1, 2, 3])
 </code></pre>
-<h3><a class="header" href="#catch--reacting-to-expected-failures-to-continue" id="catch--reacting-to-expected-failures-to-continue"><code>catch</code> : reacting to expected failures to continue.</a></h3>
+<h3 id="catch--reacting-to-expected-failures-to-continue"><a class="header" href="#catch--reacting-to-expected-failures-to-continue"><code>catch</code> : reacting to expected failures to continue.</a></h3>
 <p>To react to errors, just call the method <code>catch</code>.
 It is very similar to a <code>try-exept</code> block.
 It takes as argument a function called the <em>error handler</em>.
@@ -590,7 +590,7 @@ Ok(success=12)
 <p>If the computation is successful, or if it failed on a panic,
 then <code>catch</code> has no effect.
 Note that the error handler can itself raise errors and panics.</p>
-<h3><a class="header" href="#map_error--transforming-expected-failures" id="map_error--transforming-expected-failures"><code>map_error</code> : transforming expected failures.</a></h3>
+<h3 id="map_error--transforming-expected-failures"><a class="header" href="#map_error--transforming-expected-failures"><code>map_error</code> : transforming expected failures.</a></h3>
 <p>It is often useful to transform an error. For example you may
 want to add some useful information about the context: what
 was the request that led to this error, what were the arguments
@@ -603,14 +603,14 @@ Error(error=3)
 </code></pre>
 <p>If the computation is successful or if it fails on a panic,
 then <code>map_error</code> has no effect.</p>
-<h2><a class="header" href="#panics-unexpected-failures-in-io" id="panics-unexpected-failures-in-io">Panics: Unexpected Failures in IO</a></h2>
+<h2 id="panics-unexpected-failures-in-io"><a class="header" href="#panics-unexpected-failures-in-io">Panics: Unexpected Failures in IO</a></h2>
 <p>The type of panics is always the Python type of exception <code>Exception</code>.
 Panics can be raise either manually, by calling <code>io.panic</code>, or
 when <code>run</code> encounters an exception.
 <strong>The method <code>run</code> on <code>IO</code> never raises exceptions!</strong>
 Every exception <code>p</code> raised during the execution of <code>run</code> are caught and
 transformed into panics <code>Panic(p)</code>.</p>
-<h3><a class="header" href="#all-exceptions-are-caught" id="all-exceptions-are-caught"><strong>ALL</strong> exceptions are caught</a></h3>
+<h3 id="all-exceptions-are-caught"><a class="header" href="#all-exceptions-are-caught"><strong>ALL</strong> exceptions are caught</a></h3>
 <p>All the functions and method that accept functions as arguments
 run them inside a <code>try-except</code> block to catch every raised exception.
 All exception caught this way are transformed into panics:</p>
@@ -624,7 +624,7 @@ should never happen. In an ideal world you should never give to
 In an ideal world, panics would never occur. But we do not live in an
 ideal world, so <code>map</code>, <code>flat_map</code> and others covers your back by
 catching any exception for your own safety.</p>
-<h3><a class="header" href="#panic--something-went-terribly-wrong-were-in-unsafe-zone" id="panic--something-went-terribly-wrong-were-in-unsafe-zone"><code>panic</code> : something went terribly wrong, we're in <strong>unsafe</strong> zone.</a></h3>
+<h3 id="panic--something-went-terribly-wrong-were-in-unsafe-zone"><a class="header" href="#panic--something-went-terribly-wrong-were-in-unsafe-zone"><code>panic</code> : something went terribly wrong, we're in <strong>unsafe</strong> zone.</a></h3>
 <p>It is sometimes useful to manually raise panics. For example when
 you encounter a problematic situation you though were impossible
 but still did happen. If your program is not designed to handle this
@@ -633,7 +633,7 @@ situation, you should raise a panic.</p>
 &gt;&gt;&gt; main.run(None)
 Panic(exception=Exception('BOOM!'))
 </code></pre>
-<h3><a class="header" href="#recover--stopping-the-computation-safely-after-an-unexpected-failure" id="recover--stopping-the-computation-safely-after-an-unexpected-failure"><code>recover</code> : <strong>stopping</strong> the computation safely after an unexpected failure.</a></h3>
+<h3 id="recover--stopping-the-computation-safely-after-an-unexpected-failure"><a class="header" href="#recover--stopping-the-computation-safely-after-an-unexpected-failure"><code>recover</code> : <strong>stopping</strong> the computation safely after an unexpected failure.</a></h3>
 <p>Even in case of a panic, you have a chance to perform some emergency
 actions to recover. For example, you may want to restart the computation
 on panics. To react to panics, just call <code>recover</code>.
@@ -649,7 +649,7 @@ The result is then the the handler's result.</p>
 &gt;&gt;&gt; main.run(None)
 Ok(success='Recovered from BOOM!')
 </code></pre>
-<h3><a class="header" href="#map_panic--transforming-an-unexpected-failure" id="map_panic--transforming-an-unexpected-failure"><code>map_panic</code> : transforming an unexpected failure.</a></h3>
+<h3 id="map_panic--transforming-an-unexpected-failure"><a class="header" href="#map_panic--transforming-an-unexpected-failure"><code>map_panic</code> : transforming an unexpected failure.</a></h3>
 <p>It is often useful to transform a panic. For example you may
 want to add some useful information about the context: what
 was the request that led to this error, what were the arguments
@@ -664,10 +664,10 @@ but on panics:</p>
 &gt;&gt;&gt; main.run(None)
 Panic(exception=Exception('BOOM'))
 </code></pre>
-<h3><a class="header" href="#more-tools" id="more-tools">More tools</a></h3>
+<h3 id="more-tools"><a class="header" href="#more-tools">More tools</a></h3>
 <p>Here are some very useful functions. They can all be expressed using the
 functions and methods seen above but they deserve being seeing in details:</p>
-<h3><a class="header" href="#attempt--failures-as-values" id="attempt--failures-as-values"><code>attempt</code> : failures as values.</a></h3>
+<h3 id="attempt--failures-as-values"><a class="header" href="#attempt--failures-as-values"><code>attempt</code> : failures as values.</a></h3>
 <p>The method <code>attemp</code> transform an <code>IO[R,E,A]</code> into
 <code>IO[R,None,Result[E,A]]</code>. If the original computation is successful,
 the transformed one returns an <code>Ok</code>. If the original computation fails
@@ -686,7 +686,7 @@ Ok(success=Panic(exception=Exception('BOOM!')))
 <p>It is hugely useful when you want to do different actions depending
 on the result of a computation. Calling <code>attempt</code> and <code>flat_map</code> is
 easier than combining <code>flat_map</code>, <code>catch</code> and <code>recover</code> correctly.</p>
-<h3><a class="header" href="#from_result--from-resultea-to-iononeea" id="from_result--from-resultea-to-iononeea"><code>from_result</code> : from <code>Result[E,A]</code> to <code>IO[None,E,A]</code></a></h3>
+<h3 id="from_result--from-resultea-to-iononeea"><a class="header" href="#from_result--from-resultea-to-iononeea"><code>from_result</code> : from <code>Result[E,A]</code> to <code>IO[None,E,A]</code></a></h3>
 <p>The function <code>io.from_result</code> does almost the opposite of <code>attempt</code>.
 It transform a <code>Result[E,A]</code> into the corresponding <code>IO[None,E,A]</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; io_ok : IO[None,None,int] = io.from_result(Ok(5))
@@ -700,7 +700,7 @@ Panic(exception=Exception('BOOM!'))
 </code></pre>
 <p><code>from_result</code> is often useful after an <code>attempt</code> to restore the state
 of the computation.</p>
-<h3><a class="header" href="#finally_--doing-something-unconditionally" id="finally_--doing-something-unconditionally"><code>finally_</code> : doing something unconditionally.</a></h3>
+<h3 id="finally_--doing-something-unconditionally"><a class="header" href="#finally_--doing-something-unconditionally"><code>finally_</code> : doing something unconditionally.</a></h3>
 <p>The method <code>finally_</code> is the <em>finally</em> clause of a <em>try-except-finally</em>.
 It executed an <code>IO</code> after the current one, discard its result and
 restore the result of the current one:</p>
@@ -714,7 +714,7 @@ Error(error=7)
 Hello
 Panic(exception=Exception('BOOM!'))
 </code></pre>
-<h3><a class="header" href="#on_failure--reaction-to-both-errors-and-panics" id="on_failure--reaction-to-both-errors-and-panics"><code>on_failure</code> : reaction to both errors and panics.</a></h3>
+<h3 id="on_failure--reaction-to-both-errors-and-panics"><a class="header" href="#on_failure--reaction-to-both-errors-and-panics"><code>on_failure</code> : reaction to both errors and panics.</a></h3>
 <p>Calling both methods <code>catch</code> and <code>recover</code> is sometimes annoying.
 When you need to react to any failure, call <code>on_failure</code>. It
 takes as argument a function called the <em>failure handler</em>.
@@ -729,13 +729,13 @@ Ok(success=12)
 &gt;&gt;&gt; panic(Exception(&quot;BOOM!&quot;)).on_failure(lambda x: pure(12)).run(None)
 Ok(success=12)
 </code></pre>
-<h1><a class="header" href="#context" id="context">Context</a></h1>
+<h1 id="context"><a class="header" href="#context">Context</a></h1>
 <p>The time has come to talk about the third type parameter of an <code>IO</code>.
 <strong>In the type <code>IO[R,E,A]</code>, <code>R</code> is the type of the context</strong>.
 The context is a value that is always accessible to any <code>IO</code>.
 You can think of it as a local global variable.
 I assure you this sentence make sense!</p>
-<h2><a class="header" href="#run--executing-an-io-in-a-given-context" id="run--executing-an-io-in-a-given-context"><code>run</code> : executing an <code>IO</code> in a given context.</a></h2>
+<h2 id="run--executing-an-io-in-a-given-context"><a class="header" href="#run--executing-an-io-in-a-given-context"><code>run</code> : executing an <code>IO</code> in a given context.</a></h2>
 <p>We have called the method <code>run</code> many times. And every time we gave it
 <code>None</code> as argument. The argument you give to <code>run</code> is actually the
 context value. You take any value you want as the context.
@@ -753,7 +753,7 @@ the value <code>r</code> is accessible from everywhere in <code>main</code>.
 The context behaves like a global variable inside the running <code>IO</code>.
 But you can pass every call to <code>run</code> a different context.
 The context behaves like a local variable between different calls to <code>run</code>.</p>
-<h2><a class="header" href="#read--accessing-the-shared-context" id="read--accessing-the-shared-context"><code>read</code> : accessing the shared context.</a></h2>
+<h2 id="read--accessing-the-shared-context"><a class="header" href="#read--accessing-the-shared-context"><code>read</code> : accessing the shared context.</a></h2>
 <p>To access the context, just call the function <code>io.read()</code>. Its result
 is the context:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[int,None,int] = io.read()
@@ -766,7 +766,7 @@ Ok(success=77)
 a very big program. You can call <code>io.read()</code> anywhere in <code>main</code> to
 get the context. It saves you the huge burden of passing the context
 from <code>run</code> to every function until it reaches the location of <code>io.read()</code>.</p>
-<h2><a class="header" href="#contra_map_read--transforming-the-shared-context" id="contra_map_read--transforming-the-shared-context"><code>contra_map_read</code> : transforming the shared context.</a></h2>
+<h2 id="contra_map_read--transforming-the-shared-context"><a class="header" href="#contra_map_read--transforming-the-shared-context"><code>contra_map_read</code> : transforming the shared context.</a></h2>
 <p>As I said, the context behaves as a local global variable.
 With <code>io.read()</code> you have seen its global behaviour.
 The method <code>contra_map_read</code> transforms the context, but only
@@ -781,7 +781,7 @@ for dependency injection.</p>
 &gt;&gt;&gt; main.run(&quot;Hello&quot;)
 Ok(success=5)
 </code></pre>
-<h2><a class="header" href="#defer_read--doing-something-context-dependent-later" id="defer_read--doing-something-context-dependent-later"><code>defer_read</code> : doing something context-dependent later.</a></h2>
+<h2 id="defer_read--doing-something-context-dependent-later"><a class="header" href="#defer_read--doing-something-context-dependent-later"><code>defer_read</code> : doing something context-dependent later.</a></h2>
 <p>The function <code>io.defer_read</code> is useful when you it is easier to
 implement an <code>IO</code> as a normal function and then transform it into an <code>IO</code>.
 <code>io.defer_read</code>, like <code>io.defer</code>, takes as first argument the function
@@ -804,7 +804,7 @@ Ok(success=15)
 &gt;&gt;&gt; main.run(-1)
 Error(error='Ooups!')
 </code></pre>
-<h2><a class="header" href="#defer_read_io--computing-a-context-dependent-io-later" id="defer_read_io--computing-a-context-dependent-io-later"><code>defer_read_io</code> : computing a context-dependent IO later.</a></h2>
+<h2 id="defer_read_io--computing-a-context-dependent-io-later"><a class="header" href="#defer_read_io--computing-a-context-dependent-io-later"><code>defer_read_io</code> : computing a context-dependent IO later.</a></h2>
 <p>The function <code>io.defer_read_io</code> is the <code>IO</code> counterpart of
 <code>io.defer_read</code>. It is useful when the context-aware function you want
 to execute later returns an <code>IO</code>.</p>
@@ -819,7 +819,7 @@ Ok(success=15)
 &gt;&gt;&gt; main.run(-1)
 Error(error='Ooups!')
 </code></pre>
-<h2><a class="header" href="#use-case-dependency-injection" id="use-case-dependency-injection">Use Case: Dependency Injection</a></h2>
+<h2 id="use-case-dependency-injection"><a class="header" href="#use-case-dependency-injection">Use Case: Dependency Injection</a></h2>
 <p>As a demonstration of how dependency injection works in <em>Raffiot</em>,
 create and fill the file <code>dependency_injection.py</code> as below:</p>
 <pre><code class="language-python">from raffiot import io
@@ -900,12 +900,12 @@ Result =  ['HTML Content of file /index.html', 'Markdown Content of file /index.
 how much the context is a life saver. But imagine the <code>main</code> <code>IO</code> to be
 one of your real program. It would be much bigger, and passing the
 context as global or local variables would be a much bigger problem.</p>
-<h1><a class="header" href="#combining-a-list-of-ios" id="combining-a-list-of-ios">Combining a list of IOs</a></h1>
+<h1 id="combining-a-list-of-ios"><a class="header" href="#combining-a-list-of-ios">Combining a list of IOs</a></h1>
 <p>Remember that an <code>IO</code> is the description of some computation, like
 a source code. As such, it can be manipulated like any value, and
 so stored in lists. This section covers the operations you have
 on lists of <code>IO</code>s.</p>
-<h2><a class="header" href="#zip--from-a-list-of-io-to-an-io-of-list" id="zip--from-a-list-of-io-to-an-io-of-list"><code>zip</code> : from a list of IO to an IO of list</a></h2>
+<h2 id="zip--from-a-list-of-io-to-an-io-of-list"><a class="header" href="#zip--from-a-list-of-io-to-an-io-of-list"><code>zip</code> : from a list of IO to an IO of list</a></h2>
 <p>The <code>zip</code> function and method transform a list of <code>IO</code> into
 an <code>IO</code> returning a list. Each value of the resulting list is
 the value returned by the <code>IO</code> at the same location in the
@@ -919,7 +919,7 @@ Ok(success=[8, 'Hello'])
 &gt;&gt;&gt; main.run(None)
 Error(error='Oups')
 </code></pre>
-<h2><a class="header" href="#sequence--running-ios-in-sequence" id="sequence--running-ios-in-sequence"><code>sequence</code> : running IOs in sequence</a></h2>
+<h2 id="sequence--running-ios-in-sequence"><a class="header" href="#sequence--running-ios-in-sequence"><code>sequence</code> : running IOs in sequence</a></h2>
 <p>The function <code>io.sequence</code> is like the method <code>then</code>:
 it executes a list of <code>IO</code> sequentially, returning the
 value of the last <code>IO</code> and failing on the first failure
@@ -934,7 +934,7 @@ Hello
 World
 Ok(success=12)
 </code></pre>
-<h2><a class="header" href="#traverse--almost-like-map" id="traverse--almost-like-map"><code>traverse</code> : almost like <code>map</code></a></h2>
+<h2 id="traverse--almost-like-map"><a class="header" href="#traverse--almost-like-map"><code>traverse</code> : almost like <code>map</code></a></h2>
 <p>The function <code>io.traverse</code> is very much like the function <code>map</code> on lists.
 Like the <code>map</code> on lists it applies a function to every element of a list.
 But unlike the <code>map</code> on lists the function it applies to every element
@@ -963,7 +963,7 @@ context = 10, argument = 8
 context = 10, argument = 9
 Ok(success=[10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 </code></pre>
-<h1><a class="header" href="#asynchronous-computing" id="asynchronous-computing">Asynchronous Computing</a></h1>
+<h1 id="asynchronous-computing"><a class="header" href="#asynchronous-computing">Asynchronous Computing</a></h1>
 <p>For now you know that an <code>IO</code> is very nice for stack safety,
 dependency injection, failure management, and code-as-date manipulations.
 There is another big feature <code>IO</code> has: simple asynchronous and
@@ -985,7 +985,7 @@ of JavaScript is such an interface. The <a href="https://docs.python.org/3/libra
 syntax of many languages, including Python, is also such an interface.
 So is <em>Raffiot</em>'s <code>IO</code>. But unlike the <em>async/await</em> syntax, synchronous
 and asynchronous code can be transparently mixed with <code>IO</code>.</p>
-<h2><a class="header" href="#async_--running-something-asynchronously" id="async_--running-something-asynchronously"><code>async_</code> : running something asynchronously</a></h2>
+<h2 id="async_--running-something-asynchronously"><a class="header" href="#async_--running-something-asynchronously"><code>async_</code> : running something asynchronously</a></h2>
 <p>Calling a function <code>f</code> usually looks like this:</p>
 <pre><code class="language-python">&gt;&gt;&gt; def f():
 ...   print(&quot;f is running&quot;)
@@ -1078,7 +1078,7 @@ for task scheduling and does not directly support <code>AsyncResult</code> yet.<
 <p><strong>Very important</strong>: when you use <code>async_</code>, you must always
 <strong>return a <code>Future</code></strong> and always <strong>call the callback exactly once</strong>
 (no more, no less).</p>
-<h2><a class="header" href="#run--the-second-argument" id="run--the-second-argument"><code>run</code> : the second argument.</a></h2>
+<h2 id="run--the-second-argument"><a class="header" href="#run--the-second-argument"><code>run</code> : the second argument.</a></h2>
 <p>An <code>IO</code> is executed on a pool of threads. Until now we only gave <code>io.run</code>
 one argument: the context. But <code>io.run</code> accepts two argument! The second
 one is the number of threads in the pool.</p>
@@ -1095,7 +1095,7 @@ You know the story: Python is single-threaded.</p>
 <pre><code class="language-python">&gt;&gt;&gt; io.pure(5).run(None, 50)
 Ok(success=5)
 </code></pre>
-<h2><a class="header" href="#parallel--running-concurrent-tasks" id="parallel--running-concurrent-tasks"><code>parallel</code> : running concurrent tasks</a></h2>
+<h2 id="parallel--running-concurrent-tasks"><a class="header" href="#parallel--running-concurrent-tasks"><code>parallel</code> : running concurrent tasks</a></h2>
 <p>The function <code>io.parallel</code> runs a list of <code>IO</code>s in parallel.
 Remember that because of Python's
 <a href="https://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a>
@@ -1139,7 +1139,7 @@ Ok(success=None)
 </code></pre>
 <p>As you can see, <code>main</code> does not wait for the <code>IO</code>s running
 in parallel/concurrently to continue its execution.</p>
-<h2><a class="header" href="#wait--waiting-for-concurrent-tasks-to-end" id="wait--waiting-for-concurrent-tasks-to-end"><code>wait</code> : waiting for concurrent tasks to end</a></h2>
+<h2 id="wait--waiting-for-concurrent-tasks-to-end"><a class="header" href="#wait--waiting-for-concurrent-tasks-to-end"><code>wait</code> : waiting for concurrent tasks to end</a></h2>
 <p>Sometimes you want to wait for a parallel/concurrent computation
 to finish. Remember that parallel/concurrent computation are
 represented by the <em>fibers</em> returned by <code>io.parallel</code>.</p>
@@ -1171,7 +1171,7 @@ Task 2: End
 Finished
 Ok(success=None)
 </code></pre>
-<h2><a class="header" href="#yield_--letting-other-task-progress" id="yield_--letting-other-task-progress"><code>yield_</code> : letting other task progress</a></h2>
+<h2 id="yield_--letting-other-task-progress"><a class="header" href="#yield_--letting-other-task-progress"><code>yield_</code> : letting other task progress</a></h2>
 <p>Remember that an <code>IO</code> runs on a pool of thread.
 There there is more <code>IO</code>s to run than the number of threads to run on,
 there is a chance that some <code>IO</code> will not get executed.
@@ -1188,14 +1188,14 @@ Hello
 World!
 Ok(success=None)
 </code></pre>
-<h2><a class="header" href="#read_executor--getting-the-executor" id="read_executor--getting-the-executor"><code>read_executor</code> : getting the executor</a></h2>
+<h2 id="read_executor--getting-the-executor"><a class="header" href="#read_executor--getting-the-executor"><code>read_executor</code> : getting the executor</a></h2>
 <p>The function <code>io.read_executor</code> returns the executor on which the
 current <code>IO</code> runs.</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.read_executor().map(lambda exe: exe.submit(print,&quot;Hello World!&quot;))
 Hello World!
 Ok(success=&lt;Future at 0x7f7eaa3fb1f0 state=finished returned NoneType&gt;)
 </code></pre>
-<h2><a class="header" href="#contra_map_executor--changing-the-executor" id="contra_map_executor--changing-the-executor"><code>contra_map_executor</code> : changing the executor</a></h2>
+<h2 id="contra_map_executor--changing-the-executor"><a class="header" href="#contra_map_executor--changing-the-executor"><code>contra_map_executor</code> : changing the executor</a></h2>
 <p>You may sometimes want to change the executor running the current <code>IO</code>.
 For example you may want a long task to be executed on a different
 thread pool:</p>
@@ -1204,7 +1204,7 @@ thread pool:</p>
 ...   io.pure(18).contra_map_executor(lambda _: executor2).run(None)
 Ok(success=18)
 </code></pre>
-<h1><a class="header" href="#resource-management" id="resource-management">Resource Management</a></h1>
+<h1 id="resource-management"><a class="header" href="#resource-management">Resource Management</a></h1>
 <p>Resource management is the safe creation and release
 of resources: files, connection handlers, etc. Resource
 management ensures all created resources will be released
@@ -1272,7 +1272,7 @@ Ok(success='ZNLWSH1B')
 &gt;&gt;&gt; rnd_str.run(None)
 Ok(success='MENS91RD')
 </code></pre>
-<h2><a class="header" href="#from_open_close_io--creating-a-resource-from-openclose-ios" id="from_open_close_io--creating-a-resource-from-openclose-ios"><code>from_open_close_io</code> : Creating a <code>Resource</code> from open/close <code>IO</code>s</a></h2>
+<h2 id="from_open_close_io--creating-a-resource-from-openclose-ios"><a class="header" href="#from_open_close_io--creating-a-resource-from-openclose-ios"><code>from_open_close_io</code> : Creating a <code>Resource</code> from open/close <code>IO</code>s</a></h2>
 <p>The <code>Resource</code> we want to define will create and print a new string
 every time it is used. Releasing it will simply be printing it.
 A <code>Resource</code> is essentially two computations:</p>
@@ -1297,7 +1297,7 @@ to <code>resource.from_open_close_io</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_open_close_io(rs_open, rs_close)
 </code></pre>
 <p>That wasn't that hard, isn't it?</p>
-<h2><a class="header" href="#use--using-a-resource" id="use--using-a-resource"><code>use</code> : using a resource</a></h2>
+<h2 id="use--using-a-resource"><a class="header" href="#use--using-a-resource"><code>use</code> : using a resource</a></h2>
 <p>Now that we have a <code>Resource</code>, we want to use it. To do so, just
 call the method <code>use</code>. You need to give it a function taking as
 argument the resource created and retuning an <code>IO</code> that used this
@@ -1324,13 +1324,13 @@ Closing PSUNW6M5
 Panic(exception=Exception('BOOM!'))
 </code></pre>
 <p>If the inner <code>IO</code> panics, the string is still released too!</p>
-<h2><a class="header" href="#map-flat_map-defer-async_-and-others" id="map-flat_map-defer-async_-and-others"><code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>async_</code> and others.</a></h2>
+<h2 id="map-flat_map-defer-async_-and-others"><a class="header" href="#map-flat_map-defer-async_-and-others"><code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>async_</code> and others.</a></h2>
 <p><code>Resource</code> supports almost the same API as <code>IO</code>.
 It includes <code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>zip</code>, etc.
 It means, for example, that you can create resources in parallel,
 or simply create a list of resources (if one fails, all fails),
 etc.</p>
-<h2><a class="header" href="#lift_io--from-io-to-resource" id="lift_io--from-io-to-resource"><code>lift_io</code> : from <code>IO</code> to <code>Resource</code></a></h2>
+<h2 id="lift_io--from-io-to-resource"><a class="header" href="#lift_io--from-io-to-resource"><code>lift_io</code> : from <code>IO</code> to <code>Resource</code></a></h2>
 <p>Actually, any <code>IO[E,E,A]</code> can be lifted into a <code>Resource[R,E,A]</code>.
 The releasing function is just a no-op. It brings a lot of expressiveness
 and safety to resource creation:</p>
@@ -1339,7 +1339,7 @@ and safety to resource creation:</p>
 Hello World!
 Ok(success=5)
 </code></pre>
-<h2><a class="header" href="#from_open_close--resource-from-open-and-close-functions" id="from_open_close--resource-from-open-and-close-functions"><code>from_open_close</code> : Resource from open and close functions</a></h2>
+<h2 id="from_open_close--resource-from-open-and-close-functions"><a class="header" href="#from_open_close--resource-from-open-and-close-functions"><code>from_open_close</code> : Resource from open and close functions</a></h2>
 <p>Sometimes it is easier to create a <code>Resource</code> from usual Python's
 functions rather than from the open/close <code>IO</code>s. To do so, just
 use the function <code>resource.from_open_close</code>:</p>
@@ -1354,13 +1354,13 @@ use the function <code>resource.from_open_close</code>:</p>
 ...   print(f&quot;Closing {s}&quot;)
 &gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_open_close(rs_open, rs_close)
 </code></pre>
-<h2><a class="header" href="#from_with--resource-from-with" id="from_with--resource-from-with"><code>from_with</code> : Resource from <code>with</code></a></h2>
+<h2 id="from_with--resource-from-with"><a class="header" href="#from_with--resource-from-with"><code>from_with</code> : Resource from <code>with</code></a></h2>
 <p>If the resource you want to create already support Python's
 <code>with</code>-statement, then you're lucky: you just have to make
 one single call to <code>resource.from_with</code></p>
 <pre><code class="language-python">&gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_with(io.defer(open, &quot;hello.txt&quot;, &quot;w&quot;))
 </code></pre>
-<h2><a class="header" href="#creating-a-resource-directly" id="creating-a-resource-directly">Creating a Resource directly</a></h2>
+<h2 id="creating-a-resource-directly"><a class="header" href="#creating-a-resource-directly">Creating a Resource directly</a></h2>
 <p>A <code>Resource[R,E,A]</code> is essentially an <code>IO[R,E,Tuple[A, IO[R,Any,Any]]]</code>.
 When the <code>IO</code> runs, it returns a pair <code>Tuple[A, IO[R,Any,Any]]</code>.
 The fist member of the pair is the created resource of type <code>A</code>.
@@ -1376,7 +1376,7 @@ Note that the result and failures of the releasing <code>IO</code> are ignored.<
 ... )
 &gt;&gt;&gt; rs : Resource[None,None,str] = Resource(create)
 </code></pre>
-<h2><a class="header" href="#use-case--temporary-file" id="use-case--temporary-file">Use Case : Temporary File</a></h2>
+<h2 id="use-case--temporary-file"><a class="header" href="#use-case--temporary-file">Use Case : Temporary File</a></h2>
 <p>This is a complete use case of a <code>Resource</code> creating a random file.</p>
 <pre><code class="language-python">&gt;&gt;&gt; from io import TextIOWrapper
 &gt;&gt;&gt; create : IO[None,None,Tuple[TextIOWrapper, IO[None,None,None]]] = (

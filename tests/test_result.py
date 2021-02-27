@@ -1,8 +1,11 @@
-from hypothesis import given
-import hypothesis.strategies as st
+from typing import List
 from unittest import TestCase
-from raffiot.result import *
+
+import hypothesis.strategies as st
+from hypothesis import given
+
 from raffiot import _MatchError
+from raffiot.result import *
 
 
 class TestResult(TestCase):

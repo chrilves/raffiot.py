@@ -1,12 +1,20 @@
-from hypothesis import given
-import hypothesis.strategies as st
+from typing import List, Any, TypeVar
 from unittest import TestCase
-from raffiot.io import *
+
+import hypothesis.strategies as st
+from hypothesis import given
+
 from raffiot import _MatchError
-from raffiot.result import Ok, Error, Panic
+from raffiot.io import *
+from raffiot.result import Result, Ok, Error, Panic
+from concurrent.futures import Executor
+
+R = TypeVar("R", contravariant=True)
+E = TypeVar("E", covariant=True)
+A = TypeVar("A", covariant=True)
 
 
-class TestResource(TestCase):
+class TestIO(TestCase):
     @given(st.integers())
     def test_pure(self, i: int) -> None:
         assert pure(i).run(None) == Ok(i)
@@ -319,3 +327,6 @@ class TestResource(TestCase):
         assert parallel([f(s) for s in l]).flat_map(wait).run(None) == Ok(
             [g(s) for s in l]
         )
+
+    def test_then_keep(self):
+        assert pure(5).then_keep(pure(7)).run(None) == Ok(5)

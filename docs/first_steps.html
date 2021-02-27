@@ -163,7 +163,7 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#first-steps-with-io" id="first-steps-with-io">First Steps with IO</a></h1>
+                        <h1 id="first-steps-with-io"><a class="header" href="#first-steps-with-io">First Steps with IO</a></h1>
 <p><em>Raffiot</em> is available as a
 <a href="https://pypi.org/project/raffiot/"><em>pip</em> package</a>
 (and soon <em>conda</em>). For now just type this in a
@@ -181,7 +181,7 @@ Type &quot;help&quot;, &quot;copyright&quot;, &quot;credits&quot; or &quot;licen
 <pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
 &gt;&gt;&gt; from raffiot.io import IO
 </code></pre>
-<h2><a class="header" href="#hello-world" id="hello-world">Hello World!</a></h2>
+<h2 id="hello-world"><a class="header" href="#hello-world">Hello World!</a></h2>
 <p>Let's start by the classic <em>&quot;Hello World!&quot;</em>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.defer(print, &quot;Hello World!&quot;)
 </code></pre>
@@ -207,7 +207,7 @@ Ok(success=None)
 <p>As you can see, every call to <code>run</code> printed <code>Hello World!</code> and returned
 the value <code>Ok(None)</code>. <code>Ok</code> means the computation was successful, <code>None</code>
 is the return value of computation.</p>
-<h2><a class="header" href="#defer--doing-something-later" id="defer--doing-something-later"><code>defer</code> : doing something <strong>later</strong></a></h2>
+<h2 id="defer--doing-something-later"><a class="header" href="#defer--doing-something-later"><code>defer</code> : doing something <strong>later</strong></a></h2>
 <p>The first argument of <code>defer</code> is the function you want to call later.
 The following arguments are the function's normal arguments.
 For example, to call <code>datetime.now()</code> later, just create the <code>IO</code>:</p>
@@ -240,7 +240,7 @@ Ok(success=None)
 <p>This ability to represent any computation as a value is one of the main
 strength of an <code>IO</code>. It means you can work with computation like any
 other value: composing them, storing them in variables, in lists, etc.</p>
-<h2><a class="header" href="#then--doing-something-sequentially" id="then--doing-something-sequentially"><code>then</code> : doing something sequentially.</a></h2>
+<h2 id="then--doing-something-sequentially"><a class="header" href="#then--doing-something-sequentially"><code>then</code> : doing something sequentially.</a></h2>
 <p>You will often need to execute some <code>IO</code> sequentially.
 The method <code>then</code> compose some values of type <code>IO</code>, running
 them one by one. The return value is the one of the last <code>IO</code>:</p>
@@ -257,7 +257,7 @@ Ok(success=datetime.datetime(2021, 2, 20, 15, 52, 11, 205845))
 </code></pre>
 <p>You may sometimes prefer the analogous function <code>io.sequence</code>
 that behaves like the method <code>then</code>.</p>
-<h2><a class="header" href="#map--transforming-results" id="map--transforming-results"><code>map</code> : transforming results.</a></h2>
+<h2 id="map--transforming-results"><a class="header" href="#map--transforming-results"><code>map</code> : transforming results.</a></h2>
 <p>You can transform the return value of an <code>IO</code> using the <code>map</code> method.
 It is very similar to the <code>map</code> function on lists, but works on <code>IO</code>.
 Just provide <code>map</code> some function. It will use this function to transform
@@ -269,7 +269,7 @@ Map((Defer((&lt;built-in method now of type object at 0x7ff733070bc0&gt;,
 &gt;&gt;&gt; date_str.run(None)
 Ok(success='2021-02-19T23:54:46.297503')
 </code></pre>
-<h2><a class="header" href="#flat_map--chaining-ios" id="flat_map--chaining-ios"><code>flat_map</code> : chaining IOs.</a></h2>
+<h2 id="flat_map--chaining-ios"><a class="header" href="#flat_map--chaining-ios"><code>flat_map</code> : chaining IOs.</a></h2>
 <p><code>map</code> transform the return value of an <code>IO</code>. So transforming the
 return value of <code>date_str</code> with <code>print_io</code> will give you an  <code>IO</code>
 whose return value is also an <code>IO</code>. When you will run it, instead
@@ -287,7 +287,7 @@ Ok(success=None)
 </code></pre>
 <p>Here the return value of <code>date_str</code> is given to <code>print_io</code> via <code>x</code> and
 both <code>IO</code> are executed, returning the result of <code>print_io(x)</code>.</p>
-<h2><a class="header" href="#flatten--concatenating-an-io-of-io" id="flatten--concatenating-an-io-of-io"><code>flatten</code> : concatenating an IO of IO.</a></h2>
+<h2 id="flatten--concatenating-an-io-of-io"><a class="header" href="#flatten--concatenating-an-io-of-io"><code>flatten</code> : concatenating an IO of IO.</a></h2>
 <p>Instead of having used <code>flat_map</code>, you could have used <code>map</code> and then
 <code>flatten</code> to reduce the <code>IO of IO</code> into a single layer of <code>IO</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None]= date_str.map(lambda x: print_io(x)).flatten()
@@ -297,7 +297,7 @@ Ok(success=None)
 </code></pre>
 <p>Most of the time, you will use <code>flat_map</code> because it is simpler to use.
 But now you know where its name comes from: flatten of map.</p>
-<h2><a class="header" href="#pure--just-a-value" id="pure--just-a-value"><code>pure</code> : just a value.</a></h2>
+<h2 id="pure--just-a-value"><a class="header" href="#pure--just-a-value"><code>pure</code> : just a value.</a></h2>
 <p><code>pure</code> is very simple: the result of the computation is the very same
 argument of <code>pure</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,int] = io.pure(5)
@@ -308,7 +308,7 @@ Ok(success=5)
 </code></pre>
 <p>It is very useful when some functions/method expect some <code>IO</code>
 but you want to provide a constant.</p>
-<h2><a class="header" href="#defer_io--computing-an-io-later" id="defer_io--computing-an-io-later"><code>defer_io</code> : computing an IO later.</a></h2>
+<h2 id="defer_io--computing-an-io-later"><a class="header" href="#defer_io--computing-an-io-later"><code>defer_io</code> : computing an IO later.</a></h2>
 <p><code>defer_io</code> is very much like <code>defer</code> but for functions returning <code>IO</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,IO[None,None,None]] = io.defer(print_io, &quot;Hello&quot;, &quot;World&quot;, &quot;!&quot;)
 &gt;&gt;&gt; main.run(None)
@@ -320,7 +320,7 @@ Ok(success=None)
 </code></pre>
 <p>Like <code>flat_map</code> is <code>faltten</code> of <code>map</code>, <code>defer_io</code> is <code>flatten</code> of <code>defer</code>.
 It is useful to defer the call of function returning <code>IO</code>.</p>
-<h2><a class="header" href="#use-case-stack-safety" id="use-case-stack-safety">Use Case: Stack-Safety</a></h2>
+<h2 id="use-case-stack-safety"><a class="header" href="#use-case-stack-safety">Use Case: Stack-Safety</a></h2>
 <p>Let's see one of the main feature of <code>IO</code>: it is stack safe!
 When you run the following function in Python, even if the
 argument <code>times</code> is small, the computation will fail miserably

@@ -163,11 +163,11 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#failures" id="failures">Failures</a></h1>
+                        <h1 id="failures"><a class="header" href="#failures">Failures</a></h1>
 <p>All the computation we have seen until now were successful.
 We will now see how <code>IO</code>'s failure management works.
 But before, I need to present you the <code>Result[E,A]</code> type.</p>
-<h2><a class="header" href="#the-resultea-type" id="the-resultea-type">The <code>Result[E,A]</code> type</a></h2>
+<h2 id="the-resultea-type"><a class="header" href="#the-resultea-type">The <code>Result[E,A]</code> type</a></h2>
 <p><code>Result[E,A]</code> represent the result of a computation.
 A computation can either be successful, returning a value of type <code>A</code>,
 or failed with an expected error of type <code>E</code>, or failed with an
@@ -191,7 +191,7 @@ it doing as little damage as possible.</p>
 <pre><code class="language-python">&gt;&gt;&gt; from raffiot import result
 &gt;&gt;&gt; from raffiot.result import Result, Ok, Error, Panic
 </code></pre>
-<h3><a class="header" href="#oksuccessa--a-success" id="oksuccessa--a-success"><code>Ok(success:A)</code> : A Success</a></h3>
+<h3 id="oksuccessa--a-success"><a class="header" href="#oksuccessa--a-success"><code>Ok(success:A)</code> : A Success</a></h3>
 <p>When a computation successfully return some value <code>a</code> of type <code>A</code>,
 it actually returns the value <code>Ok(a)</code> of type <code>Result[E,A]</code>. The
 value <code>a</code> can be obtained by <code>Ok(a).success</code>:</p>
@@ -201,7 +201,7 @@ Ok(success=5)
 &gt;&gt;&gt; result.success
 5
 </code></pre>
-<h3><a class="header" href="#errorerrore--an-expected-failure" id="errorerrore--an-expected-failure"><code>Error(error:E)</code> : An Expected Failure</a></h3>
+<h3 id="errorerrore--an-expected-failure"><a class="header" href="#errorerrore--an-expected-failure"><code>Error(error:E)</code> : An Expected Failure</a></h3>
 <p>When a computation fail because of an error <code>e</code> of type <code>E</code>,
 it actually return a value <code>Error(e)</code> of type <code>Result[E,Any]</code>.
 The type <code>E</code> can be any type you want. Choose as type <code>E</code> a type
@@ -213,7 +213,7 @@ Error(error=5)
 &gt;&gt;&gt; result.error
 5
 </code></pre>
-<h3><a class="header" href="#panicexceptionexception--an-unexpected-failure" id="panicexceptionexception--an-unexpected-failure"><code>Panic(exception:Exception)</code> : An Unexpected Failure</a></h3>
+<h3 id="panicexceptionexception--an-unexpected-failure"><a class="header" href="#panicexceptionexception--an-unexpected-failure"><code>Panic(exception:Exception)</code> : An Unexpected Failure</a></h3>
 <p>When a computation fail because of an unexpected failure,
 it actually return a value <code>Panic(p)</code> of type <code>Result[Any,Any]</code>
 where <code>p</code> is the exception encountered.
@@ -225,7 +225,7 @@ Panic(exception=Exception('BOOM!'))
 &gt;&gt;&gt; result.exception
 Exception('BOOM!')
 </code></pre>
-<h3><a class="header" href="#fold--transforming-a-resultea" id="fold--transforming-a-resultea"><code>fold</code> : transforming a <code>Result[E,A]</code></a></h3>
+<h3 id="fold--transforming-a-resultea"><a class="header" href="#fold--transforming-a-resultea"><code>fold</code> : transforming a <code>Result[E,A]</code></a></h3>
 <p>To transform a <code>Result[E,A]</code>, use the method <code>fold</code>. It takes
 as argument three functions. The first one is called when the
 result is an <code>Ok</code>. The second is called when it is an <code>Error</code>.
@@ -251,7 +251,7 @@ these function receive as argument the value/error/exception
 ... 
 'exeption: BOOM!'
 </code></pre>
-<h3><a class="header" href="#raise_on_panic--reporting-panics-as-exceptions" id="raise_on_panic--reporting-panics-as-exceptions"><code>raise_on_panic</code> : reporting panics as exceptions</a></h3>
+<h3 id="raise_on_panic--reporting-panics-as-exceptions"><a class="header" href="#raise_on_panic--reporting-panics-as-exceptions"><code>raise_on_panic</code> : reporting panics as exceptions</a></h3>
 <p><em>Raffiot</em>'s functions and methods never raise exception
 but instead return a <code>Panic</code>. When you need a failed
 computation to raise the exception, call <code>raise_on_panic</code>
@@ -280,12 +280,12 @@ Traceback (most recent call last):
     raise self.exception
 Exception: BOOM!
 </code></pre>
-<h2><a class="header" href="#errors-expected-failures-in-io" id="errors-expected-failures-in-io">Errors: Expected failures in IO</a></h2>
+<h2 id="errors-expected-failures-in-io"><a class="header" href="#errors-expected-failures-in-io">Errors: Expected failures in IO</a></h2>
 <p><code>IO</code> has built-in support errors. Remember that we call error the
 expected failures. Errors can be of any type you want. You should
 usually take as error type the one that fit your business domain
 errors the best. <strong>In the type <code>IO[R,E,A]</code>, <code>E</code> is the type of errors</strong>.</p>
-<h3><a class="header" href="#error--this-failure-was-expected-were-still-in-safe-zone" id="error--this-failure-was-expected-were-still-in-safe-zone"><code>error</code> : this failure was expected, we're still in safe zone!</a></h3>
+<h3 id="error--this-failure-was-expected-were-still-in-safe-zone"><a class="header" href="#error--this-failure-was-expected-were-still-in-safe-zone"><code>error</code> : this failure was expected, we're still in safe zone!</a></h3>
 <p>To raise an error, simply call <code>io.error</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; from typing import Any, List
 
@@ -301,7 +301,7 @@ Error(error=5)
 &gt;&gt;&gt; main_list.run(None)
 Error(error=[1, 2, 3])
 </code></pre>
-<h3><a class="header" href="#catch--reacting-to-expected-failures-to-continue" id="catch--reacting-to-expected-failures-to-continue"><code>catch</code> : reacting to expected failures to continue.</a></h3>
+<h3 id="catch--reacting-to-expected-failures-to-continue"><a class="header" href="#catch--reacting-to-expected-failures-to-continue"><code>catch</code> : reacting to expected failures to continue.</a></h3>
 <p>To react to errors, just call the method <code>catch</code>.
 It is very similar to a <code>try-exept</code> block.
 It takes as argument a function called the <em>error handler</em>.
@@ -324,7 +324,7 @@ Ok(success=12)
 <p>If the computation is successful, or if it failed on a panic,
 then <code>catch</code> has no effect.
 Note that the error handler can itself raise errors and panics.</p>
-<h3><a class="header" href="#map_error--transforming-expected-failures" id="map_error--transforming-expected-failures"><code>map_error</code> : transforming expected failures.</a></h3>
+<h3 id="map_error--transforming-expected-failures"><a class="header" href="#map_error--transforming-expected-failures"><code>map_error</code> : transforming expected failures.</a></h3>
 <p>It is often useful to transform an error. For example you may
 want to add some useful information about the context: what
 was the request that led to this error, what were the arguments
@@ -337,14 +337,14 @@ Error(error=3)
 </code></pre>
 <p>If the computation is successful or if it fails on a panic,
 then <code>map_error</code> has no effect.</p>
-<h2><a class="header" href="#panics-unexpected-failures-in-io" id="panics-unexpected-failures-in-io">Panics: Unexpected Failures in IO</a></h2>
+<h2 id="panics-unexpected-failures-in-io"><a class="header" href="#panics-unexpected-failures-in-io">Panics: Unexpected Failures in IO</a></h2>
 <p>The type of panics is always the Python type of exception <code>Exception</code>.
 Panics can be raise either manually, by calling <code>io.panic</code>, or
 when <code>run</code> encounters an exception.
 <strong>The method <code>run</code> on <code>IO</code> never raises exceptions!</strong>
 Every exception <code>p</code> raised during the execution of <code>run</code> are caught and
 transformed into panics <code>Panic(p)</code>.</p>
-<h3><a class="header" href="#all-exceptions-are-caught" id="all-exceptions-are-caught"><strong>ALL</strong> exceptions are caught</a></h3>
+<h3 id="all-exceptions-are-caught"><a class="header" href="#all-exceptions-are-caught"><strong>ALL</strong> exceptions are caught</a></h3>
 <p>All the functions and method that accept functions as arguments
 run them inside a <code>try-except</code> block to catch every raised exception.
 All exception caught this way are transformed into panics:</p>
@@ -358,7 +358,7 @@ should never happen. In an ideal world you should never give to
 In an ideal world, panics would never occur. But we do not live in an
 ideal world, so <code>map</code>, <code>flat_map</code> and others covers your back by
 catching any exception for your own safety.</p>
-<h3><a class="header" href="#panic--something-went-terribly-wrong-were-in-unsafe-zone" id="panic--something-went-terribly-wrong-were-in-unsafe-zone"><code>panic</code> : something went terribly wrong, we're in <strong>unsafe</strong> zone.</a></h3>
+<h3 id="panic--something-went-terribly-wrong-were-in-unsafe-zone"><a class="header" href="#panic--something-went-terribly-wrong-were-in-unsafe-zone"><code>panic</code> : something went terribly wrong, we're in <strong>unsafe</strong> zone.</a></h3>
 <p>It is sometimes useful to manually raise panics. For example when
 you encounter a problematic situation you though were impossible
 but still did happen. If your program is not designed to handle this
@@ -367,7 +367,7 @@ situation, you should raise a panic.</p>
 &gt;&gt;&gt; main.run(None)
 Panic(exception=Exception('BOOM!'))
 </code></pre>
-<h3><a class="header" href="#recover--stopping-the-computation-safely-after-an-unexpected-failure" id="recover--stopping-the-computation-safely-after-an-unexpected-failure"><code>recover</code> : <strong>stopping</strong> the computation safely after an unexpected failure.</a></h3>
+<h3 id="recover--stopping-the-computation-safely-after-an-unexpected-failure"><a class="header" href="#recover--stopping-the-computation-safely-after-an-unexpected-failure"><code>recover</code> : <strong>stopping</strong> the computation safely after an unexpected failure.</a></h3>
 <p>Even in case of a panic, you have a chance to perform some emergency
 actions to recover. For example, you may want to restart the computation
 on panics. To react to panics, just call <code>recover</code>.
@@ -383,7 +383,7 @@ The result is then the the handler's result.</p>
 &gt;&gt;&gt; main.run(None)
 Ok(success='Recovered from BOOM!')
 </code></pre>
-<h3><a class="header" href="#map_panic--transforming-an-unexpected-failure" id="map_panic--transforming-an-unexpected-failure"><code>map_panic</code> : transforming an unexpected failure.</a></h3>
+<h3 id="map_panic--transforming-an-unexpected-failure"><a class="header" href="#map_panic--transforming-an-unexpected-failure"><code>map_panic</code> : transforming an unexpected failure.</a></h3>
 <p>It is often useful to transform a panic. For example you may
 want to add some useful information about the context: what
 was the request that led to this error, what were the arguments
@@ -398,10 +398,10 @@ but on panics:</p>
 &gt;&gt;&gt; main.run(None)
 Panic(exception=Exception('BOOM'))
 </code></pre>
-<h3><a class="header" href="#more-tools" id="more-tools">More tools</a></h3>
+<h3 id="more-tools"><a class="header" href="#more-tools">More tools</a></h3>
 <p>Here are some very useful functions. They can all be expressed using the
 functions and methods seen above but they deserve being seeing in details:</p>
-<h3><a class="header" href="#attempt--failures-as-values" id="attempt--failures-as-values"><code>attempt</code> : failures as values.</a></h3>
+<h3 id="attempt--failures-as-values"><a class="header" href="#attempt--failures-as-values"><code>attempt</code> : failures as values.</a></h3>
 <p>The method <code>attemp</code> transform an <code>IO[R,E,A]</code> into
 <code>IO[R,None,Result[E,A]]</code>. If the original computation is successful,
 the transformed one returns an <code>Ok</code>. If the original computation fails
@@ -420,7 +420,7 @@ Ok(success=Panic(exception=Exception('BOOM!')))
 <p>It is hugely useful when you want to do different actions depending
 on the result of a computation. Calling <code>attempt</code> and <code>flat_map</code> is
 easier than combining <code>flat_map</code>, <code>catch</code> and <code>recover</code> correctly.</p>
-<h3><a class="header" href="#from_result--from-resultea-to-iononeea" id="from_result--from-resultea-to-iononeea"><code>from_result</code> : from <code>Result[E,A]</code> to <code>IO[None,E,A]</code></a></h3>
+<h3 id="from_result--from-resultea-to-iononeea"><a class="header" href="#from_result--from-resultea-to-iononeea"><code>from_result</code> : from <code>Result[E,A]</code> to <code>IO[None,E,A]</code></a></h3>
 <p>The function <code>io.from_result</code> does almost the opposite of <code>attempt</code>.
 It transform a <code>Result[E,A]</code> into the corresponding <code>IO[None,E,A]</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; io_ok : IO[None,None,int] = io.from_result(Ok(5))
@@ -434,7 +434,7 @@ Panic(exception=Exception('BOOM!'))
 </code></pre>
 <p><code>from_result</code> is often useful after an <code>attempt</code> to restore the state
 of the computation.</p>
-<h3><a class="header" href="#finally_--doing-something-unconditionally" id="finally_--doing-something-unconditionally"><code>finally_</code> : doing something unconditionally.</a></h3>
+<h3 id="finally_--doing-something-unconditionally"><a class="header" href="#finally_--doing-something-unconditionally"><code>finally_</code> : doing something unconditionally.</a></h3>
 <p>The method <code>finally_</code> is the <em>finally</em> clause of a <em>try-except-finally</em>.
 It executed an <code>IO</code> after the current one, discard its result and
 restore the result of the current one:</p>
@@ -448,7 +448,7 @@ Error(error=7)
 Hello
 Panic(exception=Exception('BOOM!'))
 </code></pre>
-<h3><a class="header" href="#on_failure--reaction-to-both-errors-and-panics" id="on_failure--reaction-to-both-errors-and-panics"><code>on_failure</code> : reaction to both errors and panics.</a></h3>
+<h3 id="on_failure--reaction-to-both-errors-and-panics"><a class="header" href="#on_failure--reaction-to-both-errors-and-panics"><code>on_failure</code> : reaction to both errors and panics.</a></h3>
 <p>Calling both methods <code>catch</code> and <code>recover</code> is sometimes annoying.
 When you need to react to any failure, call <code>on_failure</code>. It
 takes as argument a function called the <em>failure handler</em>.
