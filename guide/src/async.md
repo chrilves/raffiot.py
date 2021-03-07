@@ -272,6 +272,47 @@ World!
 Ok(success=None)
 ```
 
+## `sleep`: making a break
+
+To pause an `IO` for some time, just call `io.sleep` with the number of seconds
+you want the `IO` paused:
+
+```python
+>>> from time import time
+>>> now : IO[None, None, None] = io.defer(time).flat_map(lambda t: io.defer(print, t))
+>>> main : IO[None, None, None] = now.then(io.sleep(2), now)
+>>> main.run(None)
+1615136436.7838593
+1615136438.785897
+Ok(success=None)
+```
+
+
+Calling `io.sleep(0)` does nothing. The `IO` is guaranteed to be paused for at
+least the time you requested, but it may sleep longer! Especially when threads
+are busy.
+
+## `sleep_until`: waking up in the future.
+
+To pause an `IO` until some determined time in the future, call `io.sleep_until`
+with the desired epoch:
+
+```python
+>>> from time import time
+>>> now : IO[None, None, None] = io.defer(time).flat_map(lambda t: io.defer(print, t))
+>>> time.time()
+1615136688.9909387
+>>> main : IO[None, None, None] = now.then(io.sleep_until(1615136788), now)
+>>> main.run(None)
+1615136713.6873975
+1615136788.0037072
+Ok(success=None)
+```
+
+Calling `io.sleep_until` with an epoch in the past does nothing.
+The `IO` is guaranteed to be paused until the epoch you requested is reached but
+it can sleep longer! Especially when threads are busy.
+
 ## `read_executor` : getting the executor
 
 The function `io.read_executor` returns the executor on which the

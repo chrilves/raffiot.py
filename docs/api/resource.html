@@ -76,6 +76,8 @@ __all__ = [
     &#34;yield_&#34;,
     &#34;async_&#34;,
     &#34;read_executor&#34;,
+    &#34;sleep_until&#34;,
+    &#34;sleep&#34;,
 ]
 
 
@@ -597,7 +599,31 @@ def read_executor() -&gt; Resource[R, E, Executor]:
     Return the executor running this IO.
     :return:
     &#34;&#34;&#34;
-    return lift_io(io.read_executor())</code></pre>
+    return lift_io(io.read_executor())
+
+
+def sleep_until(epoch_in_seconds: float) -&gt; Resource[R, E, None]:
+    &#34;&#34;&#34;
+    Pause the computation until the epoch is reached. The epoch
+    is the number returned by `time.time`.
+
+    Note that the computation may be awaken any time after the
+    specified epoch.
+    :param epoch_in_seconds:
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep_until(epoch_in_seconds))
+
+
+def sleep(seconds: float) -&gt; Resource[R, E, None]:
+    &#34;&#34;&#34;
+    Pause the computation for this amount of seconds.
+
+    Note that the computation may paused for longer.
+    :param seconds: the minimum number of seconds to sleep (may be longer)
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep(seconds))</code></pre>
 </details>
 </section>
 <section>
@@ -1011,6 +1037,56 @@ given to run.</p>
     :return:
     &#34;&#34;&#34;
     return lift_io(io.read_executor())</code></pre>
+</details>
+</dd>
+<dt id="raffiot.resource.sleep"><code class="name flex">
+<span>def <span class="ident">sleep</span></span>(<span>seconds: float) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pause the computation for this amount of seconds.</p>
+<p>Note that the computation may paused for longer.
+:param seconds: the minimum number of seconds to sleep (may be longer)
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sleep(seconds: float) -&gt; Resource[R, E, None]:
+    &#34;&#34;&#34;
+    Pause the computation for this amount of seconds.
+
+    Note that the computation may paused for longer.
+    :param seconds: the minimum number of seconds to sleep (may be longer)
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep(seconds))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.resource.sleep_until"><code class="name flex">
+<span>def <span class="ident">sleep_until</span></span>(<span>epoch_in_seconds: float) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pause the computation until the epoch is reached. The epoch
+is the number returned by <code>time.time</code>.</p>
+<p>Note that the computation may be awaken any time after the
+specified epoch.
+:param epoch_in_seconds:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sleep_until(epoch_in_seconds: float) -&gt; Resource[R, E, None]:
+    &#34;&#34;&#34;
+    Pause the computation until the epoch is reached. The epoch
+    is the number returned by `time.time`.
+
+    Note that the computation may be awaken any time after the
+    specified epoch.
+    :param epoch_in_seconds:
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep_until(epoch_in_seconds))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.traverse"><code class="name flex">
@@ -1870,6 +1946,8 @@ are released then).</p></div>
 <li><code><a title="raffiot.resource.pure" href="#raffiot.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.resource.read" href="#raffiot.resource.read">read</a></code></li>
 <li><code><a title="raffiot.resource.read_executor" href="#raffiot.resource.read_executor">read_executor</a></code></li>
+<li><code><a title="raffiot.resource.sleep" href="#raffiot.resource.sleep">sleep</a></code></li>
+<li><code><a title="raffiot.resource.sleep_until" href="#raffiot.resource.sleep_until">sleep_until</a></code></li>
 <li><code><a title="raffiot.resource.traverse" href="#raffiot.resource.traverse">traverse</a></code></li>
 <li><code><a title="raffiot.resource.yield_" href="#raffiot.resource.yield_">yield_</a></code></li>
 <li><code><a title="raffiot.resource.zip" href="#raffiot.resource.zip">zip</a></code></li>

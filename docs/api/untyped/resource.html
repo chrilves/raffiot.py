@@ -67,6 +67,8 @@ __all__ = [
     &#34;yield_&#34;,
     &#34;async_&#34;,
     &#34;read_executor&#34;,
+    &#34;sleep_until&#34;,
+    &#34;sleep&#34;,
 ]
 
 
@@ -561,7 +563,31 @@ def read_executor():
     Return the executor running this IO.
     :return:
     &#34;&#34;&#34;
-    return lift_io(io.read_executor())</code></pre>
+    return lift_io(io.read_executor())
+
+
+def sleep_until(epoch_in_seconds):
+    &#34;&#34;&#34;
+    Pause the computation until the epoch is reached. The epoch
+    is the number returned by `time.time`.
+
+    Note that the computation may be awaken any time after the
+    specified epoch.
+    :param epoch_in_seconds:
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep_until(epoch_in_seconds))
+
+
+def sleep(seconds):
+    &#34;&#34;&#34;
+    Pause the computation for this amount of seconds.
+
+    Note that the computation may paused for longer.
+    :param seconds: the minimum number of seconds to sleep (may be longer)
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep(seconds))</code></pre>
 </details>
 </section>
 <section>
@@ -965,6 +991,56 @@ given to run.</p>
     :return:
     &#34;&#34;&#34;
     return lift_io(io.read_executor())</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.sleep"><code class="name flex">
+<span>def <span class="ident">sleep</span></span>(<span>seconds)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pause the computation for this amount of seconds.</p>
+<p>Note that the computation may paused for longer.
+:param seconds: the minimum number of seconds to sleep (may be longer)
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sleep(seconds):
+    &#34;&#34;&#34;
+    Pause the computation for this amount of seconds.
+
+    Note that the computation may paused for longer.
+    :param seconds: the minimum number of seconds to sleep (may be longer)
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep(seconds))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.sleep_until"><code class="name flex">
+<span>def <span class="ident">sleep_until</span></span>(<span>epoch_in_seconds)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pause the computation until the epoch is reached. The epoch
+is the number returned by <code>time.time</code>.</p>
+<p>Note that the computation may be awaken any time after the
+specified epoch.
+:param epoch_in_seconds:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sleep_until(epoch_in_seconds):
+    &#34;&#34;&#34;
+    Pause the computation until the epoch is reached. The epoch
+    is the number returned by `time.time`.
+
+    Note that the computation may be awaken any time after the
+    specified epoch.
+    :param epoch_in_seconds:
+    :return:
+    &#34;&#34;&#34;
+    return lift_io(io.sleep_until(epoch_in_seconds))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.traverse"><code class="name flex">
@@ -1789,6 +1865,8 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.pure" href="#raffiot.untyped.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.resource.read" href="#raffiot.untyped.resource.read">read</a></code></li>
 <li><code><a title="raffiot.untyped.resource.read_executor" href="#raffiot.untyped.resource.read_executor">read_executor</a></code></li>
+<li><code><a title="raffiot.untyped.resource.sleep" href="#raffiot.untyped.resource.sleep">sleep</a></code></li>
+<li><code><a title="raffiot.untyped.resource.sleep_until" href="#raffiot.untyped.resource.sleep_until">sleep_until</a></code></li>
 <li><code><a title="raffiot.untyped.resource.traverse" href="#raffiot.untyped.resource.traverse">traverse</a></code></li>
 <li><code><a title="raffiot.untyped.resource.yield_" href="#raffiot.untyped.resource.yield_">yield_</a></code></li>
 <li><code><a title="raffiot.untyped.resource.zip" href="#raffiot.untyped.resource.zip">zip</a></code></li>

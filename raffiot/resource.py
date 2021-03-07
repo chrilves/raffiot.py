@@ -45,6 +45,8 @@ __all__ = [
     "yield_",
     "async_",
     "read_executor",
+    "sleep_until",
+    "sleep",
 ]
 
 
@@ -567,3 +569,27 @@ def read_executor() -> Resource[R, E, Executor]:
     :return:
     """
     return lift_io(io.read_executor())
+
+
+def sleep_until(epoch_in_seconds: float) -> Resource[R, E, None]:
+    """
+    Pause the computation until the epoch is reached. The epoch
+    is the number returned by `time.time`.
+
+    Note that the computation may be awaken any time after the
+    specified epoch.
+    :param epoch_in_seconds:
+    :return:
+    """
+    return lift_io(io.sleep_until(epoch_in_seconds))
+
+
+def sleep(seconds: float) -> Resource[R, E, None]:
+    """
+    Pause the computation for this amount of seconds.
+
+    Note that the computation may paused for longer.
+    :param seconds: the minimum number of seconds to sleep (may be longer)
+    :return:
+    """
+    return lift_io(io.sleep(seconds))

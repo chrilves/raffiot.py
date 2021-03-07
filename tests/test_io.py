@@ -1,3 +1,5 @@
+import time
+from concurrent.futures import Executor
 from typing import List, Any, TypeVar
 from unittest import TestCase
 
@@ -7,7 +9,6 @@ from hypothesis import given
 from raffiot import _MatchError
 from raffiot.io import *
 from raffiot.result import Result, Ok, Error, Panic
-from concurrent.futures import Executor
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)
@@ -330,3 +331,17 @@ class TestIO(TestCase):
 
     def test_then_keep(self):
         assert pure(5).then_keep(pure(7)).run(None) == Ok(5)
+
+    def test_sleep(self):
+        sleep_time = 2
+        assert (
+            defer(time.time)
+            .flat_map(
+                lambda beg: sleep(sleep_time)
+                .then(defer(time.time))
+                .map(lambda end: end - beg)
+            )
+            .run(None)
+            .success
+            >= sleep_time
+        )

@@ -1188,6 +1188,36 @@ Hello
 World!
 Ok(success=None)
 </code></pre>
+<h2 id="sleep-making-a-break"><a class="header" href="#sleep-making-a-break"><code>sleep</code>: making a break</a></h2>
+<p>To pause an <code>IO</code> for some time, just call <code>io.sleep</code> with the number of seconds
+you want the <code>IO</code> paused:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from time import time
+&gt;&gt;&gt; now : IO[None, None, None] = io.defer(time).flat_map(lambda t: io.defer(print, t))
+&gt;&gt;&gt; main : IO[None, None, None] = now.then(io.sleep(2), now)
+&gt;&gt;&gt; main.run(None)
+1615136436.7838593
+1615136438.785897
+Ok(success=None)
+</code></pre>
+<p>Calling <code>io.sleep(0)</code> does nothing. The <code>IO</code> is guaranteed to be paused for at
+least the time you requested, but it may sleep longer! Especially when threads
+are busy.</p>
+<h2 id="sleep_until-waking-up-in-the-future"><a class="header" href="#sleep_until-waking-up-in-the-future"><code>sleep_until</code>: waking up in the future.</a></h2>
+<p>To pause an <code>IO</code> until some determined time in the future, call <code>io.sleep_until</code>
+with the desired epoch:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from time import time
+&gt;&gt;&gt; now : IO[None, None, None] = io.defer(time).flat_map(lambda t: io.defer(print, t))
+&gt;&gt;&gt; time.time()
+1615136688.9909387
+&gt;&gt;&gt; main : IO[None, None, None] = now.then(io.sleep_until(1615136788), now)
+&gt;&gt;&gt; main.run(None)
+1615136713.6873975
+1615136788.0037072
+Ok(success=None)
+</code></pre>
+<p>Calling <code>io.sleep_until</code> with an epoch in the past does nothing.
+The <code>IO</code> is guaranteed to be paused until the epoch you requested is reached but
+it can sleep longer! Especially when threads are busy.</p>
 <h2 id="read_executor--getting-the-executor"><a class="header" href="#read_executor--getting-the-executor"><code>read_executor</code> : getting the executor</a></h2>
 <p>The function <code>io.read_executor</code> returns the executor on which the
 current <code>IO</code> runs.</p>

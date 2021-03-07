@@ -9,12 +9,9 @@ from __future__ import annotations
 from enum import Enum
 
 from typing_extensions import final
+from functools import total_ordering
 
-__all__ = [
-    "IOTag",
-    "ContTag",
-    "ResultTag",
-]
+__all__ = ["IOTag", "ContTag", "ResultTag", "Scheduled"]
 
 
 @final
@@ -44,7 +41,8 @@ class IOTag(Enum):
     DEFER_READ_IO = 22  # FUN ARGS KWARGS
     PARALLEL = 23  # IOS
     WAIT = 24  # FIBERS
-    REC = 25  # FUN
+    SLEEP_UNTIL = 25  # EPOCH IN SECONDS
+    REC = 26  # FUN
 
 
 @final
@@ -52,7 +50,7 @@ class ContTag(Enum):
     MAP = 0  # FUN
     FLATMAP = 1  # CONTEXT HANDLER
     FLATTEN = 2  # CONTEXT
-    SEQUENCE = 3  # CONTEXT IOS
+    SEQUENCE = 3  # CONTEXT SIZE_IOS IOS
     ZIP = 4  # CONTEXT IOS NB_IOS NEXT_IO_INDEX
     ATTEMPT = 5  #
     CATCH = 6  # CONTEXT HANDLER
@@ -67,3 +65,24 @@ class ResultTag(Enum):
     OK = 0
     ERROR = 1
     PANIC = 2
+
+
+@total_ordering
+class Scheduled:
+    __slots__ = ["__schedule", "__fiber"]
+
+    def __init__(self, schedule: float, fiber):
+        self.__schedule = schedule
+        self.__fiber = fiber
+
+    def __eq__(self, other):
+        if isinstance(other, Scheduled):
+            return self.__schedule == other.__schedule and self.__fiber is other.__fiber
+        return False
+
+    def __lt__(self, other):
+        if not isinstance(other, Scheduled):
+            raise Exception(f"{other} should be a Schedule")
+        if self.__schedule == other.__schedule:
+            return hash(self.__fiber) < hash(other.__fiber)
+        return self.__schedule < other.__schedule

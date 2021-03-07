@@ -4,19 +4,20 @@ Data structure representing a computation.
 
 from __future__ import annotations
 
+import concurrent.futures as fut
+import heapq
 import threading
+import time
 from collections import abc
 from concurrent.futures import Executor, ThreadPoolExecutor, Future
-import concurrent.futures as fut
 from queue import Queue
 from typing import TypeVar, Generic, Callable, Any, List, Iterable
 
 from typing_extensions import final
 
 from raffiot import _MatchError
-from raffiot.__internal import IOTag, ResultTag, ContTag
+from raffiot.__internal import IOTag, ResultTag, ContTag, Scheduled
 from raffiot.result import Result, Ok, Error, Panic
-import time
 
 R = TypeVar("R")
 E = TypeVar("E")
@@ -45,6 +46,8 @@ __all__ = [
     "traverse",
     "parallel",
     "wait",
+    "sleep_until",
+    "sleep",
     "rec",
     "safe",
     "Monitor",
@@ -300,16 +303,18 @@ class IO(Generic[R, E, A]):
             return f"Map({self.__fields})"
         if self.__tag == IOTag.FLATMAP:
             return f"FlatMap({self.__fields})"
+        if self.__tag == IOTag.FLATTEN:
+            return f"Flatten({self.__fields})"
         if self.__tag == IOTag.SEQUENCE:
             return f"Sequence({self.__fields})"
         if self.__tag == IOTag.ZIP:
             return f"Zip({self.__fields})"
-        if self.__tag == IOTag.FLATTEN:
-            return f"Flatten({self.__fields})"
         if self.__tag == IOTag.DEFER:
             return f"Defer({self.__fields})"
         if self.__tag == IOTag.DEFER_IO:
             return f"DeferIO({self.__fields})"
+        if self.__tag == IOTag.ATTEMPT:
+            return f"Attempt({self.__fields})"
         if self.__tag == IOTag.READ:
             return f"Read({self.__fields})"
         if self.__tag == IOTag.CONTRA_MAP_READ:
@@ -342,6 +347,8 @@ class IO(Generic[R, E, A]):
             return f"Parallel({self.__fields})"
         if self.__tag == IOTag.WAIT:
             return f"Wait({self.__fields})"
+        if self.__tag == IOTag.SLEEP_UNTIL:
+            return f"SleepUntil({self.__fields})"
         if self.__tag == IOTag.REC:
             return f"Rec({self.__fields})"
 
@@ -619,6 +626,30 @@ def wait(*l: Iterable[Fiber]) -> IO[R, E, List[Result[R, A]]]:
     return IO(IOTag.WAIT, list(l))
 
 
+def sleep_until(epoch_in_seconds: float) -> IO[R, E, None]:
+    """
+    Pause the computation until the epoch is reached. The epoch
+    is the number returned by `time.time`.
+
+    Note that the computation may be awaken any time after the
+    specified epoch.
+    :param epoch_in_seconds:
+    :return:
+    """
+    return IO(IOTag.SLEEP_UNTIL, epoch_in_seconds)
+
+
+def sleep(seconds: float) -> IO[R, E, None]:
+    """
+    Pause the computation for this amount of seconds.
+
+    Note that the computation may paused for longer.
+    :param seconds: the minimum number of seconds to sleep (may be longer)
+    :return:
+    """
+    return defer(time.time).flat_map(lambda t: sleep_until(t + seconds))
+
+
 def rec(f: Callable[[IO[R, E, A]], IO[R, E, A]]) -> IO[R, E, A]:
     return IO(IOTag.REC, f)
 
@@ -644,27 +675,73 @@ class Monitor:
     The monitor waits until there is no more future running.
     """
 
-    __slots__ = ["__executor", "__lock", "__queue"]
+    __slots__ = [
+        "__executor",
+        "__queue_lock",
+        "__queue",
+        "__scheduled_lock",
+        "__scheduled",
+    ]
 
     def __init__(self, executor: Executor) -> None:
         self.__executor = executor
-        self.__lock = threading.Lock()
+        self.__queue_lock = threading.Lock()
         self.__queue = []
+        self.__scheduled_lock = threading.Lock()
+        self.__scheduled = []
 
-    def register_future(self, future: Future) -> None:
-        with self.__lock:
+    def __async(self, fn, *args, **kwargs):
+        future = fn(*args, **kwargs)
+        if not isinstance(future, Future):
+            raise Exception(f"Async call returned {future} which is not a Future.")
+        with self.__queue_lock:
             self.__queue.append(future)
 
-    def wait_for_completion(self) -> None:
+    def __wakeup(self, out):
+        with self.__scheduled_lock:
+            now = time.time()
+            while self.__scheduled and self.__scheduled[0]._Scheduled__schedule <= now:
+                fiber = heapq.heappop(self.__scheduled)._Scheduled__fiber
+                out.append(fiber._Fiber__executor.submit(fiber._Fiber__step))
+
+    def __resume(self, fiber) -> None:
+        with self.__queue_lock:
+            self.__queue.append(fiber._Fiber__executor.submit(fiber._Fiber__step))
+            self.__wakeup(self.__queue)
+
+    def __sleep(self, fiber, when: float) -> None:
+        with self.__scheduled_lock:
+            heapq.heappush(self.__scheduled, Scheduled(when, fiber))
+            now = time.time()
+            while self.__scheduled and self.__scheduled[0]._Scheduled__schedule <= now:
+                fiber = heapq.heappop(self.__scheduled)._Scheduled__fiber
+                with self.__queue_lock:
+                    self.__queue.append(
+                        fiber._Fiber__executor.submit(fiber._Fiber__step)
+                    )
+
+    def __wait_for_completion(self) -> None:
         ok = True
         while ok:
-            with self.__lock:
+            with self.__queue_lock:
                 futures = self.__queue
                 self.__queue = []
+            self.__wakeup(futures)
             fut.wait(futures)
-            time.sleep(0)
-            with self.__lock:
-                ok = not (not self.__queue)
+            with self.__queue_lock:
+                if self.__queue:
+                    sleep_time = 0
+                else:
+                    with self.__scheduled_lock:
+                        if self.__scheduled:
+                            sleep_time = max(
+                                0,
+                                self.__scheduled[0]._Scheduled__schedule - time.time(),
+                            )
+                        else:
+                            sleep_time = 0
+                            ok = False
+            time.sleep(sleep_time)
 
 
 @final
@@ -702,40 +779,34 @@ class Fiber(Generic[R, E, A]):
         self.__waiting = []
         self.__nb_waiting = 0
 
-    def __schedule(self) -> None:
-        self.__monitor.register_future(self.__executor.submit(self.__step))
-
-    def __finish(self) -> None:
-        with self.__finish_lock:
-            self.finished = True
-            while not self.__callbacks.empty():
-                fiber, index = self.__callbacks.get()
-                fiber.__run_callback(index, self.result)
-
     def __add_callback(self, fiber: Fiber[Any, Any, Any], index: int) -> None:
+        finished = False
         with self.__finish_lock:
             if self.finished:
-                fiber.__run_callback(index, self.result)
+                finished = True
             else:
                 self.__callbacks.put((fiber, index))
+        if finished:
+            fiber.__run_callback(index, self.result)
 
     def __run_callback(self, index: int, res: Result[Any, Any]) -> None:
+        resume = False
         with self.__waiting_lock:
             self.__waiting[index] = res
             self.__nb_waiting -= 1
             if self.__nb_waiting == 0:
-                from raffiot.io import IO
-
-                self.__io = IO(IOTag.PURE, self.__waiting)
-                self.__waiting = None
-                self.__schedule()
+                resume = True
+        if resume:
+            self.__io = IO(IOTag.PURE, self.__waiting)
+            self.__waiting = None
+            self.__monitor._Monitor__resume(self)
 
     @classmethod
     def run(cls, io: IO[R, E, A], context: R, executor: Executor) -> Result[E, A]:
         monitor = Monitor(executor)
         fiber = Fiber(io, context, executor, monitor)
-        fiber.__schedule()
-        monitor.wait_for_completion()
+        monitor._Monitor__resume(fiber)
+        monitor._Monitor__wait_for_completion()
         return fiber.result
 
     @classmethod
@@ -770,21 +841,22 @@ class Fiber(Generic[R, E, A]):
                         io = io._IO__fields[0]
                         continue
                     if tag == IOTag.SEQUENCE:
-                        ios = iter(io._IO__fields)
-                        try:
-                            io = next(ios)
-                        except StopIteration:
-                            arg_tag = ResultTag.OK
-                            arg_value = None
-                            break
-                        except Exception as exception:
-                            arg_tag = ResultTag.PANIC
-                            arg_value = exception
-                            break
-                        cont.append(ios)
-                        cont.append(context)
-                        cont.append(ContTag.SEQUENCE)
-                        continue
+                        ios = io._IO__fields
+                        size = len(ios)
+                        if size > 1:
+                            it = iter(ios)
+                            io = next(it)
+                            cont.append(it)
+                            cont.append(size - 1)
+                            cont.append(context)
+                            cont.append(ContTag.SEQUENCE)
+                            continue
+                        if size == 1:
+                            io = ios[0]
+                            continue
+                        arg_tag = ResultTag.OK
+                        arg_value = None
+                        break
                     if tag == IOTag.ZIP:
                         ios = iter(io._IO__fields)
                         try:
@@ -875,31 +947,27 @@ class Fiber(Generic[R, E, A]):
                         io = io._IO__fields[0]
                         continue
                     if tag == IOTag.YIELD:
-                        from raffiot.io import IO
-
                         self.__io = IO(IOTag.PURE, None)
                         self.__context = context
                         self.__cont = cont
-                        self.__schedule()
+                        self.__monitor._Monitor__resume(self)
                         return
                     if tag == IOTag.ASYNC:
-                        from raffiot.io import from_result
 
                         def callback(r):
                             self.__io = from_result(r)
-                            self.__schedule()
+                            self.__monitor._Monitor__resume(self)
 
                         self.__context = context
                         self.__cont = cont
                         try:
-                            self.__monitor.register_future(
-                                io._IO__fields[0](
-                                    context,
-                                    self.__executor,
-                                    callback,
-                                    *io._IO__fields[1],
-                                    **io._IO__fields[2],
-                                )
+                            self.__monitor._Monitor__async(
+                                io._IO__fields[0],
+                                context,
+                                self.__executor,
+                                callback,
+                                *io._IO__fields[1],
+                                **io._IO__fields[2],
                             )
                             return
                         except Exception as exception:
@@ -965,20 +1033,43 @@ class Fiber(Generic[R, E, A]):
                         for fio in io._IO__fields:
                             fiber = Fiber(fio, context, self.__executor, self.__monitor)
                             arg_value.append(fiber)
-                            fiber.__schedule()
+                            fiber.__monitor._Monitor__resume(fiber)
                         arg_tag = ResultTag.OK
                         break
                     if tag == IOTag.WAIT:
                         fibers = io._IO__fields
-                        if not fibers:
-                            arg_tag = ResultTag.OK
-                            arg_value = []
-                            break
                         self.__waiting = [None for _ in fibers]
                         self.__nb_waiting = len(fibers)
+                        self.__context = context
+                        self.__cont = cont
+                        all_finished = True
                         for index, fib in enumerate(fibers):
-                            fib.__add_callback(self, index)
+                            with fib.__finish_lock:
+                                if fib.finished:
+                                    with self.__waiting_lock:
+                                        self.__waiting[index] = fib.result
+                                        self.__nb_waiting -= 1
+                                        if self.__nb_waiting == 0:
+                                            all_finished = True
+                                else:
+                                    all_finished = False
+                                    fib.__callbacks.put((self, index))
+                        if all_finished:
+                            arg_tag = ResultTag.OK
+                            arg_value = self.__waiting
+                            break
                         return
+                    if tag == IOTag.SLEEP_UNTIL:
+                        when = io._IO__fields
+                        if when > time.time():
+                            self.__io = IO(IOTag.PURE, None)
+                            self.__context = context
+                            self.__cont = cont
+                            self.__monitor._Monitor__sleep(self, when)
+                            return
+                        arg_tag = ResultTag.OK
+                        arg_value = None
+                        break
                     if tag == IOTag.REC:
                         try:
                             io = io._IO__fields(io)
@@ -1016,22 +1107,19 @@ class Fiber(Generic[R, E, A]):
                         continue
                     if tag == ContTag.SEQUENCE:
                         if arg_tag == ResultTag.OK:
-                            try:
-                                io = next(cont[-2])
-                            except StopIteration:
-                                cont.pop()  # CONTEXT
-                                cont.pop()  # IOS
-                                continue
-                            except Exception as exception:
-                                cont.pop()  # CONTEXT
-                                cont.pop()  # IOS
-                                arg_tag = ResultTag.PANIC
-                                arg_value = exception
-                                continue
-                            context = cont[-1]
-                            cont.append(ContTag.SEQUENCE)
+                            size = cont[-2]
+                            if size > 1:
+                                io = next(cont[-3])
+                                cont[-2] -= 1
+                                context = cont[-1]
+                                cont.append(ContTag.SEQUENCE)
+                                break
+                            context = cont.pop()
+                            cont.pop()
+                            io = next(cont.pop())
                             break
                         # CLEANING CONT
+                        cont.pop()  # SIZE
                         cont.pop()  # CONTEXT
                         cont.pop()  # IOS
                         continue
@@ -1133,7 +1221,11 @@ class Fiber(Generic[R, E, A]):
                             self.result = Panic(
                                 _MatchError(f"Wrong result tag {arg_tag}")
                             )
-                        self.__finish()
+                        with self.__finish_lock:
+                            self.finished = True
+                        while not self.__callbacks.empty():
+                            fiber, index = self.__callbacks.get()
+                            fiber.__run_callback(index, self.result)
                         return
                     arg_tag = ResultTag.PANIC
                     arg_value = Panic(_MatchError(f"Invalid cont {cont + [tag]}"))
