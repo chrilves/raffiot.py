@@ -351,6 +351,8 @@ class IO(Generic[R, E, A]):
             return f"SleepUntil({self.__fields})"
         if self.__tag == IOTag.REC:
             return f"Rec({self.__fields})"
+        if self.__tag == IOTag.LOCK:
+            return f"Lock({self.__fields})"
 
     def __repr__(self):
         return str(self)
@@ -1074,6 +1076,24 @@ class Fiber(Generic[R, E, A]):
                         try:
                             io = io._IO__fields(io)
                             continue
+                        except Exception as exception:
+                            arg_tag = ResultTag.PANIC
+                            arg_value = exception
+                            break
+                    if tag == IOTag.LOCK:
+                        lock = io._IO__fields
+                        try:
+                            with lock.lock:
+                                if lock.acquire(self):
+                                    arg_tag = ResultTag.OK
+                                    arg_value = None
+                                    break
+                                else:
+                                    self.__io = IO(IOTag.PURE, None)
+                                    self.__context = context
+                                    self.__cont = cont
+                                    lock.waiting.put(self)
+                                    return
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
                             arg_value = exception

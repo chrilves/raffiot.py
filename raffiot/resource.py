@@ -15,6 +15,7 @@ from typing_extensions import final
 from raffiot import io, _MatchError
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
+import __internal
 
 R = TypeVar("R")
 E = TypeVar("E")
@@ -593,3 +594,12 @@ def sleep(seconds: float) -> Resource[R, E, None]:
     :return:
     """
     return lift_io(io.sleep(seconds))
+
+
+def lock() -> Resource[None, None, None]:
+    new_lock = __internal.Lock()
+    return Resource(IO(__internal.IOTag.LOCK, new_lock).then(io.pure((None, io.defer(new_lock.release)))))
+
+def semaphore(tokens: int) -> Resource[None, None, None]:
+    new_semaphore = __internal.Semaphore(tokens)
+    return Resource(IO(__internal.IOTag.LOCK, new_semaphore).then(io.pure((None, io.defer(new_semaphore.release)))))
