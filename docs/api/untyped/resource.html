@@ -37,14 +37,16 @@ Ensure that create resources are always nicely released after use.
 from __future__ import annotations
 
 from collections import abc
-from concurrent.futures import Executor
 from dataclasses import dataclass
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 
+from typing_extensions import final
 
-from raffiot.untyped import io, _MatchError
-from raffiot.untyped.io import IO
-from raffiot.untyped.result import Result, Ok, Error, Panic
-
+from raffiot import _runtime
+from raffiot import io, MatchError
+from raffiot._internal import IOTag
+from raffiot.io import IO
+from raffiot.result import Result, Ok, Error, Panic
 
 __all__ = [
     &#34;Resource&#34;,
@@ -66,20 +68,31 @@ __all__ = [
     &#34;traverse&#34;,
     &#34;yield_&#34;,
     &#34;async_&#34;,
-    &#34;read_executor&#34;,
     &#34;sleep_until&#34;,
     &#34;sleep&#34;,
+    &#34;lock&#34;,
+    &#34;semaphore&#34;,
 ]
 
 
+R = TypeVar(&#34;R&#34;)
+E = TypeVar(&#34;E&#34;)
+A = TypeVar(&#34;A&#34;)
+X = TypeVar(&#34;X&#34;)
+R2 = TypeVar(&#34;R2&#34;)
+E2 = TypeVar(&#34;E2&#34;)
+A2 = TypeVar(&#34;A2&#34;)
+
+
+@final
 @dataclass
-class Resource:
+class Resource(Generic[R, E, A]):
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
 
-    create: None
+    create: IO[R, E, Tuple[A, IO[R, Any, Any]]]
     &#34;&#34;&#34;
     IO to create one resource along with the IO for releasing it.
     
@@ -94,7 +107,7 @@ class Resource:
         &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
     &#34;&#34;&#34;
 
-    def use(self, fun):
+    def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
         &#34;&#34;&#34;
         Create a resource a:A and use it in fun.
 
@@ -104,7 +117,7 @@ class Resource:
         This is the only way to use a resource.
         &#34;&#34;&#34;
 
-        def safe_use(x):
+        def safe_use(x: Tuple[A, IO[R, E, None]]) -&gt; IO[R, E, X]:
             a, close = x
             try:
                 return (
@@ -117,13 +130,15 @@ class Resource:
 
         return self.create.flat_map(safe_use)
 
-    def map(self, f):
+    def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Transform the created resource with f if the creation is successful.
         Do nothing otherwise.
         &#34;&#34;&#34;
 
-        def safe_map(x):
+        def safe_map(
+            x: Tuple[A, IO[R, E, None]]
+        ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
             a, close = x
             try:
                 return io.pure((f(a), close))
@@ -132,17 +147,21 @@ class Resource:
 
         return Resource(self.create.flat_map(safe_map))
 
-    def flat_map(self, f):
+    def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
         The resource created by the first one (self) can be used to create the second (f).
         &#34;&#34;&#34;
 
-        def safe_flat_map_a(xa):
+        def safe_flat_map_a(
+            xa: Tuple[A, IO[R, E, None]]
+        ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
             a, close_a = xa
             try:
 
-                def safe_flat_map_a2(xa2):
+                def safe_flat_map_a2(
+                    xa2: Tuple[A2, IO[R, Any, None]]
+                ) -&gt; IO[R, E, Tuple[A2, IO[R, Any, None]]]:
                     a2, close_a2 = xa2
                     return io.pure((a2, close_a.attempt().then(close_a2)))
 
@@ -162,14 +181,14 @@ class Resource:
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 
-    def then(self, rs):
+    def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
         The resource created by the first one (self) is dropped.
         &#34;&#34;&#34;
         return self.flat_map(lambda _: rs)
 
-    def zip(self, *rs):
+    def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
         &#34;&#34;&#34;
         Pack a list of resources (including self) into a Resource creating the
         list of all resources.
@@ -179,7 +198,9 @@ class Resource:
         &#34;&#34;&#34;
         return zip((self, *rs))
 
-    def ap(self, *arg):
+    def ap(
+        self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
 
@@ -189,7 +210,7 @@ class Resource:
         &#34;&#34;&#34;
         return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
-    def flatten(self):
+    def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Concatenation function on Resource
         &#34;&#34;&#34;
@@ -197,7 +218,7 @@ class Resource:
 
     # Reader API
 
-    def contra_map_read(self, f):
+    def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
         &#34;&#34;&#34;
         Transform the context with f.
         Note that f is not from R to R2 but from R2 to R!
@@ -210,7 +231,7 @@ class Resource:
 
     # Error API
 
-    def catch(self, handler):
+    def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
@@ -218,7 +239,7 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(self.create.catch(lambda e: handler(e).create))
 
-    def map_error(self, f):
+    def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the stored error if the resource creation fails on an error.
         Do nothing otherwise.
@@ -227,7 +248,9 @@ class Resource:
 
     # Panic
 
-    def recover(self, handler):
+    def recover(
+        self, handler: Callable[[Exception], Resource[R, E, A]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
@@ -235,7 +258,7 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(self.create.recover(lambda p: handler(p).create))
 
-    def map_panic(self, f):
+    def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the exception stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -244,10 +267,10 @@ class Resource:
             self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
         )
 
-    def attempt(self):
+    def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
         &#34;&#34;&#34;
         Transform this Resource that may fail into a Resource
-        that never fails but creates a Result.
+        that never fails but creates a Result[E,A].
 
         - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
         - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
@@ -269,7 +292,7 @@ class Resource:
             )
         )
 
-    def finally_(self, rs):
+    def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -280,7 +303,9 @@ class Resource:
         &#34;&#34;&#34;
         return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
 
-    def on_failure(self, handler):
+    def on_failure(
+        self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
+    ) -&gt; IO[R, E, A]:
         &#34;&#34;&#34;
         Combined form of catch and recover.
         React to any failure of the resource creation.
@@ -298,16 +323,8 @@ class Resource:
             )
         )
 
-    def contra_map_executor(self, f):
-        &#34;&#34;&#34;
-        Change the executor running this IO.
-        :param f:
-        :return:
-        &#34;&#34;&#34;
-        return Resource(self.create.contra_map_executor(f))
 
-
-def lift_io(mio):
+def lift_io(mio: IO[R, E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
@@ -315,14 +332,14 @@ def lift_io(mio):
     return Resource(mio.map(lambda a: (a, io.pure(None))))
 
 
-def pure(a):
+def pure(a: A) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     A Resource that always returns the same constant.
     &#34;&#34;&#34;
     return Resource(io.pure((a, io.pure(None))))
 
 
-def defer(deferred, *args, **kwargs):
+def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -333,7 +350,9 @@ def defer(deferred, *args, **kwargs):
     return lift_io(io.defer(deferred, *args, **kwargs))
 
 
-def defer_resource(deferred, *args, **kwargs):
+def defer_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
 
@@ -350,14 +369,16 @@ def defer_resource(deferred, *args, **kwargs):
     return Resource(io.defer_io(f, *args, **kwargs))
 
 
-def defer_read(deferred, *args, **kwargs):
+def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read but for Resource.
     &#34;&#34;&#34;
     return lift_io(io.defer_read(deferred, *args, **kwargs))
 
 
-def defer_read_resource(deferred, *args, **kwargs):
+def defer_read_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read_io but for Resource.
     &#34;&#34;&#34;
@@ -368,7 +389,7 @@ def defer_read_resource(deferred, *args, **kwargs):
     return Resource(io.defer_read_io(f, *args, **kwargs))
 
 
-def read():
+def read() -&gt; Resource[R, E, R]:
     &#34;&#34;&#34;
     Read the context.
 
@@ -381,21 +402,21 @@ def read():
     return lift_io(io.read())
 
 
-def error(err):
+def error(err: E) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails on the error err.
     &#34;&#34;&#34;
     return Resource(io.error(err))
 
 
-def panic(exception):
+def panic(exception: Exception) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails with the panic exception.
     &#34;&#34;&#34;
     return Resource(io.panic(exception))
 
 
-def from_result(r):
+def from_result(r: Result[E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that:
     - success if r is an `Ok`
@@ -405,28 +426,32 @@ def from_result(r):
     return r.fold(pure, error, panic)
 
 
-def from_io_resource(mio):
+def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Construct a `Resource` from an `IO[R,E,Resource[R,E,A]]`
     &#34;&#34;&#34;
     return Resource(mio.flat_map(lambda rs: rs.create))
 
 
-def from_open_close_io(open, close):
+def from_open_close_io(
+    open: IO[R, E, A], close: Callable[[A], IO[R, Any, Any]]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Construct a `Resource` from an IO to open a resource and one to close it.
     &#34;&#34;&#34;
     return Resource(open.map(lambda a: (a, close(a))))
 
 
-def from_open_close(open, close):
+def from_open_close(
+    open: Callable[[], A], close: Callable[[A], None]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
     return Resource(io.defer(open).map(lambda a: (a, io.defer(close, a))))
 
 
-def from_with(the_io):
+def from_with(the_io: IO[R, E, Any]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Create a Resource from &#34;with&#34; python expression:
 
@@ -446,7 +471,7 @@ def from_with(the_io):
     return Resource(the_io.map(manager_handler))
 
 
-def zip(*rs):
+def zip(*rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Transform a list of Resource into a Resource creating a list
     of all resources.
@@ -461,7 +486,7 @@ def zip(*rs):
     else:
         args = rs
 
-    def process(l):
+    def process(l: Result[E, A]):
         close = []
         args = []
         level = 0
@@ -479,7 +504,7 @@ def zip(*rs):
                 level = 2
             else:
                 level = 2
-                error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
+                error = Panic(MatchError(f&#34;{arg} should be a Result &#34;))
 
         if level == 0:
             return io.pure((args, io.sequence(close)))
@@ -489,7 +514,9 @@ def zip(*rs):
     return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))
 
 
-def traverse(l, f):
+def traverse(
+    l: Iterable[A], f: Callable[[A], Resource[R, E, A2]]
+) -&gt; Resource[R, E, Iterable[A2]]:
     &#34;&#34;&#34;
     Apply the function `f` to every element of the iterable.
     The resulting Resource creates the list of all the resources.
@@ -504,36 +531,33 @@ def traverse(l, f):
     return zip([defer_resource(f, i) for i in l])
 
 
-def yield_():
+def yield_() -&gt; Resource[R, E, None]:
     &#34;&#34;&#34;
     Resource implement cooperative concurrency. It means a Resource has to
     explicitly make a break for other concurrent tasks to have a chance to
     progress.
     This is what `yeild_()` does, it forces the Resource to make a break,
-    letting other tasks be run on the executor until the IO start progressing
+    letting other tasks be run on the thread pool until the IO start progressing
     again.
     :return:
     &#34;&#34;&#34;
     return lift_io(io.yield_())
 
 
-def async_(f, *args, **kwargs):
+def async_(
+    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+) -&gt; Resource[E, R, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
 
-    &gt;&gt;&gt; from concurrent.futures import Executor, Future
     &gt;&gt;&gt; def f(context: E,
-    &gt;&gt;&gt;       executor: Executor,
-    &gt;&gt;&gt;       callback: Callable[[Result], None],
+    &gt;&gt;&gt;       callback: Callable[[Result[E,A]], None],
     &gt;&gt;&gt;       *args,
-    &gt;&gt;&gt;       **kwargs) -&gt; Future:
+    &gt;&gt;&gt;       **kwargs) -&gt; None:
     &gt;&gt;&gt;     ...
 
-    - `f` **MUST** return a `Future`.
     - `context` is the context of the Resource, usually the one passed to `run`
        if not changed by `contra_map_read`.
-    - `executor` is the `Executor` where the Resource is run, usually the one
-       passed to run if not changed by `contra_map_executor`.
     - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
        Until `callback` is called, the Resource will be suspended waiting for the
        asynchronous call to complete.
@@ -548,25 +572,15 @@ def async_(f, *args, **kwargs):
 
     &gt;&gt;&gt; from raffiot.result import Ok
     &gt;&gt;&gt; from raffiot.io import async_
-    &gt;&gt;&gt; def f(context, executor, callback):
-    &gt;&gt;&gt;     def h():
-    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
-    &gt;&gt;&gt;         callback(Ok(2))
-    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; def f(context, callback):
+    &gt;&gt;&gt;     print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;     callback(Ok(2))
     &gt;&gt;&gt; resource = async_(f)
     &#34;&#34;&#34;
     return lift_io(io.async_(f, *args, **kwargs))
 
 
-def read_executor():
-    &#34;&#34;&#34;
-    Return the executor running this IO.
-    :return:
-    &#34;&#34;&#34;
-    return lift_io(io.read_executor())
-
-
-def sleep_until(epoch_in_seconds):
+def sleep_until(epoch_in_seconds: float) -&gt; Resource[R, E, None]:
     &#34;&#34;&#34;
     Pause the computation until the epoch is reached. The epoch
     is the number returned by `time.time`.
@@ -579,7 +593,7 @@ def sleep_until(epoch_in_seconds):
     return lift_io(io.sleep_until(epoch_in_seconds))
 
 
-def sleep(seconds):
+def sleep(seconds: float) -&gt; Resource[R, E, None]:
     &#34;&#34;&#34;
     Pause the computation for this amount of seconds.
 
@@ -587,7 +601,23 @@ def sleep(seconds):
     :param seconds: the minimum number of seconds to sleep (may be longer)
     :return:
     &#34;&#34;&#34;
-    return lift_io(io.sleep(seconds))</code></pre>
+    return lift_io(io.sleep(seconds))
+
+
+def lock() -&gt; Resource[None, None, None]:
+    new_lock = _runtime.Lock()
+    return Resource(
+        IO(IOTag.ACQUIRE, new_lock).then(io.pure((None, IO(IOTag.RELEASE, new_lock))))
+    )
+
+
+def semaphore(tokens: int) -&gt; Resource[None, None, None]:
+    new_semaphore = _runtime.Semaphore(tokens)
+    return Resource(
+        IO(IOTag.ACQUIRE, new_semaphore).then(
+            io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+        )
+    )</code></pre>
 </details>
 </section>
 <section>
@@ -598,24 +628,19 @@ def sleep(seconds):
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="raffiot.untyped.resource.async_"><code class="name flex">
-<span>def <span class="ident">async_</span></span>(<span>f, *args, **kwargs)</span>
+<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~E, ~R, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Perform an Asynchronous call. <code>f</code> is a function of the form:</p>
-<pre><code class="language-python-repl">&gt;&gt;&gt; from concurrent.futures import Executor, Future
-&gt;&gt;&gt; def f(context: E,
-&gt;&gt;&gt;       executor: Executor,
-&gt;&gt;&gt;       callback: Callable[[Result], None],
+<pre><code class="language-python-repl">&gt;&gt;&gt; def f(context: E,
+&gt;&gt;&gt;       callback: Callable[[Result[E,A]], None],
 &gt;&gt;&gt;       *args,
-&gt;&gt;&gt;       **kwargs) -&gt; Future:
+&gt;&gt;&gt;       **kwargs) -&gt; None:
 &gt;&gt;&gt;     ...
 </code></pre>
 <ul>
-<li><code>f</code> <strong>MUST</strong> return a <code>Future</code>.</li>
 <li><code>context</code> is the context of the Resource, usually the one passed to <code>run</code>
 if not changed by <code>contra_map_read</code>.</li>
-<li><code>executor</code> is the <code>Executor</code> where the Resource is run, usually the one
-passed to run if not changed by <code>contra_map_executor</code>.</li>
 <li>
 <p><code>callback</code> <strong>MUST ALWAYS BE CALLED EXACTLY ONCE</strong>.
 Until <code>callback</code> is called, the Resource will be suspended waiting for the
@@ -632,34 +657,29 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <p>For example:</p>
 <pre><code class="language-python-repl">&gt;&gt;&gt; from raffiot.result import Ok
 &gt;&gt;&gt; from raffiot.io import async_
-&gt;&gt;&gt; def f(context, executor, callback):
-&gt;&gt;&gt;     def h():
-&gt;&gt;&gt;         print(&quot;In the asynchronous call, returning 2.&quot;)
-&gt;&gt;&gt;         callback(Ok(2))
-&gt;&gt;&gt;     return executor.submit(h)
+&gt;&gt;&gt; def f(context, callback):
+&gt;&gt;&gt;     print(&quot;In the asynchronous call, returning 2.&quot;)
+&gt;&gt;&gt;     callback(Ok(2))
 &gt;&gt;&gt; resource = async_(f)
 </code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def async_(f, *args, **kwargs):
+<pre><code class="python">def async_(
+    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+) -&gt; Resource[E, R, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
 
-    &gt;&gt;&gt; from concurrent.futures import Executor, Future
     &gt;&gt;&gt; def f(context: E,
-    &gt;&gt;&gt;       executor: Executor,
-    &gt;&gt;&gt;       callback: Callable[[Result], None],
+    &gt;&gt;&gt;       callback: Callable[[Result[E,A]], None],
     &gt;&gt;&gt;       *args,
-    &gt;&gt;&gt;       **kwargs) -&gt; Future:
+    &gt;&gt;&gt;       **kwargs) -&gt; None:
     &gt;&gt;&gt;     ...
 
-    - `f` **MUST** return a `Future`.
     - `context` is the context of the Resource, usually the one passed to `run`
        if not changed by `contra_map_read`.
-    - `executor` is the `Executor` where the Resource is run, usually the one
-       passed to run if not changed by `contra_map_executor`.
     - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
        Until `callback` is called, the Resource will be suspended waiting for the
        asynchronous call to complete.
@@ -674,18 +694,16 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 
     &gt;&gt;&gt; from raffiot.result import Ok
     &gt;&gt;&gt; from raffiot.io import async_
-    &gt;&gt;&gt; def f(context, executor, callback):
-    &gt;&gt;&gt;     def h():
-    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
-    &gt;&gt;&gt;         callback(Ok(2))
-    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; def f(context, callback):
+    &gt;&gt;&gt;     print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;     callback(Ok(2))
     &gt;&gt;&gt; resource = async_(f)
     &#34;&#34;&#34;
     return lift_io(io.async_(f, *args, **kwargs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer"><code class="name flex">
-<span>def <span class="ident">defer</span></span>(<span>deferred, *args, **kwargs)</span>
+<span>def <span class="ident">defer</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Defer a computation.</p>
@@ -695,7 +713,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer(deferred, *args, **kwargs):
+<pre><code class="python">def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -707,7 +725,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer_read"><code class="name flex">
-<span>def <span class="ident">defer_read</span></span>(<span>deferred, *args, **kwargs)</span>
+<span>def <span class="ident">defer_read</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Similar to io.defer_read but for Resource.</p></div>
@@ -715,7 +733,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_read(deferred, *args, **kwargs):
+<pre><code class="python">def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read but for Resource.
     &#34;&#34;&#34;
@@ -723,7 +741,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer_read_resource"><code class="name flex">
-<span>def <span class="ident">defer_read_resource</span></span>(<span>deferred, *args, **kwargs)</span>
+<span>def <span class="ident">defer_read_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Similar to io.defer_read_io but for Resource.</p></div>
@@ -731,7 +749,9 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_read_resource(deferred, *args, **kwargs):
+<pre><code class="python">def defer_read_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read_io but for Resource.
     &#34;&#34;&#34;
@@ -743,7 +763,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.defer_resource"><code class="name flex">
-<span>def <span class="ident">defer_resource</span></span>(<span>deferred, *args, **kwargs)</span>
+<span>def <span class="ident">defer_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Make a function that returns an <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code>, a <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code> itself.</p>
@@ -755,7 +775,9 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_resource(deferred, *args, **kwargs):
+<pre><code class="python">def defer_resource(
+    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
 
@@ -773,7 +795,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.error"><code class="name flex">
-<span>def <span class="ident">error</span></span>(<span>err)</span>
+<span>def <span class="ident">error</span></span>(<span>err: E) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that always fails on the error err.</p></div>
@@ -781,7 +803,7 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def error(err):
+<pre><code class="python">def error(err: E) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails on the error err.
     &#34;&#34;&#34;
@@ -789,7 +811,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_io_resource"><code class="name flex">
-<span>def <span class="ident">from_io_resource</span></span>(<span>mio)</span>
+<span>def <span class="ident">from_io_resource</span></span>(<span>mio: IO[R, E, <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Construct a <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code> from an <code>IO[R,E,<a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R,E,A]]</code></p></div>
@@ -797,7 +819,7 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_io_resource(mio):
+<pre><code class="python">def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Construct a `Resource` from an `IO[R,E,Resource[R,E,A]]`
     &#34;&#34;&#34;
@@ -805,7 +827,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_open_close"><code class="name flex">
-<span>def <span class="ident">from_open_close</span></span>(<span>open, close)</span>
+<span>def <span class="ident">from_open_close</span></span>(<span>open: Callable[[], A], close: Callable[[A], None]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Construct a <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code> from a function to open a resource and one to close it.</p></div>
@@ -813,7 +835,9 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_open_close(open, close):
+<pre><code class="python">def from_open_close(
+    open: Callable[[], A], close: Callable[[A], None]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
@@ -821,7 +845,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_open_close_io"><code class="name flex">
-<span>def <span class="ident">from_open_close_io</span></span>(<span>open, close)</span>
+<span>def <span class="ident">from_open_close_io</span></span>(<span>open: IO[R, E, A], close: Callable[[A], IO[R, Any, Any]]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Construct a <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code> from an IO to open a resource and one to close it.</p></div>
@@ -829,7 +853,9 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_open_close_io(open, close):
+<pre><code class="python">def from_open_close_io(
+    open: IO[R, E, A], close: Callable[[A], IO[R, Any, Any]]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Construct a `Resource` from an IO to open a resource and one to close it.
     &#34;&#34;&#34;
@@ -837,7 +863,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_result"><code class="name flex">
-<span>def <span class="ident">from_result</span></span>(<span>r)</span>
+<span>def <span class="ident">from_result</span></span>(<span>r: Result[E, A]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that:
@@ -848,7 +874,7 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_result(r):
+<pre><code class="python">def from_result(r: Result[E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that:
     - success if r is an `Ok`
@@ -859,7 +885,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_with"><code class="name flex">
-<span>def <span class="ident">from_with</span></span>(<span>the_io)</span>
+<span>def <span class="ident">from_with</span></span>(<span>the_io: IO[R, E, Any]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Create a Resource from "with" python expression:</p>
@@ -879,7 +905,7 @@ body</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_with(the_io):
+<pre><code class="python">def from_with(the_io: IO[R, E, Any]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Create a Resource from &#34;with&#34; python expression:
 
@@ -900,7 +926,7 @@ body</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.lift_io"><code class="name flex">
-<span>def <span class="ident">lift_io</span></span>(<span>mio)</span>
+<span>def <span class="ident">lift_io</span></span>(<span>mio: IO[R, E, A]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform an IO into a Resource whose created resource if the result of the IO.
@@ -909,7 +935,7 @@ The releasing IO does nothing.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def lift_io(mio):
+<pre><code class="python">def lift_io(mio: IO[R, E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
@@ -917,8 +943,24 @@ The releasing IO does nothing.</p></div>
     return Resource(mio.map(lambda a: (a, io.pure(None))))</code></pre>
 </details>
 </dd>
+<dt id="raffiot.untyped.resource.lock"><code class="name flex">
+<span>def <span class="ident">lock</span></span>(<span>) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[NoneType, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def lock() -&gt; Resource[None, None, None]:
+    new_lock = _runtime.Lock()
+    return Resource(
+        IO(IOTag.ACQUIRE, new_lock).then(io.pure((None, IO(IOTag.RELEASE, new_lock))))
+    )</code></pre>
+</details>
+</dd>
 <dt id="raffiot.untyped.resource.panic"><code class="name flex">
-<span>def <span class="ident">panic</span></span>(<span>exception)</span>
+<span>def <span class="ident">panic</span></span>(<span>exception: Exception) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that always fails with the panic exception.</p></div>
@@ -926,7 +968,7 @@ The releasing IO does nothing.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def panic(exception):
+<pre><code class="python">def panic(exception: Exception) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails with the panic exception.
     &#34;&#34;&#34;
@@ -934,7 +976,7 @@ The releasing IO does nothing.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.pure"><code class="name flex">
-<span>def <span class="ident">pure</span></span>(<span>a)</span>
+<span>def <span class="ident">pure</span></span>(<span>a: A) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>A Resource that always returns the same constant.</p></div>
@@ -942,7 +984,7 @@ The releasing IO does nothing.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def pure(a):
+<pre><code class="python">def pure(a: A) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     A Resource that always returns the same constant.
     &#34;&#34;&#34;
@@ -950,7 +992,7 @@ The releasing IO does nothing.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.read"><code class="name flex">
-<span>def <span class="ident">read</span></span>(<span>)</span>
+<span>def <span class="ident">read</span></span>(<span>) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~R]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Read the context.</p>
@@ -962,7 +1004,7 @@ given to run.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def read():
+<pre><code class="python">def read() -&gt; Resource[R, E, R]:
     &#34;&#34;&#34;
     Read the context.
 
@@ -975,26 +1017,26 @@ given to run.</p>
     return lift_io(io.read())</code></pre>
 </details>
 </dd>
-<dt id="raffiot.untyped.resource.read_executor"><code class="name flex">
-<span>def <span class="ident">read_executor</span></span>(<span>)</span>
+<dt id="raffiot.untyped.resource.semaphore"><code class="name flex">
+<span>def <span class="ident">semaphore</span></span>(<span>tokens: int) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[NoneType, NoneType, NoneType]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Return the executor running this IO.
-:return:</p></div>
+<div class="desc"></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def read_executor():
-    &#34;&#34;&#34;
-    Return the executor running this IO.
-    :return:
-    &#34;&#34;&#34;
-    return lift_io(io.read_executor())</code></pre>
+<pre><code class="python">def semaphore(tokens: int) -&gt; Resource[None, None, None]:
+    new_semaphore = _runtime.Semaphore(tokens)
+    return Resource(
+        IO(IOTag.ACQUIRE, new_semaphore).then(
+            io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+        )
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.sleep"><code class="name flex">
-<span>def <span class="ident">sleep</span></span>(<span>seconds)</span>
+<span>def <span class="ident">sleep</span></span>(<span>seconds: float) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, NoneType]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Pause the computation for this amount of seconds.</p>
@@ -1005,7 +1047,7 @@ given to run.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def sleep(seconds):
+<pre><code class="python">def sleep(seconds: float) -&gt; Resource[R, E, None]:
     &#34;&#34;&#34;
     Pause the computation for this amount of seconds.
 
@@ -1017,7 +1059,7 @@ given to run.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.sleep_until"><code class="name flex">
-<span>def <span class="ident">sleep_until</span></span>(<span>epoch_in_seconds)</span>
+<span>def <span class="ident">sleep_until</span></span>(<span>epoch_in_seconds: float) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, NoneType]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Pause the computation until the epoch is reached. The epoch
@@ -1030,7 +1072,7 @@ specified epoch.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def sleep_until(epoch_in_seconds):
+<pre><code class="python">def sleep_until(epoch_in_seconds: float) -&gt; Resource[R, E, None]:
     &#34;&#34;&#34;
     Pause the computation until the epoch is reached. The epoch
     is the number returned by `time.time`.
@@ -1044,7 +1086,7 @@ specified epoch.
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.traverse"><code class="name flex">
-<span>def <span class="ident">traverse</span></span>(<span>l, f)</span>
+<span>def <span class="ident">traverse</span></span>(<span>l: Iterable[A], f: Callable[[A], <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A2]]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, typing.Iterable[~A2]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Apply the function <code>f</code> to every element of the iterable.
@@ -1057,7 +1099,9 @@ The resulting Resource creates the list of all the resources.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def traverse(l, f):
+<pre><code class="python">def traverse(
+    l: Iterable[A], f: Callable[[A], Resource[R, E, A2]]
+) -&gt; Resource[R, E, Iterable[A2]]:
     &#34;&#34;&#34;
     Apply the function `f` to every element of the iterable.
     The resulting Resource creates the list of all the resources.
@@ -1073,27 +1117,27 @@ The resulting Resource creates the list of all the resources.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.yield_"><code class="name flex">
-<span>def <span class="ident">yield_</span></span>(<span>)</span>
+<span>def <span class="ident">yield_</span></span>(<span>) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, NoneType]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource implement cooperative concurrency. It means a Resource has to
 explicitly make a break for other concurrent tasks to have a chance to
 progress.
 This is what <code>yeild_()</code> does, it forces the Resource to make a break,
-letting other tasks be run on the executor until the IO start progressing
+letting other tasks be run on the thread pool until the IO start progressing
 again.
 :return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def yield_():
+<pre><code class="python">def yield_() -&gt; Resource[R, E, None]:
     &#34;&#34;&#34;
     Resource implement cooperative concurrency. It means a Resource has to
     explicitly make a break for other concurrent tasks to have a chance to
     progress.
     This is what `yeild_()` does, it forces the Resource to make a break,
-    letting other tasks be run on the executor until the IO start progressing
+    letting other tasks be run on the thread pool until the IO start progressing
     again.
     :return:
     &#34;&#34;&#34;
@@ -1101,7 +1145,7 @@ again.
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*rs)</span>
+<span>def <span class="ident">zip</span></span>(<span>*rs: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform a list of Resource into a Resource creating a list
@@ -1114,7 +1158,7 @@ The resources opened are then released.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip(*rs):
+<pre><code class="python">def zip(*rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Transform a list of Resource into a Resource creating a list
     of all resources.
@@ -1129,7 +1173,7 @@ The resources opened are then released.
     else:
         args = rs
 
-    def process(l):
+    def process(l: Result[E, A]):
         close = []
         args = []
         level = 0
@@ -1147,7 +1191,7 @@ The resources opened are then released.
                 level = 2
             else:
                 level = 2
-                error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
+                error = Panic(MatchError(f&#34;{arg} should be a Result &#34;))
 
         if level == 0:
             return io.pure((args, io.sequence(close)))
@@ -1164,7 +1208,7 @@ The resources opened are then released.
 <dl>
 <dt id="raffiot.untyped.resource.Resource"><code class="flex name class">
 <span>class <span class="ident">Resource</span></span>
-<span>(</span><span>create: None)</span>
+<span>(</span><span>create: IO[R, E, Tuple[A, IO[R, Any, Any]]])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Essentially an IO-powered data structure that produces resources of type A,
@@ -1173,14 +1217,15 @@ can fail with errors of type E and read a context of type R.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
-class Resource:
+<pre><code class="python">@final
+@dataclass
+class Resource(Generic[R, E, A]):
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
 
-    create: None
+    create: IO[R, E, Tuple[A, IO[R, Any, Any]]]
     &#34;&#34;&#34;
     IO to create one resource along with the IO for releasing it.
     
@@ -1195,7 +1240,7 @@ class Resource:
         &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
     &#34;&#34;&#34;
 
-    def use(self, fun):
+    def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
         &#34;&#34;&#34;
         Create a resource a:A and use it in fun.
 
@@ -1205,7 +1250,7 @@ class Resource:
         This is the only way to use a resource.
         &#34;&#34;&#34;
 
-        def safe_use(x):
+        def safe_use(x: Tuple[A, IO[R, E, None]]) -&gt; IO[R, E, X]:
             a, close = x
             try:
                 return (
@@ -1218,13 +1263,15 @@ class Resource:
 
         return self.create.flat_map(safe_use)
 
-    def map(self, f):
+    def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Transform the created resource with f if the creation is successful.
         Do nothing otherwise.
         &#34;&#34;&#34;
 
-        def safe_map(x):
+        def safe_map(
+            x: Tuple[A, IO[R, E, None]]
+        ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
             a, close = x
             try:
                 return io.pure((f(a), close))
@@ -1233,17 +1280,21 @@ class Resource:
 
         return Resource(self.create.flat_map(safe_map))
 
-    def flat_map(self, f):
+    def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
         The resource created by the first one (self) can be used to create the second (f).
         &#34;&#34;&#34;
 
-        def safe_flat_map_a(xa):
+        def safe_flat_map_a(
+            xa: Tuple[A, IO[R, E, None]]
+        ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
             a, close_a = xa
             try:
 
-                def safe_flat_map_a2(xa2):
+                def safe_flat_map_a2(
+                    xa2: Tuple[A2, IO[R, Any, None]]
+                ) -&gt; IO[R, E, Tuple[A2, IO[R, Any, None]]]:
                     a2, close_a2 = xa2
                     return io.pure((a2, close_a.attempt().then(close_a2)))
 
@@ -1263,14 +1314,14 @@ class Resource:
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 
-    def then(self, rs):
+    def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
         Chain two Resource.
         The resource created by the first one (self) is dropped.
         &#34;&#34;&#34;
         return self.flat_map(lambda _: rs)
 
-    def zip(self, *rs):
+    def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
         &#34;&#34;&#34;
         Pack a list of resources (including self) into a Resource creating the
         list of all resources.
@@ -1280,7 +1331,9 @@ class Resource:
         &#34;&#34;&#34;
         return zip((self, *rs))
 
-    def ap(self, *arg):
+    def ap(
+        self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
 
@@ -1290,7 +1343,7 @@ class Resource:
         &#34;&#34;&#34;
         return self.zip(*arg).map(lambda l: l[0](*l[1:]))
 
-    def flatten(self):
+    def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Concatenation function on Resource
         &#34;&#34;&#34;
@@ -1298,7 +1351,7 @@ class Resource:
 
     # Reader API
 
-    def contra_map_read(self, f):
+    def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
         &#34;&#34;&#34;
         Transform the context with f.
         Note that f is not from R to R2 but from R2 to R!
@@ -1311,7 +1364,7 @@ class Resource:
 
     # Error API
 
-    def catch(self, handler):
+    def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
@@ -1319,7 +1372,7 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(self.create.catch(lambda e: handler(e).create))
 
-    def map_error(self, f):
+    def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the stored error if the resource creation fails on an error.
         Do nothing otherwise.
@@ -1328,7 +1381,9 @@ class Resource:
 
     # Panic
 
-    def recover(self, handler):
+    def recover(
+        self, handler: Callable[[Exception], Resource[R, E, A]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
@@ -1336,7 +1391,7 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(self.create.recover(lambda p: handler(p).create))
 
-    def map_panic(self, f):
+    def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
         &#34;&#34;&#34;
         Transform the exception stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -1345,10 +1400,10 @@ class Resource:
             self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
         )
 
-    def attempt(self):
+    def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
         &#34;&#34;&#34;
         Transform this Resource that may fail into a Resource
-        that never fails but creates a Result.
+        that never fails but creates a Result[E,A].
 
         - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
         - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
@@ -1370,7 +1425,7 @@ class Resource:
             )
         )
 
-    def finally_(self, rs):
+    def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -1381,7 +1436,9 @@ class Resource:
         &#34;&#34;&#34;
         return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
 
-    def on_failure(self, handler):
+    def on_failure(
+        self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
+    ) -&gt; IO[R, E, A]:
         &#34;&#34;&#34;
         Combined form of catch and recover.
         React to any failure of the resource creation.
@@ -1397,19 +1454,15 @@ class Resource:
                 lambda e: handler(Error(e)),
                 lambda p: handler(Panic(p)),
             )
-        )
-
-    def contra_map_executor(self, f):
-        &#34;&#34;&#34;
-        Change the executor running this IO.
-        :param f:
-        :return:
-        &#34;&#34;&#34;
-        return Resource(self.create.contra_map_executor(f))</code></pre>
+        )</code></pre>
 </details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
 <h3>Class variables</h3>
 <dl>
-<dt id="raffiot.untyped.resource.Resource.create"><code class="name">var <span class="ident">create</span> : NoneType</code></dt>
+<dt id="raffiot.untyped.resource.Resource.create"><code class="name">var <span class="ident">create</span> : <a title="raffiot.io.IO" href="../io.html#raffiot.io.IO">IO</a>[~R, ~E, typing.Tuple[~A, <a title="raffiot.io.IO" href="../io.html#raffiot.io.IO">IO</a>[~R, typing.Any, typing.Any]]]</code></dt>
 <dd>
 <div class="desc"><p>IO to create one resource along with the IO for releasing it.</p>
 <p>On success, this IO must produce a <code>Tuple[A, IO[R,Any,Any]</code>:
@@ -1425,7 +1478,7 @@ release the first value.</p>
 <h3>Methods</h3>
 <dl>
 <dt id="raffiot.untyped.resource.Resource.ap"><code class="name flex">
-<span>def <span class="ident">ap</span></span>(<span>self, *arg)</span>
+<span>def <span class="ident">ap</span></span>(<span>self: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, Callable[[X], A]], *arg: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, X]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Noting functions from [X1,&hellip;,XN] to A: <code>[X1, ..., Xn] -&gt; A</code>.</p>
@@ -1436,7 +1489,9 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ap(self, *arg):
+<pre><code class="python">def ap(
+    self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
 
@@ -1448,11 +1503,11 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.attempt"><code class="name flex">
-<span>def <span class="ident">attempt</span></span>(<span>self)</span>
+<span>def <span class="ident">attempt</span></span>(<span>self) ‑> <a title="raffiot.io.IO" href="../io.html#raffiot.io.IO">IO</a>[~R, typing.Any, <a title="raffiot.result.Result" href="../result.html#raffiot.result.Result">Result</a>[~E, ~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform this Resource that may fail into a Resource
-that never fails but creates a Result.</p>
+that never fails but creates a Result[E,A].</p>
 <ul>
 <li>If self successfully computes a, then <code>self.attempt()</code> successfully computes <code>Ok(a)</code>.</li>
 <li>If self fails on error e, then <code>self.attempt()</code> successfully computes <code>Error(e)</code>.</li>
@@ -1467,10 +1522,10 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def attempt(self):
+<pre><code class="python">def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
     &#34;&#34;&#34;
     Transform this Resource that may fail into a Resource
-    that never fails but creates a Result.
+    that never fails but creates a Result[E,A].
 
     - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
     - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
@@ -1494,7 +1549,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.catch"><code class="name flex">
-<span>def <span class="ident">catch</span></span>(<span>self, handler)</span>
+<span>def <span class="ident">catch</span></span>(<span>self, handler: Callable[[E], <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>React to errors (the except part of a try-except).</p>
@@ -1503,7 +1558,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def catch(self, handler):
+<pre><code class="python">def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
@@ -1512,28 +1567,8 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     return Resource(self.create.catch(lambda e: handler(e).create))</code></pre>
 </details>
 </dd>
-<dt id="raffiot.untyped.resource.Resource.contra_map_executor"><code class="name flex">
-<span>def <span class="ident">contra_map_executor</span></span>(<span>self, f)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Change the executor running this IO.
-:param f:
-:return:</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def contra_map_executor(self, f):
-    &#34;&#34;&#34;
-    Change the executor running this IO.
-    :param f:
-    :return:
-    &#34;&#34;&#34;
-    return Resource(self.create.contra_map_executor(f))</code></pre>
-</details>
-</dd>
 <dt id="raffiot.untyped.resource.Resource.contra_map_read"><code class="name flex">
-<span>def <span class="ident">contra_map_read</span></span>(<span>self, f)</span>
+<span>def <span class="ident">contra_map_read</span></span>(<span>self, f: Callable[[R2], R]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R2, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform the context with f.
@@ -1542,7 +1577,7 @@ Note that f is not from R to R2 but from R2 to R!</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def contra_map_read(self, f):
+<pre><code class="python">def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
     &#34;&#34;&#34;
     Transform the context with f.
     Note that f is not from R to R2 but from R2 to R!
@@ -1555,7 +1590,7 @@ Note that f is not from R to R2 but from R2 to R!</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.finally_"><code class="name flex">
-<span>def <span class="ident">finally_</span></span>(<span>self, rs)</span>
+<span>def <span class="ident">finally_</span></span>(<span>self, rs: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, Any, Any]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>After having computed self, but before returning its result,
@@ -1567,7 +1602,7 @@ its result, like executing a lifted IO.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def finally_(self, rs):
+<pre><code class="python">def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     After having computed self, but before returning its result,
     execute the rs Resource creation.
@@ -1580,7 +1615,7 @@ its result, like executing a lifted IO.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.flat_map"><code class="name flex">
-<span>def <span class="ident">flat_map</span></span>(<span>self, f)</span>
+<span>def <span class="ident">flat_map</span></span>(<span>self, f: Callable[[A], <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A2]]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A2]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Chain two Resource.
@@ -1589,17 +1624,21 @@ The resource created by the first one (self) can be used to create the second (f
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def flat_map(self, f):
+<pre><code class="python">def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
     &#34;&#34;&#34;
     Chain two Resource.
     The resource created by the first one (self) can be used to create the second (f).
     &#34;&#34;&#34;
 
-    def safe_flat_map_a(xa):
+    def safe_flat_map_a(
+        xa: Tuple[A, IO[R, E, None]]
+    ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
         a, close_a = xa
         try:
 
-            def safe_flat_map_a2(xa2):
+            def safe_flat_map_a2(
+                xa2: Tuple[A2, IO[R, Any, None]]
+            ) -&gt; IO[R, E, Tuple[A2, IO[R, Any, None]]]:
                 a2, close_a2 = xa2
                 return io.pure((a2, close_a.attempt().then(close_a2)))
 
@@ -1621,7 +1660,7 @@ The resource created by the first one (self) can be used to create the second (f
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.flatten"><code class="name flex">
-<span>def <span class="ident">flatten</span></span>(<span>self)</span>
+<span>def <span class="ident">flatten</span></span>(<span>self: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Concatenation function on Resource</p></div>
@@ -1629,7 +1668,7 @@ The resource created by the first one (self) can be used to create the second (f
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def flatten(self):
+<pre><code class="python">def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Concatenation function on Resource
     &#34;&#34;&#34;
@@ -1637,7 +1676,7 @@ The resource created by the first one (self) can be used to create the second (f
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.map"><code class="name flex">
-<span>def <span class="ident">map</span></span>(<span>self, f)</span>
+<span>def <span class="ident">map</span></span>(<span>self, f: Callable[[A], A2]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A2]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform the created resource with f if the creation is successful.
@@ -1646,13 +1685,15 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def map(self, f):
+<pre><code class="python">def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
     &#34;&#34;&#34;
     Transform the created resource with f if the creation is successful.
     Do nothing otherwise.
     &#34;&#34;&#34;
 
-    def safe_map(x):
+    def safe_map(
+        x: Tuple[A, IO[R, E, None]]
+    ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
         a, close = x
         try:
             return io.pure((f(a), close))
@@ -1663,7 +1704,7 @@ Do nothing otherwise.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.map_error"><code class="name flex">
-<span>def <span class="ident">map_error</span></span>(<span>self, f)</span>
+<span>def <span class="ident">map_error</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E2, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform the stored error if the resource creation fails on an error.
@@ -1672,7 +1713,7 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def map_error(self, f):
+<pre><code class="python">def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
     &#34;&#34;&#34;
     Transform the stored error if the resource creation fails on an error.
     Do nothing otherwise.
@@ -1681,7 +1722,7 @@ Do nothing otherwise.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.map_panic"><code class="name flex">
-<span>def <span class="ident">map_panic</span></span>(<span>self, f)</span>
+<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E2, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform the exception stored if the computation fails on a panic.
@@ -1690,7 +1731,7 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def map_panic(self, f):
+<pre><code class="python">def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
     &#34;&#34;&#34;
     Transform the exception stored if the computation fails on a panic.
     Do nothing otherwise.
@@ -1701,7 +1742,7 @@ Do nothing otherwise.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.on_failure"><code class="name flex">
-<span>def <span class="ident">on_failure</span></span>(<span>self, handler)</span>
+<span>def <span class="ident">on_failure</span></span>(<span>self, handler: Callable[[Result[E, Any]], IO[R, E, A]]) ‑> <a title="raffiot.io.IO" href="../io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Combined form of catch and recover.
@@ -1716,7 +1757,9 @@ Do nothing if the resource creation is successful.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def on_failure(self, handler):
+<pre><code class="python">def on_failure(
+    self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
+) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Combined form of catch and recover.
     React to any failure of the resource creation.
@@ -1736,7 +1779,7 @@ Do nothing if the resource creation is successful.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.recover"><code class="name flex">
-<span>def <span class="ident">recover</span></span>(<span>self, handler)</span>
+<span>def <span class="ident">recover</span></span>(<span>self, handler: Callable[[Exception], <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
@@ -1745,7 +1788,9 @@ Do nothing if the resource creation is successful.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def recover(self, handler):
+<pre><code class="python">def recover(
+    self, handler: Callable[[Exception], Resource[R, E, A]]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).
 
@@ -1755,7 +1800,7 @@ Do nothing if the resource creation is successful.</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.then"><code class="name flex">
-<span>def <span class="ident">then</span></span>(<span>self, rs)</span>
+<span>def <span class="ident">then</span></span>(<span>self, rs: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A2]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, ~A2]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Chain two Resource.
@@ -1764,7 +1809,7 @@ The resource created by the first one (self) is dropped.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def then(self, rs):
+<pre><code class="python">def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
     &#34;&#34;&#34;
     Chain two Resource.
     The resource created by the first one (self) is dropped.
@@ -1773,7 +1818,7 @@ The resource created by the first one (self) is dropped.</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.use"><code class="name flex">
-<span>def <span class="ident">use</span></span>(<span>self, fun)</span>
+<span>def <span class="ident">use</span></span>(<span>self, fun: Callable[[A], IO[R, E, X]]) ‑> <a title="raffiot.io.IO" href="../io.html#raffiot.io.IO">IO</a>[~R, ~E, ~X]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Create a resource a:A and use it in fun.</p>
@@ -1784,7 +1829,7 @@ its releasing IO). The return value if the result of fun(a).</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def use(self, fun):
+<pre><code class="python">def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
     &#34;&#34;&#34;
     Create a resource a:A and use it in fun.
 
@@ -1794,7 +1839,7 @@ its releasing IO). The return value if the result of fun(a).</p>
     This is the only way to use a resource.
     &#34;&#34;&#34;
 
-    def safe_use(x):
+    def safe_use(x: Tuple[A, IO[R, E, None]]) -&gt; IO[R, E, X]:
         a, close = x
         try:
             return (
@@ -1809,7 +1854,7 @@ its releasing IO). The return value if the result of fun(a).</p>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>self, *rs)</span>
+<span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A], *rs: <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[R, E, A]) ‑> <a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Pack a list of resources (including self) into a Resource creating the
@@ -1820,7 +1865,7 @@ are released then).</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip(self, *rs):
+<pre><code class="python">def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Pack a list of resources (including self) into a Resource creating the
     list of all resources.
@@ -1861,10 +1906,11 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.from_result" href="#raffiot.untyped.resource.from_result">from_result</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_with" href="#raffiot.untyped.resource.from_with">from_with</a></code></li>
 <li><code><a title="raffiot.untyped.resource.lift_io" href="#raffiot.untyped.resource.lift_io">lift_io</a></code></li>
+<li><code><a title="raffiot.untyped.resource.lock" href="#raffiot.untyped.resource.lock">lock</a></code></li>
 <li><code><a title="raffiot.untyped.resource.panic" href="#raffiot.untyped.resource.panic">panic</a></code></li>
 <li><code><a title="raffiot.untyped.resource.pure" href="#raffiot.untyped.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.resource.read" href="#raffiot.untyped.resource.read">read</a></code></li>
-<li><code><a title="raffiot.untyped.resource.read_executor" href="#raffiot.untyped.resource.read_executor">read_executor</a></code></li>
+<li><code><a title="raffiot.untyped.resource.semaphore" href="#raffiot.untyped.resource.semaphore">semaphore</a></code></li>
 <li><code><a title="raffiot.untyped.resource.sleep" href="#raffiot.untyped.resource.sleep">sleep</a></code></li>
 <li><code><a title="raffiot.untyped.resource.sleep_until" href="#raffiot.untyped.resource.sleep_until">sleep_until</a></code></li>
 <li><code><a title="raffiot.untyped.resource.traverse" href="#raffiot.untyped.resource.traverse">traverse</a></code></li>
@@ -1880,7 +1926,6 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.Resource.ap" href="#raffiot.untyped.resource.Resource.ap">ap</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.attempt" href="#raffiot.untyped.resource.Resource.attempt">attempt</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.catch" href="#raffiot.untyped.resource.Resource.catch">catch</a></code></li>
-<li><code><a title="raffiot.untyped.resource.Resource.contra_map_executor" href="#raffiot.untyped.resource.Resource.contra_map_executor">contra_map_executor</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.contra_map_read" href="#raffiot.untyped.resource.Resource.contra_map_read">contra_map_read</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.create" href="#raffiot.untyped.resource.Resource.create">create</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.finally_" href="#raffiot.untyped.resource.Resource.finally_">finally_</a></code></li>

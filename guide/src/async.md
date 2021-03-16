@@ -103,9 +103,10 @@ With *Raffiot*'s `IO` you would write:
 ...   return 3
 
 >>> with Pool(4) as pool: 
-...   f_io : IO[None,None,int] = io.async_(lambda r, exe, k:
-...     exe.submit(lambda:
-...       pool.apply_async(f, callback = lambda r: k(Ok(r))).wait()
+...   f_io : IO[None,None,int] = (
+...     io.async_(
+...       lambda r, k:
+...         pool.apply_async(f, callback = lambda r: k(Ok(r)))
 ...     )
 ...   )
 ... 
@@ -124,25 +125,21 @@ fasync finished and returned 3
 fasync started
 ```
 
-Note that we call `.wait()` on the `AsyncResult` from `apply_async`.
-But the call is still asynchronous because we start a
-[Future](https://docs.python.org/3/library/concurrent.futures.html)
-with `exe.submit`. The reason is *Raffiot* rely on Python's futures
-for task scheduling and does not directly support `AsyncResult` yet.
-
-**Very important**: when you use `async_`, you must always
-**return a `Future`** and always **call the callback exactly once**
-(no more, no less).
-
-## `run` : the second argument.
+## `run` : the second and third argument.
 
 An `IO` is executed on a pool of threads. Until now we only gave `io.run`
-one argument: the context. But `io.run` accepts two argument! The second
-one is the number of threads in the pool.
+one argument: the context. But `io.run` accepts three arguments! The second
+one is the number of threads in the pool and the third one is how long a thread
+goes to sleep when idle.
 
-Note that every time an `IO` calls `time.sleep` it blocks its thread
-and one thread is dedicated to the runtime system. So be sure to use
-enough threads to keep your CPU busy.
+The number of threads in the pool is fixed so you should never call a blocking
+function inside one of the pool's thread. Create a new thread and run the
+blocking operation inside using `async_`.
+
+When one of thread has no fibers to run, it call `time.sleep` to avoid wasting
+precious CPU cycles doing nothing. The third parameter of `run` is the amount of
+time an idle thread sleeps (a `float` of the number of seconds to sleep). 
+
 Because of the infamous Python's
 [Global Interpreter Lock](https://wiki.python.org/moin/GlobalInterpreterLock)
 Python can not run thread in parallel.
@@ -312,27 +309,3 @@ Ok(success=None)
 Calling `io.sleep_until` with an epoch in the past does nothing.
 The `IO` is guaranteed to be paused until the epoch you requested is reached but
 it can sleep longer! Especially when threads are busy.
-
-## `read_executor` : getting the executor
-
-The function `io.read_executor` returns the executor on which the
-current `IO` runs.
-
-```python
->>> main : IO[None,None,None] = io.read_executor().map(lambda exe: exe.submit(print,"Hello World!"))
-Hello World!
-Ok(success=<Future at 0x7f7eaa3fb1f0 state=finished returned NoneType>)
-```
-
-## `contra_map_executor` : changing the executor
-
-You may sometimes want to change the executor running the current `IO`.
-For example you may want a long task to be executed on a different
-thread pool:
-
-```python
->>> from concurrent.futures import ThreadPoolExecutor
->>> with ThreadPoolExecutor() as executor2:
-...   io.pure(18).contra_map_executor(lambda _: executor2).run(None)
-Ok(success=18)
-```

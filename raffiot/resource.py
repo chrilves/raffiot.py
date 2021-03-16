@@ -6,24 +6,16 @@ Ensure that create resources are always nicely released after use.
 from __future__ import annotations
 
 from collections import abc
-from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 
 from typing_extensions import final
 
-from raffiot import io, _MatchError
+from raffiot import _runtime
+from raffiot import io, MatchError
+from raffiot._internal import IOTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
-import __internal
-
-R = TypeVar("R")
-E = TypeVar("E")
-A = TypeVar("A")
-X = TypeVar("X")
-R2 = TypeVar("R2")
-E2 = TypeVar("E2")
-A2 = TypeVar("A2")
 
 __all__ = [
     "Resource",
@@ -45,10 +37,20 @@ __all__ = [
     "traverse",
     "yield_",
     "async_",
-    "read_executor",
     "sleep_until",
     "sleep",
+    "lock",
+    "semaphore",
 ]
+
+
+R = TypeVar("R")
+E = TypeVar("E")
+A = TypeVar("A")
+X = TypeVar("X")
+R2 = TypeVar("R2")
+E2 = TypeVar("E2")
+A2 = TypeVar("A2")
 
 
 @final
@@ -290,16 +292,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    def contra_map_executor(
-        self, f: Callable[[Executor], Executor]
-    ) -> Resource[R, E, A]:
-        """
-        Change the executor running this IO.
-        :param f:
-        :return:
-        """
-        return Resource(self.create.contra_map_executor(f))
-
 
 def lift_io(mio: IO[R, E, A]) -> Resource[R, E, A]:
     """
@@ -481,7 +473,7 @@ def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
                 level = 2
             else:
                 level = 2
-                error = Panic(_MatchError(f"{arg} should be a Result "))
+                error = Panic(MatchError(f"{arg} should be a Result "))
 
         if level == 0:
             return io.pure((args, io.sequence(close)))
@@ -514,7 +506,7 @@ def yield_() -> Resource[R, E, None]:
     explicitly make a break for other concurrent tasks to have a chance to
     progress.
     This is what `yeild_()` does, it forces the Resource to make a break,
-    letting other tasks be run on the executor until the IO start progressing
+    letting other tasks be run on the thread pool until the IO start progressing
     again.
     :return:
     """
@@ -522,24 +514,19 @@ def yield_() -> Resource[R, E, None]:
 
 
 def async_(
-    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
 ) -> Resource[E, R, A]:
     """
     Perform an Asynchronous call. `f` is a function of the form:
 
-    >>> from concurrent.futures import Executor, Future
     >>> def f(context: E,
-    >>>       executor: Executor,
     >>>       callback: Callable[[Result[E,A]], None],
     >>>       *args,
-    >>>       **kwargs) -> Future:
+    >>>       **kwargs) -> None:
     >>>     ...
 
-    - `f` **MUST** return a `Future`.
     - `context` is the context of the Resource, usually the one passed to `run`
        if not changed by `contra_map_read`.
-    - `executor` is the `Executor` where the Resource is run, usually the one
-       passed to run if not changed by `contra_map_executor`.
     - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
        Until `callback` is called, the Resource will be suspended waiting for the
        asynchronous call to complete.
@@ -554,22 +541,12 @@ def async_(
 
     >>> from raffiot.result import Ok
     >>> from raffiot.io import async_
-    >>> def f(context, executor, callback):
-    >>>     def h():
-    >>>         print("In the asynchronous call, returning 2.")
-    >>>         callback(Ok(2))
-    >>>     return executor.submit(h)
+    >>> def f(context, callback):
+    >>>     print("In the asynchronous call, returning 2.")
+    >>>     callback(Ok(2))
     >>> resource = async_(f)
     """
     return lift_io(io.async_(f, *args, **kwargs))
-
-
-def read_executor() -> Resource[R, E, Executor]:
-    """
-    Return the executor running this IO.
-    :return:
-    """
-    return lift_io(io.read_executor())
 
 
 def sleep_until(epoch_in_seconds: float) -> Resource[R, E, None]:
@@ -597,9 +574,16 @@ def sleep(seconds: float) -> Resource[R, E, None]:
 
 
 def lock() -> Resource[None, None, None]:
-    new_lock = __internal.Lock()
-    return Resource(IO(__internal.IOTag.LOCK, new_lock).then(io.pure((None, io.defer(new_lock.release)))))
+    new_lock = _runtime.Lock()
+    return Resource(
+        IO(IOTag.ACQUIRE, new_lock).then(io.pure((None, IO(IOTag.RELEASE, new_lock))))
+    )
+
 
 def semaphore(tokens: int) -> Resource[None, None, None]:
-    new_semaphore = __internal.Semaphore(tokens)
-    return Resource(IO(__internal.IOTag.LOCK, new_semaphore).then(io.pure((None, io.defer(new_semaphore.release)))))
+    new_semaphore = _runtime.Semaphore(tokens)
+    return Resource(
+        IO(IOTag.ACQUIRE, new_semaphore).then(
+            io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+        )
+    )

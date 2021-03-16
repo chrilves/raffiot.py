@@ -15,14 +15,16 @@ from raffiot.resource import Resource
 from collections import abc
 from abc import ABC
 
-A = TypeVar("A")
-B = TypeVar("B")
 
 __all__ = [
     "Val",
     "Var",
     "sequence",
 ]
+
+
+A = TypeVar("A")
+B = TypeVar("B")
 
 
 @dataclass

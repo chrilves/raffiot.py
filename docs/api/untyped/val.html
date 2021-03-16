@@ -36,10 +36,12 @@ Python forbids local variables and
 
 from __future__ import annotations
 
+from typing_extensions import final
 from dataclasses import dataclass
-from raffiot.untyped import io, resource
-from raffiot.untyped.io import IO
-from raffiot.untyped.resource import Resource
+from typing import Generic, TypeVar, Callable, List, Any
+from raffiot import io, resource
+from raffiot.io import IO
+from raffiot.resource import Resource
 from collections import abc
 from abc import ABC
 
@@ -51,39 +53,46 @@ __all__ = [
 ]
 
 
-@dataclass
-class Val:
-    value: None
+A = TypeVar(&#34;A&#34;)
+B = TypeVar(&#34;B&#34;)
 
-    def get(self):
+
+@dataclass
+class Val(Generic[A]):
+    value: A
+
+    @final
+    def get(self) -&gt; A:
         return self.value
 
-    def get_io(self):
+    @final
+    def get_io(self) -&gt; IO[None, None, A]:
         return io.defer(self.get)
 
-    def get_rs(self):
+    @final
+    def get_rs(self) -&gt; Resource[None, None, A]:
         return resource.defer(self.get)
 
     @classmethod
-    def pure(cls, a):
+    def pure(cls, a: A) -&gt; Val[A]:
         return Val(a)
 
-    def map(self, f):
+    def map(self, f: Callable[[A], B]) -&gt; Val[B]:
         return Val(f(self.value))
 
-    def flat_map(self, f):
+    def flat_map(self, f: Callable[[A], Val[B]]) -&gt; Val[B]:
         return f(self.value)
 
     @classmethod
-    def zip(cls, *vals):
+    def zip(cls, *vals: Any) -&gt; Val[List[A]]:
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
         return Val([x.value for x in vals])
 
-    def zip_with(self, *vals):
+    def zip_with(self, *vals: Any) -&gt; Val[List[A]]:
         return Val.zip(self, *vals)
 
-    def ap(self, *arg):
+    def ap(self, *arg: Val[A]) -&gt; Val[B]:
         if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
             l = [x.value for x in arg[0]]
         else:
@@ -91,41 +100,42 @@ class Val:
         return Val(self.value(*l))
 
 
+@final
 @dataclass
-class Var(Val):
-    value: None
+class Var(Val[A]):
+    value: A
 
-    def set(self, v):
+    def set(self, v: A) -&gt; A:
         old = self.value
         self.value = v
         return old
 
-    def set_io(self, v):
+    def set_io(self, v: A) -&gt; IO[None, None, None]:
         return io.defer(self.set, v)
 
-    def set_rs(self, v):
+    def set_rs(self, v: A) -&gt; Resource[None, None, None]:
         return resource.defer(self.set, v)
 
     @classmethod
-    def pure(cls, a):
+    def pure(cls, a: A) -&gt; Var[A]:
         return Var(a)
 
-    def map(self, f):
+    def map(self, f: Callable[[A], B]) -&gt; Var[B]:
         return Var(f(self.value))
 
-    def flat_map(self, f):
+    def flat_map(self, f: Callable[[A], Var[B]]) -&gt; Var[B]:
         return f(self.value)
 
     @classmethod
-    def zip(cls, *vars):
+    def zip(cls, *vars: Any) -&gt; Val[List[A]]:
         if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
             return Var([x.value for x in vars[0]])
         return Var([x.value for x in vars])
 
-    def zip_with(self, *vars):
+    def zip_with(self, *vars: Any) -&gt; Val[List[A]]:
         return Var.zip(self, *vars)
 
-    def ap(self, *arg):
+    def ap(self, *arg: Any) -&gt; Val[B]:
         if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
             l = [x.value for x in arg[0]]
         else:
@@ -133,7 +143,7 @@ class Var(Val):
         return Var(self.value(*l))
 
 
-def sequence(*a):
+def sequence(*a: Any) -&gt; Any:
     if len(a) == 1 and isinstance(a[0], abc.Iterable):
         return a[0][-1]
     return a[-1]</code></pre>
@@ -147,7 +157,7 @@ def sequence(*a):
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="raffiot.untyped.val.sequence"><code class="name flex">
-<span>def <span class="ident">sequence</span></span>(<span>*a)</span>
+<span>def <span class="ident">sequence</span></span>(<span>*a: Any) ‑> Any</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -155,7 +165,7 @@ def sequence(*a):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def sequence(*a):
+<pre><code class="python">def sequence(*a: Any) -&gt; Any:
     if len(a) == 1 and isinstance(a[0], abc.Iterable):
         return a[0][-1]
     return a[-1]</code></pre>
@@ -168,60 +178,67 @@ def sequence(*a):
 <dl>
 <dt id="raffiot.untyped.val.Val"><code class="flex name class">
 <span>class <span class="ident">Val</span></span>
-<span>(</span><span>value: None)</span>
+<span>(</span><span>value: A)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Val(value: 'None')</p></div>
+<div class="desc"><p>Val(value: 'A')</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@dataclass
-class Val:
-    value: None
+class Val(Generic[A]):
+    value: A
 
-    def get(self):
+    @final
+    def get(self) -&gt; A:
         return self.value
 
-    def get_io(self):
+    @final
+    def get_io(self) -&gt; IO[None, None, A]:
         return io.defer(self.get)
 
-    def get_rs(self):
+    @final
+    def get_rs(self) -&gt; Resource[None, None, A]:
         return resource.defer(self.get)
 
     @classmethod
-    def pure(cls, a):
+    def pure(cls, a: A) -&gt; Val[A]:
         return Val(a)
 
-    def map(self, f):
+    def map(self, f: Callable[[A], B]) -&gt; Val[B]:
         return Val(f(self.value))
 
-    def flat_map(self, f):
+    def flat_map(self, f: Callable[[A], Val[B]]) -&gt; Val[B]:
         return f(self.value)
 
     @classmethod
-    def zip(cls, *vals):
+    def zip(cls, *vals: Any) -&gt; Val[List[A]]:
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
         return Val([x.value for x in vals])
 
-    def zip_with(self, *vals):
+    def zip_with(self, *vals: Any) -&gt; Val[List[A]]:
         return Val.zip(self, *vals)
 
-    def ap(self, *arg):
+    def ap(self, *arg: Val[A]) -&gt; Val[B]:
         if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
         return Val(self.value(*l))</code></pre>
 </details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
 <h3>Subclasses</h3>
 <ul class="hlist">
 <li><a title="raffiot.untyped.val.Var" href="#raffiot.untyped.val.Var">Var</a></li>
 </ul>
 <h3>Class variables</h3>
 <dl>
-<dt id="raffiot.untyped.val.Val.value"><code class="name">var <span class="ident">value</span> : NoneType</code></dt>
+<dt id="raffiot.untyped.val.Val.value"><code class="name">var <span class="ident">value</span> : ~A</code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -229,7 +246,7 @@ class Val:
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.untyped.val.Val.pure"><code class="name flex">
-<span>def <span class="ident">pure</span></span>(<span>a)</span>
+<span>def <span class="ident">pure</span></span>(<span>a: A) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[~A]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -238,12 +255,12 @@ class Val:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def pure(cls, a):
+def pure(cls, a: A) -&gt; Val[A]:
     return Val(a)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*vals)</span>
+<span>def <span class="ident">zip</span></span>(<span>*vals: Any) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -252,7 +269,7 @@ def pure(cls, a):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def zip(cls, *vals):
+def zip(cls, *vals: Any) -&gt; Val[List[A]]:
     if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
         return Val([x.value for x in vals[0]])
     return Val([x.value for x in vals])</code></pre>
@@ -262,7 +279,7 @@ def zip(cls, *vals):
 <h3>Methods</h3>
 <dl>
 <dt id="raffiot.untyped.val.Val.ap"><code class="name flex">
-<span>def <span class="ident">ap</span></span>(<span>self, *arg)</span>
+<span>def <span class="ident">ap</span></span>(<span>self, *arg: <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[A]) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[~B]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -270,7 +287,7 @@ def zip(cls, *vals):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ap(self, *arg):
+<pre><code class="python">def ap(self, *arg: Val[A]) -&gt; Val[B]:
     if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
         l = [x.value for x in arg[0]]
     else:
@@ -279,7 +296,7 @@ def zip(cls, *vals):
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.flat_map"><code class="name flex">
-<span>def <span class="ident">flat_map</span></span>(<span>self, f)</span>
+<span>def <span class="ident">flat_map</span></span>(<span>self, f: Callable[[A], <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[B]]) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[~B]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -287,12 +304,12 @@ def zip(cls, *vals):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def flat_map(self, f):
+<pre><code class="python">def flat_map(self, f: Callable[[A], Val[B]]) -&gt; Val[B]:
     return f(self.value)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.get"><code class="name flex">
-<span>def <span class="ident">get</span></span>(<span>self)</span>
+<span>def <span class="ident">get</span></span>(<span>self) ‑> ~A</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -300,12 +317,13 @@ def zip(cls, *vals):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get(self):
+<pre><code class="python">@final
+def get(self) -&gt; A:
     return self.value</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.get_io"><code class="name flex">
-<span>def <span class="ident">get_io</span></span>(<span>self)</span>
+<span>def <span class="ident">get_io</span></span>(<span>self) ‑> <a title="raffiot.io.IO" href="../io.html#raffiot.io.IO">IO</a>[NoneType, NoneType, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -313,12 +331,13 @@ def zip(cls, *vals):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_io(self):
+<pre><code class="python">@final
+def get_io(self) -&gt; IO[None, None, A]:
     return io.defer(self.get)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.get_rs"><code class="name flex">
-<span>def <span class="ident">get_rs</span></span>(<span>self)</span>
+<span>def <span class="ident">get_rs</span></span>(<span>self) ‑> <a title="raffiot.resource.Resource" href="../resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -326,12 +345,13 @@ def zip(cls, *vals):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_rs(self):
+<pre><code class="python">@final
+def get_rs(self) -&gt; Resource[None, None, A]:
     return resource.defer(self.get)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.map"><code class="name flex">
-<span>def <span class="ident">map</span></span>(<span>self, f)</span>
+<span>def <span class="ident">map</span></span>(<span>self, f: Callable[[A], B]) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[~B]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -339,12 +359,12 @@ def zip(cls, *vals):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def map(self, f):
+<pre><code class="python">def map(self, f: Callable[[A], B]) -&gt; Val[B]:
     return Val(f(self.value))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.zip_with"><code class="name flex">
-<span>def <span class="ident">zip_with</span></span>(<span>self, *vals)</span>
+<span>def <span class="ident">zip_with</span></span>(<span>self, *vals: Any) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -352,7 +372,7 @@ def zip(cls, *vals):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip_with(self, *vals):
+<pre><code class="python">def zip_with(self, *vals: Any) -&gt; Val[List[A]]:
     return Val.zip(self, *vals)</code></pre>
 </details>
 </dd>
@@ -360,49 +380,50 @@ def zip(cls, *vals):
 </dd>
 <dt id="raffiot.untyped.val.Var"><code class="flex name class">
 <span>class <span class="ident">Var</span></span>
-<span>(</span><span>value: None)</span>
+<span>(</span><span>value: A)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Var(value: 'None')</p></div>
+<div class="desc"><p>Var(value: 'A')</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
-class Var(Val):
-    value: None
+<pre><code class="python">@final
+@dataclass
+class Var(Val[A]):
+    value: A
 
-    def set(self, v):
+    def set(self, v: A) -&gt; A:
         old = self.value
         self.value = v
         return old
 
-    def set_io(self, v):
+    def set_io(self, v: A) -&gt; IO[None, None, None]:
         return io.defer(self.set, v)
 
-    def set_rs(self, v):
+    def set_rs(self, v: A) -&gt; Resource[None, None, None]:
         return resource.defer(self.set, v)
 
     @classmethod
-    def pure(cls, a):
+    def pure(cls, a: A) -&gt; Var[A]:
         return Var(a)
 
-    def map(self, f):
+    def map(self, f: Callable[[A], B]) -&gt; Var[B]:
         return Var(f(self.value))
 
-    def flat_map(self, f):
+    def flat_map(self, f: Callable[[A], Var[B]]) -&gt; Var[B]:
         return f(self.value)
 
     @classmethod
-    def zip(cls, *vars):
+    def zip(cls, *vars: Any) -&gt; Val[List[A]]:
         if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
             return Var([x.value for x in vars[0]])
         return Var([x.value for x in vars])
 
-    def zip_with(self, *vars):
+    def zip_with(self, *vars: Any) -&gt; Val[List[A]]:
         return Var.zip(self, *vars)
 
-    def ap(self, *arg):
+    def ap(self, *arg: Any) -&gt; Val[B]:
         if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
             l = [x.value for x in arg[0]]
         else:
@@ -412,10 +433,11 @@ class Var(Val):
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li><a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a></li>
+<li>typing.Generic</li>
 </ul>
 <h3>Class variables</h3>
 <dl>
-<dt id="raffiot.untyped.val.Var.value"><code class="name">var <span class="ident">value</span> : NoneType</code></dt>
+<dt id="raffiot.untyped.val.Var.value"><code class="name">var <span class="ident">value</span> : ~A</code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -423,7 +445,7 @@ class Var(Val):
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.untyped.val.Var.pure"><code class="name flex">
-<span>def <span class="ident">pure</span></span>(<span>a)</span>
+<span>def <span class="ident">pure</span></span>(<span>a: A) ‑> <a title="raffiot.untyped.val.Var" href="#raffiot.untyped.val.Var">Var</a>[~A]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -432,12 +454,12 @@ class Var(Val):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def pure(cls, a):
+def pure(cls, a: A) -&gt; Var[A]:
     return Var(a)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Var.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*vars)</span>
+<span>def <span class="ident">zip</span></span>(<span>*vars: Any) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -446,7 +468,7 @@ def pure(cls, a):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def zip(cls, *vars):
+def zip(cls, *vars: Any) -&gt; Val[List[A]]:
     if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
         return Var([x.value for x in vars[0]])
     return Var([x.value for x in vars])</code></pre>
@@ -456,7 +478,7 @@ def zip(cls, *vars):
 <h3>Methods</h3>
 <dl>
 <dt id="raffiot.untyped.val.Var.ap"><code class="name flex">
-<span>def <span class="ident">ap</span></span>(<span>self, *arg)</span>
+<span>def <span class="ident">ap</span></span>(<span>self, *arg: Any) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[~B]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -464,7 +486,7 @@ def zip(cls, *vars):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def ap(self, *arg):
+<pre><code class="python">def ap(self, *arg: Any) -&gt; Val[B]:
     if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
         l = [x.value for x in arg[0]]
     else:
@@ -473,7 +495,7 @@ def zip(cls, *vars):
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Var.flat_map"><code class="name flex">
-<span>def <span class="ident">flat_map</span></span>(<span>self, f)</span>
+<span>def <span class="ident">flat_map</span></span>(<span>self, f: Callable[[A], <a title="raffiot.untyped.val.Var" href="#raffiot.untyped.val.Var">Var</a>[B]]) ‑> <a title="raffiot.untyped.val.Var" href="#raffiot.untyped.val.Var">Var</a>[~B]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -481,12 +503,12 @@ def zip(cls, *vars):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def flat_map(self, f):
+<pre><code class="python">def flat_map(self, f: Callable[[A], Var[B]]) -&gt; Var[B]:
     return f(self.value)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Var.map"><code class="name flex">
-<span>def <span class="ident">map</span></span>(<span>self, f)</span>
+<span>def <span class="ident">map</span></span>(<span>self, f: Callable[[A], B]) ‑> <a title="raffiot.untyped.val.Var" href="#raffiot.untyped.val.Var">Var</a>[~B]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -494,12 +516,12 @@ def zip(cls, *vars):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def map(self, f):
+<pre><code class="python">def map(self, f: Callable[[A], B]) -&gt; Var[B]:
     return Var(f(self.value))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Var.set"><code class="name flex">
-<span>def <span class="ident">set</span></span>(<span>self, v)</span>
+<span>def <span class="ident">set</span></span>(<span>self, v: A) ‑> ~A</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -507,14 +529,14 @@ def zip(cls, *vars):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def set(self, v):
+<pre><code class="python">def set(self, v: A) -&gt; A:
     old = self.value
     self.value = v
     return old</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Var.set_io"><code class="name flex">
-<span>def <span class="ident">set_io</span></span>(<span>self, v)</span>
+<span>def <span class="ident">set_io</span></span>(<span>self, v: A) ‑> <a title="raffiot.io.IO" href="../io.html#raffiot.io.IO">IO</a>[NoneType, NoneType, NoneType]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -522,12 +544,12 @@ def zip(cls, *vars):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def set_io(self, v):
+<pre><code class="python">def set_io(self, v: A) -&gt; IO[None, None, None]:
     return io.defer(self.set, v)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Var.set_rs"><code class="name flex">
-<span>def <span class="ident">set_rs</span></span>(<span>self, v)</span>
+<span>def <span class="ident">set_rs</span></span>(<span>self, v: A) ‑> <a title="raffiot.resource.Resource" href="../resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, NoneType]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -535,12 +557,12 @@ def zip(cls, *vars):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def set_rs(self, v):
+<pre><code class="python">def set_rs(self, v: A) -&gt; Resource[None, None, None]:
     return resource.defer(self.set, v)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Var.zip_with"><code class="name flex">
-<span>def <span class="ident">zip_with</span></span>(<span>self, *vars)</span>
+<span>def <span class="ident">zip_with</span></span>(<span>self, *vars: Any) ‑> <a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>[typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -548,7 +570,7 @@ def zip(cls, *vars):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip_with(self, *vars):
+<pre><code class="python">def zip_with(self, *vars: Any) -&gt; Val[List[A]]:
     return Var.zip(self, *vars)</code></pre>
 </details>
 </dd>

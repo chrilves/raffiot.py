@@ -4,7 +4,7 @@ from unittest import TestCase
 import hypothesis.strategies as st
 from hypothesis import given
 
-from raffiot import _MatchError
+from raffiot import MatchError
 from raffiot.result import *
 
 
@@ -46,4 +46,4 @@ class TestResult(TestCase):
 
     @given(st.text(), st.text())
     def test_zip_panic(self, i: str, j: str) -> None:
-        assert zip(error(i), panic(_MatchError(j))) == panic(_MatchError(j))
+        assert zip(error(i), panic(MatchError(j))) == panic(MatchError(j))

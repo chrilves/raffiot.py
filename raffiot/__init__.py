@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 
 __all__ = [
-    "_MatchError",
+    "MatchError",
 ]
 
 
 @dataclass
-class _MatchError(Exception):
+class MatchError(Exception):
     """
     Exception for pattern matching errors (used internally, should NEVER happen).
     """
