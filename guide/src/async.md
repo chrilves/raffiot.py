@@ -1,9 +1,41 @@
-# Asynchronous Computing
+# Asynchronous and Concurrent Programming
 
 For now you know that an `IO` is very nice for stack safety,
 dependency injection, failure management, and code-as-date manipulations.
 There is another big feature `IO` has: simple asynchronous and
 concurrent programming.
+
+### `run` : the second and third argument.
+
+An `IO` is executed on a pool of threads. Until now we only gave `io.run`
+one argument: the context. But `io.run` accepts three arguments! The second
+one is the number of threads in the pool and the third one is how long a thread
+goes to sleep when idle.
+
+The number of threads in the pool is fixed so you should never call a blocking
+function inside one of the pool's thread. Create a new thread and run the
+blocking operation inside using `async_`.
+
+When one of thread has no fibers to run, it call `time.sleep` to avoid wasting
+precious CPU cycles doing nothing. The third parameter of `run` is the amount of
+time an idle thread sleeps (a `float` of the number of seconds to sleep). 
+
+Because of the infamous Python's
+[Global Interpreter Lock](https://wiki.python.org/moin/GlobalInterpreterLock)
+Python can not run thread in parallel.
+So if your code only uses one 100% of a single core,
+this is normal.
+You know the story: Python is single-threaded.
+
+To use *n* thread with an idle time of *idle_time* seconds, just give *n* and
+*idle_time* to `io.run`:
+
+```python
+>>> io.pure(5).run(None, 50, 0.01)
+Ok(success=5)
+```
+
+## Asynchronous Programming
 
 A call to some function is called synchronous when the thread making
 the call actually waits for the call to return a value. This is annoying
@@ -26,7 +58,7 @@ syntax of many languages, including Python, is also such an interface.
 So is *Raffiot*'s `IO`. But unlike the *async/await* syntax, synchronous
 and asynchronous code can be transparently mixed with `IO`.
 
-## `async_` : running something asynchronously
+### `async_` : running something asynchronously
 
 Calling a function `f` usually looks like this:
 
@@ -103,9 +135,10 @@ With *Raffiot*'s `IO` you would write:
 ...   return 3
 
 >>> with Pool(4) as pool: 
-...   f_io : IO[None,None,int] = io.async_(lambda r, exe, k:
-...     exe.submit(lambda:
-...       pool.apply_async(f, callback = lambda r: k(Ok(r))).wait()
+...   f_io : IO[None,None,int] = (
+...     io.async_(
+...       lambda r, k:
+...         pool.apply_async(f, callback = lambda r: k(Ok(r)))
 ...     )
 ...   )
 ... 
@@ -124,40 +157,12 @@ fasync finished and returned 3
 fasync started
 ```
 
-Note that we call `.wait()` on the `AsyncResult` from `apply_async`.
-But the call is still asynchronous because we start a
-[Future](https://docs.python.org/3/library/concurrent.futures.html)
-with `exe.submit`. The reason is *Raffiot* rely on Python's futures
-for task scheduling and does not directly support `AsyncResult` yet.
+## Concurrent Programming
 
-**Very important**: when you use `async_`, you must always
-**return a `Future`** and always **call the callback exactly once**
-(no more, no less).
+Concurrent programming is about running things "in parallel". *Raffiot* can run
+a large number of concurrent computation simply and safely:
 
-## `run` : the second argument.
-
-An `IO` is executed on a pool of threads. Until now we only gave `io.run`
-one argument: the context. But `io.run` accepts two argument! The second
-one is the number of threads in the pool.
-
-Note that every time an `IO` calls `time.sleep` it blocks its thread
-and one thread is dedicated to the runtime system. So be sure to use
-enough threads to keep your CPU busy.
-Because of the infamous Python's
-[Global Interpreter Lock](https://wiki.python.org/moin/GlobalInterpreterLock)
-Python can not run thread in parallel.
-So if your code only uses one 100% of a single core,
-this is normal.
-You know the story: Python is single-threaded.
-
-To use *n* thread, just give *n* to `io.run`:
-
-```python
->>> io.pure(5).run(None, 50)
-Ok(success=5)
-```
-
-## `parallel` : running concurrent tasks
+### `parallel` : running concurrent tasks
 
 The function `io.parallel` runs a list of `IO`s in parallel.
 Remember that because of Python's
@@ -210,7 +215,7 @@ Ok(success=None)
 As you can see, `main` does not wait for the `IO`s running
 in parallel/concurrently to continue its execution.
 
-## `wait` : waiting for concurrent tasks to end
+### `wait` : waiting for concurrent tasks to end
 
 Sometimes you want to wait for a parallel/concurrent computation
 to finish. Remember that parallel/concurrent computation are
@@ -250,7 +255,7 @@ Finished
 Ok(success=None)
 ```
 
-## `yield_` : letting other task progress
+### `yield_` : letting other task progress
 
 Remember that an `IO` runs on a pool of thread.
 There there is more `IO`s to run than the number of threads to run on,
@@ -258,12 +263,12 @@ there is a chance that some `IO` will not get executed.
 An `IO` can explicitly release its thread for a moment to let other
 tasks a chance to progress.
 
-Call `io.yield_()` to release the current thread. The `IO` will make
+Call `io.yield_` to release the current thread. The `IO` will make
 a break and continue its execution later.
 
 ```python
 >>> main : IO[None,None,None] = io.defer(print, "Hello").then(
-...   io.yield_(),
+...   io.yield_,
 ...   io.defer(print, "World!") 
 ... )
 >>> main.run(None)
@@ -272,7 +277,156 @@ World!
 Ok(success=None)
 ```
 
-## `sleep`: making a break
+## Controlling Concurrency
+
+Sometimes you want to prevent some fibers to run concurrently. For example you
+may want to avoid several fibers modifying variables at the same time or
+avoiding too many fibers to access some resources.
+
+### `reentrant_lock`: only one fiber at a time.
+
+The *IO* `reentrant_lock` from package `raffiot.resource` ensures that
+**only one** fiber can run a portion of code **at a time**:
+
+```python
+reentrant_lock: IO[Any, None, Resource[Any, None, None]]
+```
+
+Let's take an example. The class `Shared` represents any class defining mutable
+objects. In our example, calling the `set` method change the object's attribute
+`value`:
+
+```python
+>>> from raffiot import io
+>>> from raffiot.io import IO
+>>> from typing import Any
+>>>
+>>> class Shared:
+...   def __init__(self):
+...     self.value = 0
+...
+...   def get(self) -> int:
+...     return self.value
+... 
+...   def set(self, i: int) -> None:
+...     self.value = i
+...
+>>> shared_object = Shared()
+```
+
+The `increment` *IO* does exactly as its name suggests: it reads the shared
+object attribute `value` using the method `get`, wait for one second and
+set the attribute with `value + 1` using the `set` method:
+
+``` python
+>>> increment: IO[Any,None,None] = (
+...   io.defer(shared_object.get)
+...     .flat_map(lambda value:
+...       io.sleep(1)
+...         .then(io.defer(shared_object.set, value + 1))
+...     )
+... )
+>>> shared_object.get()
+0
+>>> increment.run(None)
+Ok(success=None)
+>>> shared_object.get()
+1
+```
+
+Running `increment` several times concurrently is unsafe:
+
+```python
+>>> shared_object.get()
+1
+>>> io.parallel(increment, increment).run(None)
+Ok(success=...)
+>>> shared_object.get()
+2
+```
+
+Although the `value` was *1* and `increment` has been called twice, its final
+value is *2* instead of the expected *3*. The reason if the issue is they both
+have read the value *1* at the same time, and so both written `value + 1 == 2`
+instead of *3*. We need to prevent one instance of `increment` to run if
+another one is already running. We can do so using `reentrant_lock`:
+
+
+```python
+>>> from raffiot.resource import reentrant_lock
+>>> shared_object.get()
+2
+>>> reentrant_lock.flat_map(lambda lock:
+...   io.parallel(
+...     lock.with_(increment),
+...     lock.with_(increment)
+...   )
+>>> ).run(None)
+Ok(success=[...])
+>>> shared_object.get()
+4
+```
+
+`reentrant_lock` gives us a `lock` which is a `Resource`. The two instances
+of `increment` still runs in parallel, but inside a `lock.with_(an_io)` which
+prevent them from running at the same time. The first instance to take the lock
+forces the second one to wait it releases it.
+
+You will learn more about `Resource` in the section
+[Resource Management](./resources.md), but for now just remember that you can
+prevent some fibers to run concurrently by creating a lock with `reentrant_lock`
+and using `lock.with_` to wrap portion of the code you want to avoid being
+accessed concurrently. The type `Resource` is used to ensure that the lock will
+always be released, even if the computation fails.
+
+Note: every call to `reentrant_lock` gives back a different lock.
+
+Unlike the python equivalent
+[`threading.Lock`](https://docs.python.org/3/library/threading.html#lock-objects),
+*Raffiot*'s locks do not block threads, they only block fibers.
+
+In addition, the these locks are **reentrant**, which means that the fiber that
+have the lock can still acquire it without blocking.
+
+### `semaphore`: limited resource.
+
+The primitive `semaphore`, also from package `raffiot.resource`, is useful to
+simulate limited resources.
+
+Imagine you have to call an API for which it is forbidden to make more than
+*n* concurrent calls, `semaphore` is the way to go:
+
+```python
+semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
+```
+
+The parameter `tokens` is the number of fibers the semaphore will allow to run
+concurrently:
+
+```python
+>>> from raffiot import io
+>>> from raffiot.io import IO
+>>> from typing import Any
+>>>
+>>> from raffiot.resource import semaphore
+>>>
+>>> def fiber(sem, i:int) -> IO[Any, None, None]:
+...   return sem.with_(io.defer(print, f"Fiber {i} running!"))
+>>>
+>>> semaphore(5).flat_map(lambda sem:
+...   io.parallel([fiber(sem, i) for i in range(100)])
+... ).run(None)
+```
+
+Even though there are 100 fibers running concurrently, there will be only 5
+concurrent calls to `print`.
+
+## Time
+
+Time functions enable you to schedule some computations in the future or to
+stop a fiber until a point in time is reached.
+
+### `sleep`: making a break
 
 To pause an `IO` for some time, just call `io.sleep` with the number of seconds
 you want the `IO` paused:
@@ -292,7 +446,7 @@ Calling `io.sleep(0)` does nothing. The `IO` is guaranteed to be paused for at
 least the time you requested, but it may sleep longer! Especially when threads
 are busy.
 
-## `sleep_until`: waking up in the future.
+### `sleep_until`: waking up in the future.
 
 To pause an `IO` until some determined time in the future, call `io.sleep_until`
 with the desired epoch:
@@ -312,27 +466,3 @@ Ok(success=None)
 Calling `io.sleep_until` with an epoch in the past does nothing.
 The `IO` is guaranteed to be paused until the epoch you requested is reached but
 it can sleep longer! Especially when threads are busy.
-
-## `read_executor` : getting the executor
-
-The function `io.read_executor` returns the executor on which the
-current `IO` runs.
-
-```python
->>> main : IO[None,None,None] = io.read_executor().map(lambda exe: exe.submit(print,"Hello World!"))
-Hello World!
-Ok(success=<Future at 0x7f7eaa3fb1f0 state=finished returned NoneType>)
-```
-
-## `contra_map_executor` : changing the executor
-
-You may sometimes want to change the executor running the current `IO`.
-For example you may want a long task to be executed on a different
-thread pool:
-
-```python
->>> from concurrent.futures import ThreadPoolExecutor
->>> with ThreadPoolExecutor() as executor2:
-...   io.pure(18).contra_map_executor(lambda _: executor2).run(None)
-Ok(success=18)
-```

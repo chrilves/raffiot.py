@@ -162,6 +162,8 @@ Panic(exception=Exception('BOOM!'))
 
 If the inner `IO` panics, the string is still released too!
 
+Note: the `with_(an_io)` method is a nice alias for `use(lambda _: an_io)`.
+
 ## `map`, `flat_map`, `defer`, `async_` and others.
 
 `Resource` supports almost the same API as `IO`.

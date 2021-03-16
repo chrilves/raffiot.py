@@ -37,23 +37,16 @@ Ensure that create resources are always nicely released after use.
 from __future__ import annotations
 
 from collections import abc
-from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 
 from typing_extensions import final
 
-from raffiot import io, _MatchError
+from raffiot import _runtime
+from raffiot import io, MatchError
+from raffiot._internal import IOTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
-
-R = TypeVar(&#34;R&#34;)
-E = TypeVar(&#34;E&#34;)
-A = TypeVar(&#34;A&#34;)
-X = TypeVar(&#34;X&#34;)
-R2 = TypeVar(&#34;R2&#34;)
-E2 = TypeVar(&#34;E2&#34;)
-A2 = TypeVar(&#34;A2&#34;)
 
 __all__ = [
     &#34;Resource&#34;,
@@ -75,10 +68,20 @@ __all__ = [
     &#34;traverse&#34;,
     &#34;yield_&#34;,
     &#34;async_&#34;,
-    &#34;read_executor&#34;,
     &#34;sleep_until&#34;,
     &#34;sleep&#34;,
+    &#34;reentrant_lock&#34;,
+    &#34;semaphore&#34;,
 ]
+
+
+R = TypeVar(&#34;R&#34;)
+E = TypeVar(&#34;E&#34;)
+A = TypeVar(&#34;A&#34;)
+X = TypeVar(&#34;X&#34;)
+R2 = TypeVar(&#34;R2&#34;)
+E2 = TypeVar(&#34;E2&#34;)
+A2 = TypeVar(&#34;A2&#34;)
 
 
 @final
@@ -126,6 +129,17 @@ class Resource(Generic[R, E, A]):
                 return close.attempt().then(io.panic(exception))
 
         return self.create.flat_map(safe_use)
+
+    def with_(self, the_io: IO[R, E, X]) -&gt; IO[R, E, X]:
+        &#34;&#34;&#34;
+        Create a resource a:A but does not use it in the IO.
+
+        Once created, the resource a:A is guaranteed to be released (by running
+        its releasing IO). The return value if the result of the_io.
+
+        This is an alias for self.use(lambda _: the_io)
+        &#34;&#34;&#34;
+        return self.use(lambda _: the_io)
 
     def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
@@ -320,16 +334,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    def contra_map_executor(
-        self, f: Callable[[Executor], Executor]
-    ) -&gt; Resource[R, E, A]:
-        &#34;&#34;&#34;
-        Change the executor running this IO.
-        :param f:
-        :return:
-        &#34;&#34;&#34;
-        return Resource(self.create.contra_map_executor(f))
-
 
 def lift_io(mio: IO[R, E, A]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
@@ -396,17 +400,16 @@ def defer_read_resource(
     return Resource(io.defer_read_io(f, *args, **kwargs))
 
 
-def read() -&gt; Resource[R, E, R]:
-    &#34;&#34;&#34;
-    Read the context.
+read: Resource[R, E, R] = lift_io(io.read)
+&#34;&#34;&#34;
+Read the context.
 
-    To execute a computation `IO[R,E,A]`, you need to call the run method with
-    some value r of type R: `io.run(r)`. the `read()` action returns the value r
-    given to run.
+To execute a computation `IO[R,E,A]`, you need to call the run method with
+some value r of type R: `io.run(r)`. the `read` action returns the value r
+given to run.
 
-    Please note that the contra_map_read method can transform this value r.
-    &#34;&#34;&#34;
-    return lift_io(io.read())
+Please note that the contra_map_read method can transform this value r.
+&#34;&#34;&#34;
 
 
 def error(err: E) -&gt; Resource[R, E, A]:
@@ -511,7 +514,7 @@ def zip(*rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
                 level = 2
             else:
                 level = 2
-                error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
+                error = Panic(MatchError(f&#34;{arg} should be a Result &#34;))
 
         if level == 0:
             return io.pure((args, io.sequence(close)))
@@ -538,38 +541,32 @@ def traverse(
     return zip([defer_resource(f, i) for i in l])
 
 
-def yield_() -&gt; Resource[R, E, None]:
-    &#34;&#34;&#34;
-    Resource implement cooperative concurrency. It means a Resource has to
-    explicitly make a break for other concurrent tasks to have a chance to
-    progress.
-    This is what `yeild_()` does, it forces the Resource to make a break,
-    letting other tasks be run on the executor until the IO start progressing
-    again.
-    :return:
-    &#34;&#34;&#34;
-    return lift_io(io.yield_())
+yield_: Resource[R, E, None] = lift_io(io.yield_)
+&#34;&#34;&#34;
+Resource implement cooperative concurrency. It means a Resource has to
+explicitly make a break for other concurrent tasks to have a chance to
+progress.
+This is what `yeild_()` does, it forces the Resource to make a break,
+letting other tasks be run on the thread pool until the IO start progressing
+again.
+:return:
+&#34;&#34;&#34;
 
 
 def async_(
-    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
 ) -&gt; Resource[E, R, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
 
-    &gt;&gt;&gt; from concurrent.futures import Executor, Future
     &gt;&gt;&gt; def f(context: E,
-    &gt;&gt;&gt;       executor: Executor,
     &gt;&gt;&gt;       callback: Callable[[Result[E,A]], None],
     &gt;&gt;&gt;       *args,
-    &gt;&gt;&gt;       **kwargs) -&gt; Future:
+    &gt;&gt;&gt;       **kwargs) -&gt; None:
     &gt;&gt;&gt;     ...
 
-    - `f` **MUST** return a `Future`.
     - `context` is the context of the Resource, usually the one passed to `run`
        if not changed by `contra_map_read`.
-    - `executor` is the `Executor` where the Resource is run, usually the one
-       passed to run if not changed by `contra_map_executor`.
     - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
        Until `callback` is called, the Resource will be suspended waiting for the
        asynchronous call to complete.
@@ -584,22 +581,12 @@ def async_(
 
     &gt;&gt;&gt; from raffiot.result import Ok
     &gt;&gt;&gt; from raffiot.io import async_
-    &gt;&gt;&gt; def f(context, executor, callback):
-    &gt;&gt;&gt;     def h():
-    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
-    &gt;&gt;&gt;         callback(Ok(2))
-    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; def f(context, callback):
+    &gt;&gt;&gt;     print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;     callback(Ok(2))
     &gt;&gt;&gt; resource = async_(f)
     &#34;&#34;&#34;
     return lift_io(io.async_(f, *args, **kwargs))
-
-
-def read_executor() -&gt; Resource[R, E, Executor]:
-    &#34;&#34;&#34;
-    Return the executor running this IO.
-    :return:
-    &#34;&#34;&#34;
-    return lift_io(io.read_executor())
 
 
 def sleep_until(epoch_in_seconds: float) -&gt; Resource[R, E, None]:
@@ -623,35 +610,93 @@ def sleep(seconds: float) -&gt; Resource[R, E, None]:
     :param seconds: the minimum number of seconds to sleep (may be longer)
     :return:
     &#34;&#34;&#34;
-    return lift_io(io.sleep(seconds))</code></pre>
+    return lift_io(io.sleep(seconds))
+
+
+reentrant_lock: IO[Any, None, Resource[Any, None, None]] = io.defer(_runtime.Lock).map(
+    lambda new_lock: Resource(
+        IO(IOTag.ACQUIRE, new_lock).then(io.pure((None, IO(IOTag.RELEASE, new_lock))))
+    )
+)
+&#34;&#34;&#34;
+A reentrant lock.
+
+Only allow one fiber to access this resource concurrently. Reentrant means the fiber having
+the lock can acquire it again without blocking.
+&#34;&#34;&#34;
+
+
+def semaphore(tokens: int) -&gt; IO[Any, None, Resource[Any, None, None]]:
+    &#34;&#34;&#34;
+    Enable `token` concurrent accesses.
+
+    Each use of this resource take a token. While there are still tokens
+    left, the fiber creating the resource is not blocked. But is no tokens
+    left, then the fiber is blocked until one token is available again.
+
+    :param tokens: the number of allowed concurrent access, must be ≥ 1
+    :return:
+    &#34;&#34;&#34;
+
+    def h():
+        new_semaphore = _runtime.Semaphore(tokens)
+        return Resource(
+            IO(IOTag.ACQUIRE, new_semaphore).then(
+                io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+            )
+        )
+
+    return io.defer(h)</code></pre>
 </details>
 </section>
 <section>
 </section>
 <section>
+<h2 class="section-title" id="header-variables">Global variables</h2>
+<dl>
+<dt id="raffiot.resource.read"><code class="name">var <span class="ident">read</span> : <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~R]</code></dt>
+<dd>
+<div class="desc"><p>Read the context.</p>
+<p>To execute a computation <code>IO[R,E,A]</code>, you need to call the run method with
+some value r of type R: <code>io.run(r)</code>. the <code><a title="raffiot.resource.read" href="#raffiot.resource.read">read</a></code> action returns the value r
+given to run.</p>
+<p>Please note that the contra_map_read method can transform this value r.</p></div>
+</dd>
+<dt id="raffiot.resource.reentrant_lock"><code class="name">var <span class="ident">reentrant_lock</span> : <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, NoneType]]</code></dt>
+<dd>
+<div class="desc"><p>A reentrant lock.</p>
+<p>Only allow one fiber to access this resource concurrently. Reentrant means the fiber having
+the lock can acquire it again without blocking.</p></div>
+</dd>
+<dt id="raffiot.resource.yield_"><code class="name">var <span class="ident">yield_</span> : <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, NoneType]</code></dt>
+<dd>
+<div class="desc"><p>Resource implement cooperative concurrency. It means a Resource has to
+explicitly make a break for other concurrent tasks to have a chance to
+progress.
+This is what <code>yeild_()</code> does, it forces the Resource to make a break,
+letting other tasks be run on the thread pool until the IO start progressing
+again.
+:return:</p></div>
+</dd>
+</dl>
 </section>
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="raffiot.resource.async_"><code class="name flex">
-<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~E, ~R, ~A]</span>
+<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~E, ~R, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Perform an Asynchronous call. <code>f</code> is a function of the form:</p>
-<pre><code class="language-python-repl">&gt;&gt;&gt; from concurrent.futures import Executor, Future
-&gt;&gt;&gt; def f(context: E,
-&gt;&gt;&gt;       executor: Executor,
+<pre><code class="language-python-repl">&gt;&gt;&gt; def f(context: E,
 &gt;&gt;&gt;       callback: Callable[[Result[E,A]], None],
 &gt;&gt;&gt;       *args,
-&gt;&gt;&gt;       **kwargs) -&gt; Future:
+&gt;&gt;&gt;       **kwargs) -&gt; None:
 &gt;&gt;&gt;     ...
 </code></pre>
 <ul>
-<li><code>f</code> <strong>MUST</strong> return a <code>Future</code>.</li>
 <li><code>context</code> is the context of the Resource, usually the one passed to <code>run</code>
 if not changed by <code>contra_map_read</code>.</li>
-<li><code>executor</code> is the <code>Executor</code> where the Resource is run, usually the one
-passed to run if not changed by <code>contra_map_executor</code>.</li>
 <li>
 <p><code>callback</code> <strong>MUST ALWAYS BE CALLED EXACTLY ONCE</strong>.
 Until <code>callback</code> is called, the Resource will be suspended waiting for the
@@ -668,11 +713,9 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <p>For example:</p>
 <pre><code class="language-python-repl">&gt;&gt;&gt; from raffiot.result import Ok
 &gt;&gt;&gt; from raffiot.io import async_
-&gt;&gt;&gt; def f(context, executor, callback):
-&gt;&gt;&gt;     def h():
-&gt;&gt;&gt;         print(&quot;In the asynchronous call, returning 2.&quot;)
-&gt;&gt;&gt;         callback(Ok(2))
-&gt;&gt;&gt;     return executor.submit(h)
+&gt;&gt;&gt; def f(context, callback):
+&gt;&gt;&gt;     print(&quot;In the asynchronous call, returning 2.&quot;)
+&gt;&gt;&gt;     callback(Ok(2))
 &gt;&gt;&gt; resource = async_(f)
 </code></pre></div>
 <details class="source">
@@ -680,24 +723,19 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def async_(
-    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
 ) -&gt; Resource[E, R, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
 
-    &gt;&gt;&gt; from concurrent.futures import Executor, Future
     &gt;&gt;&gt; def f(context: E,
-    &gt;&gt;&gt;       executor: Executor,
     &gt;&gt;&gt;       callback: Callable[[Result[E,A]], None],
     &gt;&gt;&gt;       *args,
-    &gt;&gt;&gt;       **kwargs) -&gt; Future:
+    &gt;&gt;&gt;       **kwargs) -&gt; None:
     &gt;&gt;&gt;     ...
 
-    - `f` **MUST** return a `Future`.
     - `context` is the context of the Resource, usually the one passed to `run`
        if not changed by `contra_map_read`.
-    - `executor` is the `Executor` where the Resource is run, usually the one
-       passed to run if not changed by `contra_map_executor`.
     - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
        Until `callback` is called, the Resource will be suspended waiting for the
        asynchronous call to complete.
@@ -712,11 +750,9 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 
     &gt;&gt;&gt; from raffiot.result import Ok
     &gt;&gt;&gt; from raffiot.io import async_
-    &gt;&gt;&gt; def f(context, executor, callback):
-    &gt;&gt;&gt;     def h():
-    &gt;&gt;&gt;         print(&#34;In the asynchronous call, returning 2.&#34;)
-    &gt;&gt;&gt;         callback(Ok(2))
-    &gt;&gt;&gt;     return executor.submit(h)
+    &gt;&gt;&gt; def f(context, callback):
+    &gt;&gt;&gt;     print(&#34;In the asynchronous call, returning 2.&#34;)
+    &gt;&gt;&gt;     callback(Ok(2))
     &gt;&gt;&gt; resource = async_(f)
     &#34;&#34;&#34;
     return lift_io(io.async_(f, *args, **kwargs))</code></pre>
@@ -995,48 +1031,41 @@ The releasing IO does nothing.</p></div>
     return Resource(io.pure((a, io.pure(None))))</code></pre>
 </details>
 </dd>
-<dt id="raffiot.resource.read"><code class="name flex">
-<span>def <span class="ident">read</span></span>(<span>) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~R]</span>
+<dt id="raffiot.resource.semaphore"><code class="name flex">
+<span>def <span class="ident">semaphore</span></span>(<span>tokens: int) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, NoneType]]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Read the context.</p>
-<p>To execute a computation <code>IO[R,E,A]</code>, you need to call the run method with
-some value r of type R: <code>io.run(r)</code>. the <code><a title="raffiot.resource.read" href="#raffiot.resource.read">read()</a></code> action returns the value r
-given to run.</p>
-<p>Please note that the contra_map_read method can transform this value r.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def read() -&gt; Resource[R, E, R]:
-    &#34;&#34;&#34;
-    Read the context.
-
-    To execute a computation `IO[R,E,A]`, you need to call the run method with
-    some value r of type R: `io.run(r)`. the `read()` action returns the value r
-    given to run.
-
-    Please note that the contra_map_read method can transform this value r.
-    &#34;&#34;&#34;
-    return lift_io(io.read())</code></pre>
-</details>
-</dd>
-<dt id="raffiot.resource.read_executor"><code class="name flex">
-<span>def <span class="ident">read_executor</span></span>(<span>) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, concurrent.futures._base.Executor]</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Return the executor running this IO.
+<div class="desc"><p>Enable <code>token</code> concurrent accesses.</p>
+<p>Each use of this resource take a token. While there are still tokens
+left, the fiber creating the resource is not blocked. But is no tokens
+left, then the fiber is blocked until one token is available again.</p>
+<p>:param tokens: the number of allowed concurrent access, must be ≥ 1
 :return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def read_executor() -&gt; Resource[R, E, Executor]:
+<pre><code class="python">def semaphore(tokens: int) -&gt; IO[Any, None, Resource[Any, None, None]]:
     &#34;&#34;&#34;
-    Return the executor running this IO.
+    Enable `token` concurrent accesses.
+
+    Each use of this resource take a token. While there are still tokens
+    left, the fiber creating the resource is not blocked. But is no tokens
+    left, then the fiber is blocked until one token is available again.
+
+    :param tokens: the number of allowed concurrent access, must be ≥ 1
     :return:
     &#34;&#34;&#34;
-    return lift_io(io.read_executor())</code></pre>
+
+    def h():
+        new_semaphore = _runtime.Semaphore(tokens)
+        return Resource(
+            IO(IOTag.ACQUIRE, new_semaphore).then(
+                io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+            )
+        )
+
+    return io.defer(h)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.sleep"><code class="name flex">
@@ -1120,34 +1149,6 @@ The resulting Resource creates the list of all the resources.</p>
     return zip([defer_resource(f, i) for i in l])</code></pre>
 </details>
 </dd>
-<dt id="raffiot.resource.yield_"><code class="name flex">
-<span>def <span class="ident">yield_</span></span>(<span>) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, NoneType]</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Resource implement cooperative concurrency. It means a Resource has to
-explicitly make a break for other concurrent tasks to have a chance to
-progress.
-This is what <code>yeild_()</code> does, it forces the Resource to make a break,
-letting other tasks be run on the executor until the IO start progressing
-again.
-:return:</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def yield_() -&gt; Resource[R, E, None]:
-    &#34;&#34;&#34;
-    Resource implement cooperative concurrency. It means a Resource has to
-    explicitly make a break for other concurrent tasks to have a chance to
-    progress.
-    This is what `yeild_()` does, it forces the Resource to make a break,
-    letting other tasks be run on the executor until the IO start progressing
-    again.
-    :return:
-    &#34;&#34;&#34;
-    return lift_io(io.yield_())</code></pre>
-</details>
-</dd>
 <dt id="raffiot.resource.zip"><code class="name flex">
 <span>def <span class="ident">zip</span></span>(<span>*rs: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
 </code></dt>
@@ -1195,7 +1196,7 @@ The resources opened are then released.
                 level = 2
             else:
                 level = 2
-                error = Panic(_MatchError(f&#34;{arg} should be a Result &#34;))
+                error = Panic(MatchError(f&#34;{arg} should be a Result &#34;))
 
         if level == 0:
             return io.pure((args, io.sequence(close)))
@@ -1266,6 +1267,17 @@ class Resource(Generic[R, E, A]):
                 return close.attempt().then(io.panic(exception))
 
         return self.create.flat_map(safe_use)
+
+    def with_(self, the_io: IO[R, E, X]) -&gt; IO[R, E, X]:
+        &#34;&#34;&#34;
+        Create a resource a:A but does not use it in the IO.
+
+        Once created, the resource a:A is guaranteed to be released (by running
+        its releasing IO). The return value if the result of the_io.
+
+        This is an alias for self.use(lambda _: the_io)
+        &#34;&#34;&#34;
+        return self.use(lambda _: the_io)
 
     def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
         &#34;&#34;&#34;
@@ -1458,17 +1470,7 @@ class Resource(Generic[R, E, A]):
                 lambda e: handler(Error(e)),
                 lambda p: handler(Panic(p)),
             )
-        )
-
-    def contra_map_executor(
-        self, f: Callable[[Executor], Executor]
-    ) -&gt; Resource[R, E, A]:
-        &#34;&#34;&#34;
-        Change the executor running this IO.
-        :param f:
-        :return:
-        &#34;&#34;&#34;
-        return Resource(self.create.contra_map_executor(f))</code></pre>
+        )</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -1579,28 +1581,6 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     On error, call the handler with the error.
     &#34;&#34;&#34;
     return Resource(self.create.catch(lambda e: handler(e).create))</code></pre>
-</details>
-</dd>
-<dt id="raffiot.resource.Resource.contra_map_executor"><code class="name flex">
-<span>def <span class="ident">contra_map_executor</span></span>(<span>self, f: Callable[[Executor], Executor]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Change the executor running this IO.
-:param f:
-:return:</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def contra_map_executor(
-    self, f: Callable[[Executor], Executor]
-) -&gt; Resource[R, E, A]:
-    &#34;&#34;&#34;
-    Change the executor running this IO.
-    :param f:
-    :return:
-    &#34;&#34;&#34;
-    return Resource(self.create.contra_map_executor(f))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.contra_map_read"><code class="name flex">
@@ -1889,6 +1869,30 @@ its releasing IO). The return value if the result of fun(a).</p>
     return self.create.flat_map(safe_use)</code></pre>
 </details>
 </dd>
+<dt id="raffiot.resource.Resource.with_"><code class="name flex">
+<span>def <span class="ident">with_</span></span>(<span>self, the_io: IO[R, E, X]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~X]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a resource a:A but does not use it in the IO.</p>
+<p>Once created, the resource a:A is guaranteed to be released (by running
+its releasing IO). The return value if the result of the_io.</p>
+<p>This is an alias for self.use(lambda _: the_io)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def with_(self, the_io: IO[R, E, X]) -&gt; IO[R, E, X]:
+    &#34;&#34;&#34;
+    Create a resource a:A but does not use it in the IO.
+
+    Once created, the resource a:A is guaranteed to be released (by running
+    its releasing IO). The return value if the result of the_io.
+
+    This is an alias for self.use(lambda _: the_io)
+    &#34;&#34;&#34;
+    return self.use(lambda _: the_io)</code></pre>
+</details>
+</dd>
 <dt id="raffiot.resource.Resource.zip"><code class="name flex">
 <span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A], *rs: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
 </code></dt>
@@ -1928,6 +1932,13 @@ are released then).</p></div>
 <li><code><a title="raffiot" href="index.html">raffiot</a></code></li>
 </ul>
 </li>
+<li><h3><a href="#header-variables">Global variables</a></h3>
+<ul class="">
+<li><code><a title="raffiot.resource.read" href="#raffiot.resource.read">read</a></code></li>
+<li><code><a title="raffiot.resource.reentrant_lock" href="#raffiot.resource.reentrant_lock">reentrant_lock</a></code></li>
+<li><code><a title="raffiot.resource.yield_" href="#raffiot.resource.yield_">yield_</a></code></li>
+</ul>
+</li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="two-column">
 <li><code><a title="raffiot.resource.async_" href="#raffiot.resource.async_">async_</a></code></li>
@@ -1944,12 +1955,10 @@ are released then).</p></div>
 <li><code><a title="raffiot.resource.lift_io" href="#raffiot.resource.lift_io">lift_io</a></code></li>
 <li><code><a title="raffiot.resource.panic" href="#raffiot.resource.panic">panic</a></code></li>
 <li><code><a title="raffiot.resource.pure" href="#raffiot.resource.pure">pure</a></code></li>
-<li><code><a title="raffiot.resource.read" href="#raffiot.resource.read">read</a></code></li>
-<li><code><a title="raffiot.resource.read_executor" href="#raffiot.resource.read_executor">read_executor</a></code></li>
+<li><code><a title="raffiot.resource.semaphore" href="#raffiot.resource.semaphore">semaphore</a></code></li>
 <li><code><a title="raffiot.resource.sleep" href="#raffiot.resource.sleep">sleep</a></code></li>
 <li><code><a title="raffiot.resource.sleep_until" href="#raffiot.resource.sleep_until">sleep_until</a></code></li>
 <li><code><a title="raffiot.resource.traverse" href="#raffiot.resource.traverse">traverse</a></code></li>
-<li><code><a title="raffiot.resource.yield_" href="#raffiot.resource.yield_">yield_</a></code></li>
 <li><code><a title="raffiot.resource.zip" href="#raffiot.resource.zip">zip</a></code></li>
 </ul>
 </li>
@@ -1961,7 +1970,6 @@ are released then).</p></div>
 <li><code><a title="raffiot.resource.Resource.ap" href="#raffiot.resource.Resource.ap">ap</a></code></li>
 <li><code><a title="raffiot.resource.Resource.attempt" href="#raffiot.resource.Resource.attempt">attempt</a></code></li>
 <li><code><a title="raffiot.resource.Resource.catch" href="#raffiot.resource.Resource.catch">catch</a></code></li>
-<li><code><a title="raffiot.resource.Resource.contra_map_executor" href="#raffiot.resource.Resource.contra_map_executor">contra_map_executor</a></code></li>
 <li><code><a title="raffiot.resource.Resource.contra_map_read" href="#raffiot.resource.Resource.contra_map_read">contra_map_read</a></code></li>
 <li><code><a title="raffiot.resource.Resource.create" href="#raffiot.resource.Resource.create">create</a></code></li>
 <li><code><a title="raffiot.resource.Resource.finally_" href="#raffiot.resource.Resource.finally_">finally_</a></code></li>
@@ -1974,6 +1982,7 @@ are released then).</p></div>
 <li><code><a title="raffiot.resource.Resource.recover" href="#raffiot.resource.Resource.recover">recover</a></code></li>
 <li><code><a title="raffiot.resource.Resource.then" href="#raffiot.resource.Resource.then">then</a></code></li>
 <li><code><a title="raffiot.resource.Resource.use" href="#raffiot.resource.Resource.use">use</a></code></li>
+<li><code><a title="raffiot.resource.Resource.with_" href="#raffiot.resource.Resource.with_">with_</a></code></li>
 <li><code><a title="raffiot.resource.Resource.zip" href="#raffiot.resource.Resource.zip">zip</a></code></li>
 </ul>
 </li>

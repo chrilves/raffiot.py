@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Asynchronous Computing - RAFFIOT Guide</title>
+        <title>Concurrent Programming - RAFFIOT Guide</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html" class="active"><strong aria-hidden="true">6.</strong> Asynchronous Computing</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html" class="active"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -163,11 +163,34 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="asynchronous-computing"><a class="header" href="#asynchronous-computing">Asynchronous Computing</a></h1>
+                        <h1 id="asynchronous-and-concurrent-programming"><a class="header" href="#asynchronous-and-concurrent-programming">Asynchronous and Concurrent Programming</a></h1>
 <p>For now you know that an <code>IO</code> is very nice for stack safety,
 dependency injection, failure management, and code-as-date manipulations.
 There is another big feature <code>IO</code> has: simple asynchronous and
 concurrent programming.</p>
+<h3 id="run--the-second-and-third-argument"><a class="header" href="#run--the-second-and-third-argument"><code>run</code> : the second and third argument.</a></h3>
+<p>An <code>IO</code> is executed on a pool of threads. Until now we only gave <code>io.run</code>
+one argument: the context. But <code>io.run</code> accepts three arguments! The second
+one is the number of threads in the pool and the third one is how long a thread
+goes to sleep when idle.</p>
+<p>The number of threads in the pool is fixed so you should never call a blocking
+function inside one of the pool's thread. Create a new thread and run the
+blocking operation inside using <code>async_</code>.</p>
+<p>When one of thread has no fibers to run, it call <code>time.sleep</code> to avoid wasting
+precious CPU cycles doing nothing. The third parameter of <code>run</code> is the amount of
+time an idle thread sleeps (a <code>float</code> of the number of seconds to sleep). </p>
+<p>Because of the infamous Python's
+<a href="https://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a>
+Python can not run thread in parallel.
+So if your code only uses one 100% of a single core,
+this is normal.
+You know the story: Python is single-threaded.</p>
+<p>To use <em>n</em> thread with an idle time of <em>idle_time</em> seconds, just give <em>n</em> and
+<em>idle_time</em> to <code>io.run</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; io.pure(5).run(None, 50, 0.01)
+Ok(success=5)
+</code></pre>
+<h2 id="asynchronous-programming"><a class="header" href="#asynchronous-programming">Asynchronous Programming</a></h2>
 <p>A call to some function is called synchronous when the thread making
 the call actually waits for the call to return a value. This is annoying
 because the thread could be used to perform useful computations instead
@@ -185,7 +208,7 @@ of JavaScript is such an interface. The <a href="https://docs.python.org/3/libra
 syntax of many languages, including Python, is also such an interface.
 So is <em>Raffiot</em>'s <code>IO</code>. But unlike the <em>async/await</em> syntax, synchronous
 and asynchronous code can be transparently mixed with <code>IO</code>.</p>
-<h2 id="async_--running-something-asynchronously"><a class="header" href="#async_--running-something-asynchronously"><code>async_</code> : running something asynchronously</a></h2>
+<h3 id="async_--running-something-asynchronously"><a class="header" href="#async_--running-something-asynchronously"><code>async_</code> : running something asynchronously</a></h3>
 <p>Calling a function <code>f</code> usually looks like this:</p>
 <pre><code class="language-python">&gt;&gt;&gt; def f():
 ...   print(&quot;f is running&quot;)
@@ -250,9 +273,10 @@ finishes.</p>
 ...   return 3
 
 &gt;&gt;&gt; with Pool(4) as pool: 
-...   f_io : IO[None,None,int] = io.async_(lambda r, exe, k:
-...     exe.submit(lambda:
-...       pool.apply_async(f, callback = lambda r: k(Ok(r))).wait()
+...   f_io : IO[None,None,int] = (
+...     io.async_(
+...       lambda r, k:
+...         pool.apply_async(f, callback = lambda r: k(Ok(r)))
 ...     )
 ...   )
 ... 
@@ -270,32 +294,10 @@ f is running
 fasync finished and returned 3
 fasync started
 </code></pre>
-<p>Note that we call <code>.wait()</code> on the <code>AsyncResult</code> from <code>apply_async</code>.
-But the call is still asynchronous because we start a
-<a href="https://docs.python.org/3/library/concurrent.futures.html">Future</a>
-with <code>exe.submit</code>. The reason is <em>Raffiot</em> rely on Python's futures
-for task scheduling and does not directly support <code>AsyncResult</code> yet.</p>
-<p><strong>Very important</strong>: when you use <code>async_</code>, you must always
-<strong>return a <code>Future</code></strong> and always <strong>call the callback exactly once</strong>
-(no more, no less).</p>
-<h2 id="run--the-second-argument"><a class="header" href="#run--the-second-argument"><code>run</code> : the second argument.</a></h2>
-<p>An <code>IO</code> is executed on a pool of threads. Until now we only gave <code>io.run</code>
-one argument: the context. But <code>io.run</code> accepts two argument! The second
-one is the number of threads in the pool.</p>
-<p>Note that every time an <code>IO</code> calls <code>time.sleep</code> it blocks its thread
-and one thread is dedicated to the runtime system. So be sure to use
-enough threads to keep your CPU busy.
-Because of the infamous Python's
-<a href="https://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a>
-Python can not run thread in parallel.
-So if your code only uses one 100% of a single core,
-this is normal.
-You know the story: Python is single-threaded.</p>
-<p>To use <em>n</em> thread, just give <em>n</em> to <code>io.run</code>:</p>
-<pre><code class="language-python">&gt;&gt;&gt; io.pure(5).run(None, 50)
-Ok(success=5)
-</code></pre>
-<h2 id="parallel--running-concurrent-tasks"><a class="header" href="#parallel--running-concurrent-tasks"><code>parallel</code> : running concurrent tasks</a></h2>
+<h2 id="concurrent-programming"><a class="header" href="#concurrent-programming">Concurrent Programming</a></h2>
+<p>Concurrent programming is about running things &quot;in parallel&quot;. <em>Raffiot</em> can run
+a large number of concurrent computation simply and safely:</p>
+<h3 id="parallel--running-concurrent-tasks"><a class="header" href="#parallel--running-concurrent-tasks"><code>parallel</code> : running concurrent tasks</a></h3>
 <p>The function <code>io.parallel</code> runs a list of <code>IO</code>s in parallel.
 Remember that because of Python's
 <a href="https://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a>
@@ -339,7 +341,7 @@ Ok(success=None)
 </code></pre>
 <p>As you can see, <code>main</code> does not wait for the <code>IO</code>s running
 in parallel/concurrently to continue its execution.</p>
-<h2 id="wait--waiting-for-concurrent-tasks-to-end"><a class="header" href="#wait--waiting-for-concurrent-tasks-to-end"><code>wait</code> : waiting for concurrent tasks to end</a></h2>
+<h3 id="wait--waiting-for-concurrent-tasks-to-end"><a class="header" href="#wait--waiting-for-concurrent-tasks-to-end"><code>wait</code> : waiting for concurrent tasks to end</a></h3>
 <p>Sometimes you want to wait for a parallel/concurrent computation
 to finish. Remember that parallel/concurrent computation are
 represented by the <em>fibers</em> returned by <code>io.parallel</code>.</p>
@@ -371,16 +373,16 @@ Task 2: End
 Finished
 Ok(success=None)
 </code></pre>
-<h2 id="yield_--letting-other-task-progress"><a class="header" href="#yield_--letting-other-task-progress"><code>yield_</code> : letting other task progress</a></h2>
+<h3 id="yield_--letting-other-task-progress"><a class="header" href="#yield_--letting-other-task-progress"><code>yield_</code> : letting other task progress</a></h3>
 <p>Remember that an <code>IO</code> runs on a pool of thread.
 There there is more <code>IO</code>s to run than the number of threads to run on,
 there is a chance that some <code>IO</code> will not get executed.
 An <code>IO</code> can explicitly release its thread for a moment to let other
 tasks a chance to progress.</p>
-<p>Call <code>io.yield_()</code> to release the current thread. The <code>IO</code> will make
+<p>Call <code>io.yield_</code> to release the current thread. The <code>IO</code> will make
 a break and continue its execution later.</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.defer(print, &quot;Hello&quot;).then(
-...   io.yield_(),
+...   io.yield_,
 ...   io.defer(print, &quot;World!&quot;) 
 ... )
 &gt;&gt;&gt; main.run(None)
@@ -388,7 +390,121 @@ Hello
 World!
 Ok(success=None)
 </code></pre>
-<h2 id="sleep-making-a-break"><a class="header" href="#sleep-making-a-break"><code>sleep</code>: making a break</a></h2>
+<h2 id="controlling-concurrency"><a class="header" href="#controlling-concurrency">Controlling Concurrency</a></h2>
+<p>Sometimes you want to prevent some fibers to run concurrently. For example you
+may want to avoid several fibers modifying variables at the same time or
+avoiding too many fibers to access some resources.</p>
+<h3 id="reentrant_lock-only-one-fiber-at-a-time"><a class="header" href="#reentrant_lock-only-one-fiber-at-a-time"><code>reentrant_lock</code>: only one fiber at a time.</a></h3>
+<p>The <em>IO</em> <code>reentrant_lock</code> from package <code>raffiot.resource</code> ensures that
+<strong>only one</strong> fiber can run a portion of code <strong>at a time</strong>:</p>
+<pre><code class="language-python">reentrant_lock: IO[Any, None, Resource[Any, None, None]]
+</code></pre>
+<p>Let's take an example. The class <code>Shared</code> represents any class defining mutable
+objects. In our example, calling the <code>set</code> method change the object's attribute
+<code>value</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
+&gt;&gt;&gt; from raffiot.io import IO
+&gt;&gt;&gt; from typing import Any
+&gt;&gt;&gt;
+&gt;&gt;&gt; class Shared:
+...   def __init__(self):
+...     self.value = 0
+...
+...   def get(self) -&gt; int:
+...     return self.value
+... 
+...   def set(self, i: int) -&gt; None:
+...     self.value = i
+...
+&gt;&gt;&gt; shared_object = Shared()
+</code></pre>
+<p>The <code>increment</code> <em>IO</em> does exactly as its name suggests: it reads the shared
+object attribute <code>value</code> using the method <code>get</code>, wait for one second and
+set the attribute with <code>value + 1</code> using the <code>set</code> method:</p>
+<pre><code class="language-python">&gt;&gt;&gt; increment: IO[Any,None,None] = (
+...   io.defer(shared_object.get)
+...     .flat_map(lambda value:
+...       io.sleep(1)
+...         .then(io.defer(shared_object.set, value + 1))
+...     )
+... )
+&gt;&gt;&gt; shared_object.get()
+0
+&gt;&gt;&gt; increment.run(None)
+Ok(success=None)
+&gt;&gt;&gt; shared_object.get()
+1
+</code></pre>
+<p>Running <code>increment</code> several times concurrently is unsafe:</p>
+<pre><code class="language-python">&gt;&gt;&gt; shared_object.get()
+1
+&gt;&gt;&gt; io.parallel(increment, increment).run(None)
+Ok(success=...)
+&gt;&gt;&gt; shared_object.get()
+2
+</code></pre>
+<p>Although the <code>value</code> was <em>1</em> and <code>increment</code> has been called twice, its final
+value is <em>2</em> instead of the expected <em>3</em>. The reason if the issue is they both
+have read the value <em>1</em> at the same time, and so both written <code>value + 1 == 2</code>
+instead of <em>3</em>. We need to prevent one instance of <code>increment</code> to run if
+another one is already running. We can do so using <code>reentrant_lock</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot.resource import reentrant_lock
+&gt;&gt;&gt; shared_object.get()
+2
+&gt;&gt;&gt; reentrant_lock.flat_map(lambda lock:
+...   io.parallel(
+...     lock.with_(increment),
+...     lock.with_(increment)
+...   )
+&gt;&gt;&gt; ).run(None)
+Ok(success=[...])
+&gt;&gt;&gt; shared_object.get()
+4
+</code></pre>
+<p><code>reentrant_lock</code> gives us a <code>lock</code> which is a <code>Resource</code>. The two instances
+of <code>increment</code> still runs in parallel, but inside a <code>lock.with_(an_io)</code> which
+prevent them from running at the same time. The first instance to take the lock
+forces the second one to wait it releases it.</p>
+<p>You will learn more about <code>Resource</code> in the section
+<a href="./resources.html">Resource Management</a>, but for now just remember that you can
+prevent some fibers to run concurrently by creating a lock with <code>reentrant_lock</code>
+and using <code>lock.with_</code> to wrap portion of the code you want to avoid being
+accessed concurrently. The type <code>Resource</code> is used to ensure that the lock will
+always be released, even if the computation fails.</p>
+<p>Note: every call to <code>reentrant_lock</code> gives back a different lock.</p>
+<p>Unlike the python equivalent
+<a href="https://docs.python.org/3/library/threading.html#lock-objects"><code>threading.Lock</code></a>,
+<em>Raffiot</em>'s locks do not block threads, they only block fibers.</p>
+<p>In addition, the these locks are <strong>reentrant</strong>, which means that the fiber that
+have the lock can still acquire it without blocking.</p>
+<h3 id="semaphore-limited-resource"><a class="header" href="#semaphore-limited-resource"><code>semaphore</code>: limited resource.</a></h3>
+<p>The primitive <code>semaphore</code>, also from package <code>raffiot.resource</code>, is useful to
+simulate limited resources.</p>
+<p>Imagine you have to call an API for which it is forbidden to make more than
+<em>n</em> concurrent calls, <code>semaphore</code> is the way to go:</p>
+<pre><code class="language-python">semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
+</code></pre>
+<p>The parameter <code>tokens</code> is the number of fibers the semaphore will allow to run
+concurrently:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
+&gt;&gt;&gt; from raffiot.io import IO
+&gt;&gt;&gt; from typing import Any
+&gt;&gt;&gt;
+&gt;&gt;&gt; from raffiot.resource import semaphore
+&gt;&gt;&gt;
+&gt;&gt;&gt; def fiber(sem, i:int) -&gt; IO[Any, None, None]:
+...   return sem.with_(io.defer(print, f&quot;Fiber {i} running!&quot;))
+&gt;&gt;&gt;
+&gt;&gt;&gt; semaphore(5).flat_map(lambda sem:
+...   io.parallel([fiber(sem, i) for i in range(100)])
+... ).run(None)
+</code></pre>
+<p>Even though there are 100 fibers running concurrently, there will be only 5
+concurrent calls to <code>print</code>.</p>
+<h2 id="time"><a class="header" href="#time">Time</a></h2>
+<p>Time functions enable you to schedule some computations in the future or to
+stop a fiber until a point in time is reached.</p>
+<h3 id="sleep-making-a-break"><a class="header" href="#sleep-making-a-break"><code>sleep</code>: making a break</a></h3>
 <p>To pause an <code>IO</code> for some time, just call <code>io.sleep</code> with the number of seconds
 you want the <code>IO</code> paused:</p>
 <pre><code class="language-python">&gt;&gt;&gt; from time import time
@@ -402,7 +518,7 @@ Ok(success=None)
 <p>Calling <code>io.sleep(0)</code> does nothing. The <code>IO</code> is guaranteed to be paused for at
 least the time you requested, but it may sleep longer! Especially when threads
 are busy.</p>
-<h2 id="sleep_until-waking-up-in-the-future"><a class="header" href="#sleep_until-waking-up-in-the-future"><code>sleep_until</code>: waking up in the future.</a></h2>
+<h3 id="sleep_until-waking-up-in-the-future"><a class="header" href="#sleep_until-waking-up-in-the-future"><code>sleep_until</code>: waking up in the future.</a></h3>
 <p>To pause an <code>IO</code> until some determined time in the future, call <code>io.sleep_until</code>
 with the desired epoch:</p>
 <pre><code class="language-python">&gt;&gt;&gt; from time import time
@@ -418,22 +534,6 @@ Ok(success=None)
 <p>Calling <code>io.sleep_until</code> with an epoch in the past does nothing.
 The <code>IO</code> is guaranteed to be paused until the epoch you requested is reached but
 it can sleep longer! Especially when threads are busy.</p>
-<h2 id="read_executor--getting-the-executor"><a class="header" href="#read_executor--getting-the-executor"><code>read_executor</code> : getting the executor</a></h2>
-<p>The function <code>io.read_executor</code> returns the executor on which the
-current <code>IO</code> runs.</p>
-<pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.read_executor().map(lambda exe: exe.submit(print,&quot;Hello World!&quot;))
-Hello World!
-Ok(success=&lt;Future at 0x7f7eaa3fb1f0 state=finished returned NoneType&gt;)
-</code></pre>
-<h2 id="contra_map_executor--changing-the-executor"><a class="header" href="#contra_map_executor--changing-the-executor"><code>contra_map_executor</code> : changing the executor</a></h2>
-<p>You may sometimes want to change the executor running the current <code>IO</code>.
-For example you may want a long task to be executed on a different
-thread pool:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from concurrent.futures import ThreadPoolExecutor
-&gt;&gt;&gt; with ThreadPoolExecutor() as executor2:
-...   io.pure(18).contra_map_executor(lambda _: executor2).run(None)
-Ok(success=18)
-</code></pre>
 
                     </main>
 

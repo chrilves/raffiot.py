@@ -6,14 +6,8 @@ from __future__ import annotations
 from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 from dataclasses import dataclass
-from raffiot import _MatchError
+from raffiot import MatchError
 from collections import abc
-
-E = TypeVar("E")
-A = TypeVar("A")
-E2 = TypeVar("E2")
-A2 = TypeVar("A2")
-X = TypeVar("X")
 
 __all__ = [
     "safe",
@@ -28,6 +22,13 @@ __all__ = [
     "zip",
     "returns_result",
 ]
+
+
+E = TypeVar("E")
+A = TypeVar("A")
+E2 = TypeVar("E2")
+A2 = TypeVar("A2")
+X = TypeVar("X")
 
 
 def safe(f: Callable[..., Result[E, A]]) -> Callable[..., Result[E, A]]:
@@ -105,7 +106,7 @@ class Result(Generic[E, A]):
             return on_error(self.error)
         if isinstance(self, Panic):
             return on_panic(self.exception)
-        raise _MatchError(f"{self} should be a Result")
+        raise MatchError(f"{self} should be a Result")
 
     @final
     @safe
@@ -144,7 +145,7 @@ class Result(Generic[E, A]):
             return on_error(self.error)
         if isinstance(self, Panic):
             raise self.exception
-        raise _MatchError(f"{self} should be a Result")
+        raise MatchError(f"{self} should be a Result")
 
     @final
     @safe

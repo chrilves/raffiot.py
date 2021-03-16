@@ -77,14 +77,13 @@ implement an `IO` as a normal function and then transform it into an `IO`.
 you want to execute later. But unlike `io.defer`, this function:
 
 - has access to the context
-- has access to the executor (see the chapter about [asynchronous computing](./async.md))
 - returns a `Result[E,A]`
 
 The last point is important because it means the function can raise
 errors while `io.defer` can only raise panics.
 
 ```python
->>> def f(context:int, executor, i:int) -> Result[str,int]:
+>>> def f(context:int) -> Result[str,int]:
 ...   if context > 0:
 ...     return Ok(context + i)
 ...   else:
@@ -104,7 +103,7 @@ to execute later returns an `IO`.
 
 
 ```python
->>> def f(context:int, executor, i:int) -> IO[None,str,int]:
+>>> def f(context:int, i:int) -> IO[None,str,int]:
 ...   if context > 0:
 ...     return io.pure(context + i)
 ...   else:

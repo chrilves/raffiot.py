@@ -5,5 +5,5 @@
 - [Failures](./failures.md)
 - [Context](./context.md)
 - [Combining a list of IOs](./lists.md)
-- [Asynchronous Computing](./async.md)
+- [Concurrent Programming](./async.md)
 - [Resource Management](./resource.md)

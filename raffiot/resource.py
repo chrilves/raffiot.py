@@ -6,24 +6,16 @@ Ensure that create resources are always nicely released after use.
 from __future__ import annotations
 
 from collections import abc
-from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 
 from typing_extensions import final
 
-from raffiot import io, _MatchError
+from raffiot import _runtime
+from raffiot import io, MatchError
+from raffiot._internal import IOTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
-import __internal
-
-R = TypeVar("R")
-E = TypeVar("E")
-A = TypeVar("A")
-X = TypeVar("X")
-R2 = TypeVar("R2")
-E2 = TypeVar("E2")
-A2 = TypeVar("A2")
 
 __all__ = [
     "Resource",
@@ -45,10 +37,20 @@ __all__ = [
     "traverse",
     "yield_",
     "async_",
-    "read_executor",
     "sleep_until",
     "sleep",
+    "reentrant_lock",
+    "semaphore",
 ]
+
+
+R = TypeVar("R")
+E = TypeVar("E")
+A = TypeVar("A")
+X = TypeVar("X")
+R2 = TypeVar("R2")
+E2 = TypeVar("E2")
+A2 = TypeVar("A2")
 
 
 @final
@@ -96,6 +98,17 @@ class Resource(Generic[R, E, A]):
                 return close.attempt().then(io.panic(exception))
 
         return self.create.flat_map(safe_use)
+
+    def with_(self, the_io: IO[R, E, X]) -> IO[R, E, X]:
+        """
+        Create a resource a:A but does not use it in the IO.
+
+        Once created, the resource a:A is guaranteed to be released (by running
+        its releasing IO). The return value if the result of the_io.
+
+        This is an alias for self.use(lambda _: the_io)
+        """
+        return self.use(lambda _: the_io)
 
     def map(self, f: Callable[[A], A2]) -> Resource[R, E, A2]:
         """
@@ -290,16 +303,6 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    def contra_map_executor(
-        self, f: Callable[[Executor], Executor]
-    ) -> Resource[R, E, A]:
-        """
-        Change the executor running this IO.
-        :param f:
-        :return:
-        """
-        return Resource(self.create.contra_map_executor(f))
-
 
 def lift_io(mio: IO[R, E, A]) -> Resource[R, E, A]:
     """
@@ -366,17 +369,16 @@ def defer_read_resource(
     return Resource(io.defer_read_io(f, *args, **kwargs))
 
 
-def read() -> Resource[R, E, R]:
-    """
-    Read the context.
+read: Resource[R, E, R] = lift_io(io.read)
+"""
+Read the context.
 
-    To execute a computation `IO[R,E,A]`, you need to call the run method with
-    some value r of type R: `io.run(r)`. the `read()` action returns the value r
-    given to run.
+To execute a computation `IO[R,E,A]`, you need to call the run method with
+some value r of type R: `io.run(r)`. the `read` action returns the value r
+given to run.
 
-    Please note that the contra_map_read method can transform this value r.
-    """
-    return lift_io(io.read())
+Please note that the contra_map_read method can transform this value r.
+"""
 
 
 def error(err: E) -> Resource[R, E, A]:
@@ -481,7 +483,7 @@ def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
                 level = 2
             else:
                 level = 2
-                error = Panic(_MatchError(f"{arg} should be a Result "))
+                error = Panic(MatchError(f"{arg} should be a Result "))
 
         if level == 0:
             return io.pure((args, io.sequence(close)))
@@ -508,38 +510,32 @@ def traverse(
     return zip([defer_resource(f, i) for i in l])
 
 
-def yield_() -> Resource[R, E, None]:
-    """
-    Resource implement cooperative concurrency. It means a Resource has to
-    explicitly make a break for other concurrent tasks to have a chance to
-    progress.
-    This is what `yeild_()` does, it forces the Resource to make a break,
-    letting other tasks be run on the executor until the IO start progressing
-    again.
-    :return:
-    """
-    return lift_io(io.yield_())
+yield_: Resource[R, E, None] = lift_io(io.yield_)
+"""
+Resource implement cooperative concurrency. It means a Resource has to
+explicitly make a break for other concurrent tasks to have a chance to
+progress.
+This is what `yeild_()` does, it forces the Resource to make a break,
+letting other tasks be run on the thread pool until the IO start progressing
+again.
+:return:
+"""
 
 
 def async_(
-    f: Callable[[R, Executor, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
 ) -> Resource[E, R, A]:
     """
     Perform an Asynchronous call. `f` is a function of the form:
 
-    >>> from concurrent.futures import Executor, Future
     >>> def f(context: E,
-    >>>       executor: Executor,
     >>>       callback: Callable[[Result[E,A]], None],
     >>>       *args,
-    >>>       **kwargs) -> Future:
+    >>>       **kwargs) -> None:
     >>>     ...
 
-    - `f` **MUST** return a `Future`.
     - `context` is the context of the Resource, usually the one passed to `run`
        if not changed by `contra_map_read`.
-    - `executor` is the `Executor` where the Resource is run, usually the one
-       passed to run if not changed by `contra_map_executor`.
     - `callback` **MUST ALWAYS BE CALLED EXACTLY ONCE**.
        Until `callback` is called, the Resource will be suspended waiting for the
        asynchronous call to complete.
@@ -554,22 +550,12 @@ def async_(
 
     >>> from raffiot.result import Ok
     >>> from raffiot.io import async_
-    >>> def f(context, executor, callback):
-    >>>     def h():
-    >>>         print("In the asynchronous call, returning 2.")
-    >>>         callback(Ok(2))
-    >>>     return executor.submit(h)
+    >>> def f(context, callback):
+    >>>     print("In the asynchronous call, returning 2.")
+    >>>     callback(Ok(2))
     >>> resource = async_(f)
     """
     return lift_io(io.async_(f, *args, **kwargs))
-
-
-def read_executor() -> Resource[R, E, Executor]:
-    """
-    Return the executor running this IO.
-    :return:
-    """
-    return lift_io(io.read_executor())
 
 
 def sleep_until(epoch_in_seconds: float) -> Resource[R, E, None]:
@@ -596,10 +582,37 @@ def sleep(seconds: float) -> Resource[R, E, None]:
     return lift_io(io.sleep(seconds))
 
 
-def lock() -> Resource[None, None, None]:
-    new_lock = __internal.Lock()
-    return Resource(IO(__internal.IOTag.LOCK, new_lock).then(io.pure((None, io.defer(new_lock.release)))))
+reentrant_lock: IO[Any, None, Resource[Any, None, None]] = io.defer(_runtime.Lock).map(
+    lambda new_lock: Resource(
+        IO(IOTag.ACQUIRE, new_lock).then(io.pure((None, IO(IOTag.RELEASE, new_lock))))
+    )
+)
+"""
+A reentrant lock.
 
-def semaphore(tokens: int) -> Resource[None, None, None]:
-    new_semaphore = __internal.Semaphore(tokens)
-    return Resource(IO(__internal.IOTag.LOCK, new_semaphore).then(io.pure((None, io.defer(new_semaphore.release)))))
+Only allow one fiber to access this resource concurrently. Reentrant means the fiber having
+the lock can acquire it again without blocking.
+"""
+
+
+def semaphore(tokens: int) -> IO[Any, None, Resource[Any, None, None]]:
+    """
+    Enable `token` concurrent accesses.
+
+    Each use of this resource take a token. While there are still tokens
+    left, the fiber creating the resource is not blocked. But is no tokens
+    left, then the fiber is blocked until one token is available again.
+
+    :param tokens: the number of allowed concurrent access, must be ≥ 1
+    :return:
+    """
+
+    def h():
+        new_semaphore = _runtime.Semaphore(tokens)
+        return Resource(
+            IO(IOTag.ACQUIRE, new_semaphore).then(
+                io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+            )
+        )
+
+    return io.defer(h)

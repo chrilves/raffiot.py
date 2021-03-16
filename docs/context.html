@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html" class="active"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Asynchronous Computing</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html" class="active"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -222,12 +222,11 @@ implement an <code>IO</code> as a normal function and then transform it into an 
 you want to execute later. But unlike <code>io.defer</code>, this function:</p>
 <ul>
 <li>has access to the context</li>
-<li>has access to the executor (see the chapter about <a href="./async.html">asynchronous computing</a>)</li>
 <li>returns a <code>Result[E,A]</code></li>
 </ul>
 <p>The last point is important because it means the function can raise
 errors while <code>io.defer</code> can only raise panics.</p>
-<pre><code class="language-python">&gt;&gt;&gt; def f(context:int, executor, i:int) -&gt; Result[str,int]:
+<pre><code class="language-python">&gt;&gt;&gt; def f(context:int) -&gt; Result[str,int]:
 ...   if context &gt; 0:
 ...     return Ok(context + i)
 ...   else:
@@ -242,7 +241,7 @@ Error(error='Ooups!')
 <p>The function <code>io.defer_read_io</code> is the <code>IO</code> counterpart of
 <code>io.defer_read</code>. It is useful when the context-aware function you want
 to execute later returns an <code>IO</code>.</p>
-<pre><code class="language-python">&gt;&gt;&gt; def f(context:int, executor, i:int) -&gt; IO[None,str,int]:
+<pre><code class="language-python">&gt;&gt;&gt; def f(context:int, i:int) -&gt; IO[None,str,int]:
 ...   if context &gt; 0:
 ...     return io.pure(context + i)
 ...   else:

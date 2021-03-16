@@ -35,14 +35,8 @@ from __future__ import annotations
 from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 from dataclasses import dataclass
-from raffiot import _MatchError
+from raffiot import MatchError
 from collections import abc
-
-E = TypeVar(&#34;E&#34;)
-A = TypeVar(&#34;A&#34;)
-E2 = TypeVar(&#34;E2&#34;)
-A2 = TypeVar(&#34;A2&#34;)
-X = TypeVar(&#34;X&#34;)
 
 __all__ = [
     &#34;safe&#34;,
@@ -57,6 +51,13 @@ __all__ = [
     &#34;zip&#34;,
     &#34;returns_result&#34;,
 ]
+
+
+E = TypeVar(&#34;E&#34;)
+A = TypeVar(&#34;A&#34;)
+E2 = TypeVar(&#34;E2&#34;)
+A2 = TypeVar(&#34;A2&#34;)
+X = TypeVar(&#34;X&#34;)
 
 
 def safe(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E, A]]:
@@ -134,7 +135,7 @@ class Result(Generic[E, A]):
             return on_error(self.error)
         if isinstance(self, Panic):
             return on_panic(self.exception)
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @final
     @safe
@@ -173,7 +174,7 @@ class Result(Generic[E, A]):
             return on_error(self.error)
         if isinstance(self, Panic):
             raise self.exception
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @final
     @safe
@@ -988,7 +989,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
             return on_error(self.error)
         if isinstance(self, Panic):
             return on_panic(self.exception)
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @final
     @safe
@@ -1027,7 +1028,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
             return on_error(self.error)
         if isinstance(self, Panic):
             raise self.exception
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @final
     @safe
@@ -1687,7 +1688,7 @@ def unsafe_fold(
         return on_error(self.error)
     if isinstance(self, Panic):
         return on_panic(self.exception)
-    raise _MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_fold_raise"><code class="name flex">
@@ -1724,7 +1725,7 @@ def unsafe_fold_raise(
         return on_error(self.error)
     if isinstance(self, Panic):
         raise self.exception
-    raise _MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_map"><code class="name flex">

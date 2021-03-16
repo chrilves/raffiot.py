@@ -6,9 +6,10 @@ from unittest import TestCase
 import hypothesis.strategies as st
 from hypothesis import given
 
-from raffiot import _MatchError
+from raffiot import MatchError
 from raffiot.io import *
 from raffiot.result import Result, Ok, Error, Panic
+from concurrent.futures import ThreadPoolExecutor
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)
@@ -34,9 +35,9 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_ap_panic(self, u: str, v: str) -> None:
-        assert pure(lambda x, y: x + y).ap(pure(u), panic(_MatchError(v))).run(
+        assert pure(lambda x, y: x + y).ap(pure(u), panic(MatchError(v))).run(
             None
-        ) == Panic(_MatchError(v))
+        ) == Panic(MatchError(v))
 
     @given(st.lists(st.text()))
     def test_zip(self, l: List[str]) -> None:
@@ -48,7 +49,7 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_zip_panic(self, u: str, v: str) -> None:
-        assert zip(pure(u), panic(_MatchError(v))).run(None) == Panic(_MatchError(v))
+        assert zip(pure(u), panic(MatchError(v))).run(None) == Panic(MatchError(v))
 
     @given(st.integers(), st.integers(), st.integers(), st.lists(st.text()))
     def test_sequence(self, x: int, y: int, z: int, l: List[str]) -> None:
@@ -82,9 +83,9 @@ class TestIO(TestCase):
         def f(i):
             state[i] = arr[i]
 
-        assert sequence(defer(f, 0), panic(_MatchError(w)), defer(f, 1)).run(
+        assert sequence(defer(f, 0), panic(MatchError(w)), defer(f, 1)).run(
             None
-        ) == Panic(_MatchError(w))
+        ) == Panic(MatchError(w))
         assert state == [u, None]
 
     @given(st.text())
@@ -105,25 +106,25 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_not_catch_panic(self, u: str, v: str) -> None:
-        pan = _MatchError(u)
+        pan = MatchError(u)
         assert panic(pan).catch(lambda x: pure(x + v)).run(None) == Panic(pan)
 
     @given(st.text())
     def test_panic(self, err: str) -> None:
-        pan = _MatchError(err)
+        pan = MatchError(err)
         assert panic(pan).run(None) == Panic(pan)
 
     @given(st.text(), st.text())
     def test_map_panic(self, u: str, v: str) -> None:
-        pu = _MatchError(u)
-        puv = _MatchError(u + v)
-        assert panic(pu).map_panic(lambda x: _MatchError(x.message + v)).run(
+        pu = MatchError(u)
+        puv = MatchError(u + v)
+        assert panic(pu).map_panic(lambda x: MatchError(x.message + v)).run(
             None
         ) == Panic(puv)
 
     @given(st.text(), st.text())
     def test_recover_panic(self, u: str, v: str) -> None:
-        pu = _MatchError(u)
+        pu = MatchError(u)
         assert panic(pu).recover(lambda x: pure(x.message + v)).run(None) == Ok(u + v)
 
     @given(st.text(), st.text())
@@ -136,7 +137,7 @@ class TestIO(TestCase):
 
     @given(st.text())
     def test_panic(self, pan: str) -> None:
-        assert panic(_MatchError(pan)).run(None) == Panic(_MatchError(pan))
+        assert panic(MatchError(pan)).run(None) == Panic(MatchError(pan))
 
     @given(st.text(), st.text())
     def test_on_failure_ok(self, u: str, v: str) -> None:
@@ -148,16 +149,16 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_on_failure_panic(self, u: str, v: str) -> None:
-        pu = _MatchError(u)
+        pu = MatchError(u)
         assert panic(pu).map(lambda _: v).on_failure(pure).run(None) == Ok(Panic(pu))
 
     @given(st.text())
     def test_read(self, i: st.integers()) -> None:
-        assert read().run(i) == Ok(i)
+        assert read.run(i) == Ok(i)
 
     @given(st.text(), st.text())
     def test_map_read(self, u: str, v: str) -> None:
-        assert read().contra_map_read(lambda x: x + v).run(u) == Ok(u + v)
+        assert read.contra_map_read(lambda x: x + v).run(u) == Ok(u + v)
 
     @given(st.text())
     def test_attempt_ok(self, u: str) -> None:
@@ -165,11 +166,11 @@ class TestIO(TestCase):
 
     @given(st.text())
     def test_attempt_error(self, u: str) -> None:
-        assert error(u).attempt().run(None).raise_on_panic() == Ok(Error(u))
+        assert error(u).attempt().run(None) == Ok(Error(u))
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:
-        pu = _MatchError(u)
+        pu = MatchError(u)
         assert panic(pu).attempt().run(None) == Ok(Panic(pu))
 
     @given(st.text())
@@ -184,7 +185,7 @@ class TestIO(TestCase):
 
     @given(st.text())
     def test_from_panic(self, u: str) -> None:
-        x = Panic(_MatchError(u))
+        x = Panic(MatchError(u))
         assert from_result(x).run(None) == x
 
     @given(st.integers(min_value=1000, max_value=2000))
@@ -204,16 +205,16 @@ class TestIO(TestCase):
                 return Ok(j)
             if j % 3 == 1:
                 return Error(j)
-            return Panic(_MatchError(j))
+            return Panic(MatchError(j))
 
-        def f(context: R, executor: Executor, j: int) -> Result[E, A]:
+        def f(context: R, j: int) -> Result[E, A]:
             return g(j + k)
 
         assert defer_read(f, i).run(k) == g(i + k)
 
     @given(st.integers(min_value=1000, max_value=2000))
     def test_defer_read_io(self, i: int) -> None:
-        def f(context: R, executor: Executor, j: int) -> IO[Any, Any, int]:
+        def f(context: R, j: int) -> IO[Any, Any, int]:
             if j <= 0:
                 return pure(0)
             else:
@@ -245,57 +246,37 @@ class TestIO(TestCase):
     def test_yield(self, l: List[int], x: int) -> None:
         def select_io(i: int):
             if i % 2 == 0:
-                return yield_()
+                return yield_
             return pure(i)
 
         ios = [select_io(i) for i in l] + [pure(x)]
 
-        assert sequence(ios).run(None).raise_on_panic() == Ok(x)
+        assert sequence(ios).run(None) == Ok(x)
 
     @given(st.text(), st.lists(st.text()))
     def test_async(self, s: str, l: List[str]) -> None:
+        l = l[0:2]
 
-        expected = s
-        for u in l:
-            expected += u
+        with ThreadPoolExecutor() as pool:
+            expected = s
+            for u in l:
+                expected += u
 
-        def get_async(v, u):
-            def f(r, executor, k):
-                def h():
-                    k(Ok(v + u))
+            def get_async(v, u):
+                def f(r, k):
+                    def h():
+                        time.sleep(0.01)
+                        k(Ok(v + u))
 
-                return executor.submit(h)
+                    pool.submit(h)
 
-            return async_(f)
+                return async_(f)
 
-        ret = pure(s)
-        for u in l:
-            ret = (lambda ret, u: ret.flat_map(lambda v: get_async(v, u)))(ret, u)
+            ret = pure(s)
+            for u in l:
+                ret = (lambda ret, u: ret.flat_map(lambda v: get_async(v, u)))(ret, u)
 
-        assert ret.run(None).raise_on_panic() == Ok(expected)
-
-    def test_executor(self) -> None:
-        a = 10
-        assert pure(a).flat_map(lambda r: read_executor().then(pure(r))).run(
-            None
-        ) == Ok(a)
-
-    def test_contra_map_executor_ok(self) -> None:
-        a = 10
-        assert pure(a).contra_map_executor(lambda e: e).run(None) == Ok(a)
-
-    def test_contra_map_executor_fail(self) -> None:
-        a = 10
-        assert pure(a).contra_map_executor(lambda e: 1 / 0).run(None).is_panic()
-
-    def test_contra_map_executor_type_error(self) -> None:
-        a = 10
-        assert (
-            pure(a)
-            .contra_map_executor(lambda e: "not an executor")
-            .run(None)
-            .is_panic()
-        )
+            assert ret.run(None) == Ok(expected)
 
     @given(st.lists(st.integers()))
     def test_parallel(self, l: List[str]) -> None:
@@ -305,12 +286,12 @@ class TestIO(TestCase):
             if j % 5 == 1:
                 return error(j)
             if j % 5 == 2:
-                return panic(_MatchError(j))
+                return panic(MatchError(j))
             if j % 5 == 3:
                 return defer(print, j)
 
             def h():
-                raise _MatchError(j)
+                raise MatchError(j)
 
             return defer(h)
 
@@ -320,10 +301,10 @@ class TestIO(TestCase):
             if j % 5 == 1:
                 return Error(j)
             if j % 5 == 2:
-                return Panic(_MatchError(j))
+                return Panic(MatchError(j))
             if j % 5 == 3:
                 return Ok(None)
-            return Panic(_MatchError(j))
+            return Panic(MatchError(j))
 
         assert parallel([f(s) for s in l]).flat_map(wait).run(None) == Ok(
             [g(s) for s in l]

@@ -1,11 +1,13 @@
-from concurrent.futures import Executor
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Any, TypeVar
 from unittest import TestCase
 
 import hypothesis.strategies as st
 from hypothesis import given
 
-from raffiot import _MatchError
+from raffiot import MatchError
 from raffiot import io
 from raffiot.io import IO
 from raffiot.resource import *
@@ -29,7 +31,7 @@ class TestResource(TestCase):
     def test_ap(self, u: str, v: str) -> None:
         assert pure(lambda x, y: x + y).ap(pure(u), pure(v)).use(io.pure).run(
             None
-        ).raise_on_panic() == Ok(u + v)
+        ) == Ok(u + v)
 
     @given(st.text())
     def test_error(self, err: str) -> None:
@@ -51,27 +53,27 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_not_catch_panic(self, u: str, v: str) -> None:
-        pan = _MatchError(u)
+        pan = MatchError(u)
         assert panic(pan).catch(lambda x: pure(x + v)).use(io.pure).run(None) == Panic(
             pan
         )
 
     @given(st.text())
     def test_panic(self, err: str) -> None:
-        pan = _MatchError(err)
+        pan = MatchError(err)
         assert panic(pan).use(io.pure).run(None) == Panic(pan)
 
     @given(st.text(), st.text())
     def test_map_panic(self, u: str, v: str) -> None:
-        pu = _MatchError(u)
-        puv = _MatchError(u + v)
-        assert panic(pu).map_panic(lambda x: _MatchError(x.message + v)).use(
+        pu = MatchError(u)
+        puv = MatchError(u + v)
+        assert panic(pu).map_panic(lambda x: MatchError(x.message + v)).use(
             io.pure
         ).run(None) == Panic(puv)
 
     @given(st.text(), st.text())
     def test_recover_panic(self, u: str, v: str) -> None:
-        pu = _MatchError(u)
+        pu = MatchError(u)
         assert panic(pu).recover(lambda x: pure(x.message + v)).use(io.pure).run(
             None
         ) == Ok(u + v)
@@ -86,7 +88,7 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_panic(self, pan: str) -> None:
-        assert panic(_MatchError(pan)).use(io.pure).run(None) == Panic(_MatchError(pan))
+        assert panic(MatchError(pan)).use(io.pure).run(None) == Panic(MatchError(pan))
 
     @given(st.text(), st.text())
     def test_on_failure_ok(self, u: str, v: str) -> None:
@@ -100,18 +102,18 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_on_failure_panic(self, u: str, v: str) -> None:
-        pu = _MatchError(u)
+        pu = MatchError(u)
         assert panic(pu).map(lambda _: v).on_failure(pure).use(io.pure).run(None) == Ok(
             Panic(pu)
         )
 
     @given(st.text())
     def test_read(self, i: st.integers()) -> None:
-        assert read().use(io.pure).run(i) == Ok(i)
+        assert read.use(io.pure).run(i) == Ok(i)
 
     @given(st.text(), st.text())
     def test_map_read(self, u: str, v: str) -> None:
-        assert read().contra_map_read(lambda x: x + v).use(io.pure).run(u) == Ok(u + v)
+        assert read.contra_map_read(lambda x: x + v).use(io.pure).run(u) == Ok(u + v)
 
     @given(st.text())
     def test_attempt_ok(self, u: str) -> None:
@@ -123,7 +125,7 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:
-        pu = _MatchError(u)
+        pu = MatchError(u)
         assert panic(pu).attempt().use(io.pure).run(None) == Ok(Panic(pu))
 
     @given(st.text())
@@ -138,7 +140,7 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_from_panic(self, u: str) -> None:
-        x = Panic(_MatchError(u))
+        x = Panic(MatchError(u))
         assert from_result(x).use(io.pure).run(None) == x
 
     @given(st.integers(min_value=1000, max_value=2000))
@@ -158,16 +160,16 @@ class TestResource(TestCase):
                 return Ok(j)
             if j % 3 == 1:
                 return Error(j)
-            return Panic(_MatchError(j))
+            return Panic(MatchError(j))
 
-        def f(context: R, executor: Executor, j: int) -> Result[E, A]:
+        def f(context: R, j: int) -> Result[E, A]:
             return g(j + k)
 
         assert defer_read(f, i).use(io.pure).run(k) == g(i + k)
 
     @given(st.integers(min_value=1000, max_value=2000))
     def test_defer_read_resource(self, i: int) -> None:
-        def f(context: R, executor: Executor, j: int) -> Resource[Any, Any, int]:
+        def f(context: R, j: int) -> Resource[Any, Any, int]:
             if j <= 0:
                 return pure(0)
             else:
@@ -199,7 +201,7 @@ class TestResource(TestCase):
     def test_yield(self, l: List[int]) -> None:
         def select_io(i: int):
             if i % 2 == 0:
-                return yield_()
+                return yield_
             return pure(i)
 
         assert zip([select_io(i) for i in l]).use(io.pure).run(None) == Ok(
@@ -208,55 +210,27 @@ class TestResource(TestCase):
 
     @given(st.text(), st.lists(st.text()))
     def test_async(self, s: str, l: List[str]) -> None:
+        l = l[0:2]
+        with ThreadPoolExecutor() as pool:
+            expected = s
+            for u in l:
+                expected += u
 
-        expected = s
-        for u in l:
-            expected += u
+            def get_async(v, u):
+                def f(r, k):
+                    def h():
+                        time.sleep(0.01)
+                        k(Ok(v + u))
 
-        def get_async(v, u):
-            def f(r, executor, k):
-                def h():
-                    k(Ok(v + u))
+                    pool.submit(h)
 
-                return executor.submit(h)
+                return async_(f)
 
-            return async_(f)
+            ret = pure(s)
+            for u in l:
+                ret = (lambda ret, u: ret.flat_map(lambda v: get_async(v, u)))(ret, u)
 
-        ret = pure(s)
-        for u in l:
-            ret = (lambda ret, u: ret.flat_map(lambda v: get_async(v, u)))(ret, u)
-
-        assert ret.use(io.pure).run(None).raise_on_panic() == Ok(expected)
-
-    def test_executor(self) -> None:
-        a = 10
-        assert pure(a).flat_map(lambda r: read_executor().then(pure(r))).use(
-            io.pure
-        ).run(None) == Ok(a)
-
-    def test_contra_map_executor_ok(self) -> None:
-        a = 10
-        assert pure(a).contra_map_executor(lambda e: e).use(io.pure).run(None) == Ok(a)
-
-    def test_contra_map_executor_fail(self) -> None:
-        a = 10
-        assert (
-            pure(a)
-            .contra_map_executor(lambda e: 1 / 0)
-            .use(io.pure)
-            .run(None)
-            .is_panic()
-        )
-
-    def test_contra_map_executor_type_error(self) -> None:
-        a = 10
-        assert (
-            pure(a)
-            .contra_map_executor(lambda e: "not an executor")
-            .use(io.pure)
-            .run(None)
-            .is_panic()
-        )
+            assert ret.use(io.pure).run(None) == Ok(expected)
 
     @given(
         st.booleans(),
@@ -438,7 +412,7 @@ class TestResource(TestCase):
             1 if can_open_a and can_flat_map and can_open_b and not can_close_b else 0
         )
         if can_open_a and can_flat_map and can_open_b and can_use:
-            assert ret.raise_on_panic() == Ok(i)
+            assert ret == Ok(i)
 
     @given(
         st.booleans(),
@@ -510,4 +484,80 @@ class TestResource(TestCase):
         assert opened_a == (1 if can_open_a and not can_close_a else 0)
         assert opened_b == (1 if can_open_b and not can_close_b else 0)
         if can_open_a and can_open_b and can_use:
-            assert ret.raise_on_panic() == Ok([ret_a, ret_b])
+            assert ret == Ok([ret_a, ret_b])
+
+    def test_reentrant_lock(self) -> None:
+        shared = None
+        failed = False
+
+        def begin(i) -> None:
+            nonlocal shared, failed
+            if shared is None:
+                shared = i
+            else:
+                failed = True
+
+        def end(i) -> None:
+            nonlocal shared, failed
+            if shared == i:
+                shared = None
+            else:
+                failed = True
+
+        def f(lock, i: int) -> IO[None, None, None]:
+            return lock.with_(
+                io.sequence(
+                    io.defer(begin, i),
+                    lock.use(lambda _: io.pure(None)),
+                    io.sleep(1),
+                    io.defer(end, i),
+                )
+            )
+
+        reentrant_lock.flat_map(
+            lambda lock: io.parallel([f(lock, 0), f(lock, 2)]).flat_map(io.wait)
+        ).run(None)
+        assert failed == False
+
+    @given(st.integers(1, 5))
+    def test_semaphore(self, tokens: int) -> None:
+
+        shared_lock = threading.Lock()
+        shared = 0
+        failed = False
+
+        def incr():
+            nonlocal shared_lock, shared
+            with shared_lock:
+                shared += 1
+
+        def decr():
+            nonlocal shared_lock, shared
+            with shared_lock:
+                shared -= 1
+
+        def test() -> None:
+            nonlocal shared, failed, tokens
+            if shared > tokens:
+                failed = True
+
+        def f(sem) -> IO[None, None, None]:
+            return sem.with_(
+                io.sequence(
+                    io.defer(test),
+                    io.defer(incr),
+                    io.defer(test),
+                    io.sleep(0.01),
+                    io.defer(test),
+                    io.sleep(0.01),
+                    io.defer(test),
+                    io.defer(decr),
+                )
+            )
+
+        semaphore(tokens).flat_map(
+            lambda sem: io.parallel([f(sem) for _ in range(tokens * 4)]).flat_map(
+                io.wait
+            )
+        ).run(None)
+        assert failed == False

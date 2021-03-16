@@ -28,15 +28,25 @@
 </summary>
 <pre><code class="python">from dataclasses import dataclass
 
+
 __all__ = [
-    &#34;_MatchError&#34;,
+    &#34;MatchError&#34;,
 ]
 
 
 @dataclass
-class _MatchError(Exception):
+class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
+    &#34;&#34;&#34;
+
+    message: None
+
+
+@dataclass
+class RuntimeFailure(Exception):
+    &#34;&#34;&#34;
+    A failure of the Runtime system.
     &#34;&#34;&#34;
 
     message: None</code></pre>
@@ -58,10 +68,6 @@ Ensure that create resources are always nicely released after use.</p></div>
 <dd>
 <div class="desc"><p>Data structure to represent the result of computation.</p></div>
 </dd>
-<dt><code class="name"><a title="raffiot.untyped.test" href="test.html">raffiot.untyped.test</a></code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
 <dt><code class="name"><a title="raffiot.untyped.val" href="val.html">raffiot.untyped.val</a></code></dt>
 <dd>
 <div class="desc"><p>Local Variables to work around Python annoying limitations about lambdas …</p></div>
@@ -75,8 +81,8 @@ Ensure that create resources are always nicely released after use.</p></div>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="raffiot.untyped._MatchError"><code class="flex name class">
-<span>class <span class="ident">_MatchError</span></span>
+<dt id="raffiot.untyped.MatchError"><code class="flex name class">
+<span>class <span class="ident">MatchError</span></span>
 <span>(</span><span>message: None)</span>
 </code></dt>
 <dd>
@@ -86,7 +92,7 @@ Ensure that create resources are always nicely released after use.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@dataclass
-class _MatchError(Exception):
+class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
@@ -100,7 +106,7 @@ class _MatchError(Exception):
 </ul>
 <h3>Class variables</h3>
 <dl>
-<dt id="raffiot.untyped._MatchError.message"><code class="name">var <span class="ident">message</span> : NoneType</code></dt>
+<dt id="raffiot.untyped.MatchError.message"><code class="name">var <span class="ident">message</span> : NoneType</code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -125,16 +131,15 @@ class _MatchError(Exception):
 <li><code><a title="raffiot.untyped.io" href="io.html">raffiot.untyped.io</a></code></li>
 <li><code><a title="raffiot.untyped.resource" href="resource.html">raffiot.untyped.resource</a></code></li>
 <li><code><a title="raffiot.untyped.result" href="result.html">raffiot.untyped.result</a></code></li>
-<li><code><a title="raffiot.untyped.test" href="test.html">raffiot.untyped.test</a></code></li>
 <li><code><a title="raffiot.untyped.val" href="val.html">raffiot.untyped.val</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
-<h4><code><a title="raffiot.untyped._MatchError" href="#raffiot.untyped._MatchError">_MatchError</a></code></h4>
+<h4><code><a title="raffiot.untyped.MatchError" href="#raffiot.untyped.MatchError">MatchError</a></code></h4>
 <ul class="">
-<li><code><a title="raffiot.untyped._MatchError.message" href="#raffiot.untyped._MatchError.message">message</a></code></li>
+<li><code><a title="raffiot.untyped.MatchError.message" href="#raffiot.untyped.MatchError.message">message</a></code></li>
 </ul>
 </li>
 </ul>

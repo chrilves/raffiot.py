@@ -33,9 +33,8 @@ Data structure to represent the result of computation.
 
 from __future__ import annotations
 from dataclasses import dataclass
-from raffiot.untyped import _MatchError
+from raffiot.untyped import MatchError
 from collections import abc
-
 
 __all__ = [
     &#34;safe&#34;,
@@ -126,7 +125,7 @@ class Result:
             return on_error(self.error)
         if isinstance(self, Panic):
             return on_panic(self.exception)
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @safe
     def fold(
@@ -161,7 +160,7 @@ class Result:
             return on_error(self.error)
         if isinstance(self, Panic):
             raise self.exception
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @safe
     def fold_raise(self, on_success, on_error):
@@ -937,7 +936,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
             return on_error(self.error)
         if isinstance(self, Panic):
             return on_panic(self.exception)
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @safe
     def fold(
@@ -972,7 +971,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
             return on_error(self.error)
         if isinstance(self, Panic):
             raise self.exception
-        raise _MatchError(f&#34;{self} should be a Result&#34;)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @safe
     def fold_raise(self, on_success, on_error):
@@ -1588,7 +1587,7 @@ Otherwise, do nothing.</p></div>
         return on_error(self.error)
     if isinstance(self, Panic):
         return on_panic(self.exception)
-    raise _MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.unsafe_fold_raise"><code class="name flex">
@@ -1622,7 +1621,7 @@ But raise the stored exception is this is a panic.</p>
         return on_error(self.error)
     if isinstance(self, Panic):
         raise self.exception
-    raise _MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.unsafe_map"><code class="name flex">

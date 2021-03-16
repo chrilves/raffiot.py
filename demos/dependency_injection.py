@@ -46,7 +46,7 @@ class LocalFileSytemService(Service):
         return io.defer(print, f"Opening file {url}").then(response)
 
 
-main: IO[Service, NotFound, List[str]] = io.read().flat_map(
+main: IO[Service, NotFound, List[str]] = io.read.flat_map(
     lambda service: service.get("index.html").flat_map(
         lambda x: service.get("index.md").flat_map(
             lambda y: io.defer(print, "Result = ", [x, y])

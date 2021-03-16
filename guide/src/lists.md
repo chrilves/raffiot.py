@@ -59,7 +59,7 @@ Like `zip` and `sequence`, it fails on the first failure encountered.
 ```python
 >>> from typing import List
 >>> def add_context(i: int) -> IO[int,None,int]:
-...   return io.read().flat_map(lambda c:
+...   return io.read.flat_map(lambda c:
 ...     io.defer(print, f"context = {c}, argument = {i}")
 ...     .then(io.pure(c + i))
 ...   )

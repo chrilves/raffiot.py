@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Asynchronous Computing</a></li><li class="chapter-item expanded "><a href="resource.html" class="active"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html" class="active"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -283,6 +283,7 @@ Closing PSUNW6M5
 Panic(exception=Exception('BOOM!'))
 </code></pre>
 <p>If the inner <code>IO</code> panics, the string is still released too!</p>
+<p>Note: the <code>with_(an_io)</code> method is a nice alias for <code>use(lambda _: an_io)</code>.</p>
 <h2 id="map-flat_map-defer-async_-and-others"><a class="header" href="#map-flat_map-defer-async_-and-others"><code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>async_</code> and others.</a></h2>
 <p><code>Resource</code> supports almost the same API as <code>IO</code>.
 It includes <code>map</code>, <code>flat_map</code>, <code>defer</code>, <code>zip</code>, etc.

@@ -15,7 +15,7 @@ def prog(color, name, i) -> IO[None, None, None]:
     """
     if i > 0:
         return io.defer(print, f"{color}From prog {name}: {i}{reset}").then(
-            io.yield_(), io.defer_io(prog, color, name, i - 1)
+            io.yield_, io.defer_io(prog, color, name, i - 1)
         )
     else:
         return io.pure(0)
