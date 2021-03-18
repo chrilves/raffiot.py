@@ -107,14 +107,11 @@ class Resource:
 
         def safe_use(x):
             a, close = x
-            try:
-                return (
-                    fun(a)
-                    .attempt()
-                    .flat_map(lambda r: close.attempt().then(io.from_result(r)))
-                )
-            except Exception as exception:
-                return close.attempt().then(io.panic(exception))
+            return (
+                io.defer_io(fun, a)
+                .attempt()
+                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            )
 
         return self.create.flat_map(safe_use)
 
@@ -1208,14 +1205,11 @@ class Resource:
 
         def safe_use(x):
             a, close = x
-            try:
-                return (
-                    fun(a)
-                    .attempt()
-                    .flat_map(lambda r: close.attempt().then(io.from_result(r)))
-                )
-            except Exception as exception:
-                return close.attempt().then(io.panic(exception))
+            return (
+                io.defer_io(fun, a)
+                .attempt()
+                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            )
 
         return self.create.flat_map(safe_use)
 
@@ -1780,14 +1774,11 @@ its releasing IO). The return value if the result of fun(a).</p>
 
     def safe_use(x):
         a, close = x
-        try:
-            return (
-                fun(a)
-                .attempt()
-                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
-            )
-        except Exception as exception:
-            return close.attempt().then(io.panic(exception))
+        return (
+            io.defer_io(fun, a)
+            .attempt()
+            .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+        )
 
     return self.create.flat_map(safe_use)</code></pre>
 </details>

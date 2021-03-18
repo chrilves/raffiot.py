@@ -88,14 +88,11 @@ class Resource(Generic[R, E, A]):
 
         def safe_use(x: Tuple[A, IO[R, E, None]]) -> IO[R, E, X]:
             a, close = x
-            try:
-                return (
-                    fun(a)
-                    .attempt()
-                    .flat_map(lambda r: close.attempt().then(io.from_result(r)))
-                )
-            except Exception as exception:
-                return close.attempt().then(io.panic(exception))
+            return (
+                io.defer_io(fun, a)
+                .attempt()
+                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            )
 
         return self.create.flat_map(safe_use)
 
