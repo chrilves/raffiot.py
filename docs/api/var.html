@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.9.2" />
+<title>raffiot.var API documentation</title>
+<meta name="description" content="Local Variables to work around Python annoying limitations about lambdas …" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>raffiot.var</code></h1>
+</header>
+<section id="section-intro">
+<p>Local Variables to work around Python annoying limitations about lambdas.</p>
+<p>Python forbids local variables and</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Local Variables to work around Python annoying limitations about lambdas.
+
+Python forbids local variables and
+&#34;&#34;&#34;
+
+from __future__ import annotations
+
+from collections import abc
+from dataclasses import dataclass
+from typing import Generic, TypeVar, Callable, List, Any, Tuple
+
+from typing_extensions import final
+
+from raffiot import io, resource
+from raffiot.io import IO
+from raffiot.resource import Resource
+
+__all__ = [
+    &#34;UpdateResult&#34;,
+    &#34;Var&#34;,
+]
+
+
+A = TypeVar(&#34;A&#34;)
+B = TypeVar(&#34;B&#34;)
+
+
+@final
+@dataclass
+class UpdateResult(Generic[A, B]):
+    &#34;&#34;&#34;
+    The result of the `update` methods of `Var`.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;]
+
+    &#34;&#34;&#34;
+    The result of an Update
+    &#34;&#34;&#34;
+
+    old_value: A
+    &#34;&#34;&#34;
+    The value before the Update
+    &#34;&#34;&#34;
+
+    new_value: A
+    &#34;&#34;&#34;
+    The value after the update
+    &#34;&#34;&#34;
+
+    returned: B
+    &#34;&#34;&#34;
+    The result produced by the update
+    &#34;&#34;&#34;
+
+
+@final
+class Var(Generic[A]):
+    &#34;&#34;&#34;
+    A mutable variable.
+    **All** concurrent access are protected using a Reentrant Lock.
+
+    **IMPORTANT:** /!\\ **NEVER CREATE VARIABLES BY THE CONSTRUCTOT !!!!** /!\\
+
+    Use `Var.create instead.`
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;_lock&#34;, &#34;_value&#34;]
+
+    def __init__(self, lock: Resource[Any, None, None], value: A):
+        self._lock = lock
+        self._value = value
+
+    def lock(self) -&gt; Resource[Any, None, None]:
+        &#34;&#34;&#34;
+        The Reentrant Lock that guarantees exclusive access to this variable.
+        &#34;&#34;&#34;
+        return self._lock
+
+    @classmethod
+    def create(cls, a: A) -&gt; IO[Any, None, Var[A]]:
+        &#34;&#34;&#34;
+        Create a new variable whose value is `a`.
+
+        :param a:
+        :return:
+        &#34;&#34;&#34;
+        return resource.reentrant_lock.map(lambda lock: Var(lock, a))
+
+    @classmethod
+    def create_rs(cls, a: A) -&gt; Resource[Any, None, Var[A]]:
+        &#34;&#34;&#34;
+        Create a new variable whose value is `a`.
+
+        :param a:
+        :return:
+        &#34;&#34;&#34;
+        return resource.lift_io(resource.reentrant_lock.map(lambda lock: Var(lock, a)))
+
+    #############
+    #   GETTER  #
+    #############
+
+    def get(self) -&gt; IO[None, None, A]:
+        &#34;&#34;&#34;
+        Get the current value of this variable.
+        :return:
+        &#34;&#34;&#34;
+        return self._lock.with_(io.defer(lambda: self._value))
+
+    def get_rs(self) -&gt; Resource[None, None, A]:
+        &#34;&#34;&#34;
+        Get the current value of this variable.
+        :return:
+        &#34;&#34;&#34;
+        return self._lock.then(resource.defer(lambda: self._value))
+
+    #############
+    #   SETTER  #
+    #############
+
+    def set(self, v: A) -&gt; IO[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h(w) -&gt; None:
+            self._value = w
+
+        return self._lock.with_(io.defer(h, v))
+
+    def set_rs(self, v: A) -&gt; Resource[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h(w) -&gt; None:
+            self._value = w
+
+        return self._lock.then(resource.defer(h, v))
+
+    #####################
+    #   GETTER + SETTER #
+    #####################
+
+    def get_and_set(self, v: A) -&gt; IO[Any, None, A]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable. The previous value is returned.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            old_value = self._value
+            self._value = v
+            return old_value
+
+        return self._lock.with_(io.defer(h))
+
+    def get_and_set_rs(self, v: A) -&gt; Resource[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable. The previous value is returned.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            old_value = self._value
+            self._value = v
+            return old_value
+
+        return self._lock.then(resource.defer(h))
+
+    ###############
+    #    UPDATE   #
+    ###############
+
+    def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; UpdateResult[A, B]:
+            old_value = self._value
+            new_value, ret = f(self._value)
+            self._value = new_value
+            return UpdateResult(old_value, new_value, ret)
+
+        return self._lock.with_(io.defer(h))
+
+    def update_io(
+        self, f: Callable[[A], IO[Any, None, Tuple[A, B]]]
+    ) -&gt; IO[Any, None, UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; IO[Any, None, UpdateResult[A, B]]:
+            old_value = self._value
+
+            def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+                self._value = x[0]
+                return UpdateResult(old_value, self._value, x[1])
+
+            return f(old_value).map(g)
+
+        return self._lock.with_(io.defer_io(h))
+
+    def update_rs(
+        self, f: Callable[[A], Resource[Any, None, Tuple[A, B]]]
+    ) -&gt; Resource[Any, None, UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; Resource[Any, None, UpdateResult[A, B]]:
+            old_value = self._value
+
+            def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+                self._value = x[0]
+                return UpdateResult(old_value, self._value, x[1])
+
+            return f(old_value).map(g)
+
+        return self._lock.then(resource.defer_resource(h))
+
+    ######################
+    #  Creating New Vars #
+    ######################
+
+    def traverse(self, f: Callable[[A], IO[Any, None, B]]) -&gt; IO[Any, None, Var[B]]:
+        &#34;&#34;&#34;
+        Create a new variable by transforming the current value of this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            return f(self._value).flat_map(Var.create)
+
+        return self._lock.with_(io.defer_io(h))
+
+    @classmethod
+    def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+        &#34;&#34;&#34; &#34;
+        Group these variables current values into a list.
+        &#34;&#34;&#34;
+
+        if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
+            args = vars[0]
+        else:
+            args = vars
+        return resource.zip([x._lock for x in args]).with_(
+            io.defer(lambda: [x._value for x in args])
+        )
+
+    def zip_with(self, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+        &#34;&#34;&#34;
+        Group this variable current value with `vars` variable current values.
+
+        :param vals: other variables to combine with self.
+        :return:
+        &#34;&#34;&#34;
+        return Var.zip(self, *vars)
+
+    def ap(self, *arg: Var[A]) -&gt; IO[Any, None, B]:
+        &#34;&#34;&#34;
+        Apply the function contained in this variable to `args` variables.
+
+        :param arg:
+        :return:
+        &#34;&#34;&#34;
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="raffiot.var.UpdateResult"><code class="flex name class">
+<span>class <span class="ident">UpdateResult</span></span>
+<span>(</span><span>old_value: A, new_value: A, returned: B)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The result of the <code>update</code> methods of <code><a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a></code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass
+class UpdateResult(Generic[A, B]):
+    &#34;&#34;&#34;
+    The result of the `update` methods of `Var`.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;]
+
+    &#34;&#34;&#34;
+    The result of an Update
+    &#34;&#34;&#34;
+
+    old_value: A
+    &#34;&#34;&#34;
+    The value before the Update
+    &#34;&#34;&#34;
+
+    new_value: A
+    &#34;&#34;&#34;
+    The value after the update
+    &#34;&#34;&#34;
+
+    returned: B
+    &#34;&#34;&#34;
+    The result produced by the update
+    &#34;&#34;&#34;</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.var.UpdateResult.new_value"><code class="name">var <span class="ident">new_value</span> : ~A</code></dt>
+<dd>
+<div class="desc"><p>The value after the update</p></div>
+</dd>
+<dt id="raffiot.var.UpdateResult.old_value"><code class="name">var <span class="ident">old_value</span> : ~A</code></dt>
+<dd>
+<div class="desc"><p>The value before the Update</p></div>
+</dd>
+<dt id="raffiot.var.UpdateResult.returned"><code class="name">var <span class="ident">returned</span> : ~B</code></dt>
+<dd>
+<div class="desc"><p>The result produced by the update</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.var.Var"><code class="flex name class">
+<span>class <span class="ident">Var</span></span>
+<span>(</span><span>lock: Resource[Any, None, None], value: A)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A mutable variable.
+<strong>All</strong> concurrent access are protected using a Reentrant Lock.</p>
+<p><strong>IMPORTANT:</strong> /!\ <strong>NEVER CREATE VARIABLES BY THE CONSTRUCTOT !!!!</strong> /!\</p>
+<p>Use <code><a title="raffiot.var.Var.create" href="#raffiot.var.Var.create">Var.create()</a> instead.</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+class Var(Generic[A]):
+    &#34;&#34;&#34;
+    A mutable variable.
+    **All** concurrent access are protected using a Reentrant Lock.
+
+    **IMPORTANT:** /!\\ **NEVER CREATE VARIABLES BY THE CONSTRUCTOT !!!!** /!\\
+
+    Use `Var.create instead.`
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;_lock&#34;, &#34;_value&#34;]
+
+    def __init__(self, lock: Resource[Any, None, None], value: A):
+        self._lock = lock
+        self._value = value
+
+    def lock(self) -&gt; Resource[Any, None, None]:
+        &#34;&#34;&#34;
+        The Reentrant Lock that guarantees exclusive access to this variable.
+        &#34;&#34;&#34;
+        return self._lock
+
+    @classmethod
+    def create(cls, a: A) -&gt; IO[Any, None, Var[A]]:
+        &#34;&#34;&#34;
+        Create a new variable whose value is `a`.
+
+        :param a:
+        :return:
+        &#34;&#34;&#34;
+        return resource.reentrant_lock.map(lambda lock: Var(lock, a))
+
+    @classmethod
+    def create_rs(cls, a: A) -&gt; Resource[Any, None, Var[A]]:
+        &#34;&#34;&#34;
+        Create a new variable whose value is `a`.
+
+        :param a:
+        :return:
+        &#34;&#34;&#34;
+        return resource.lift_io(resource.reentrant_lock.map(lambda lock: Var(lock, a)))
+
+    #############
+    #   GETTER  #
+    #############
+
+    def get(self) -&gt; IO[None, None, A]:
+        &#34;&#34;&#34;
+        Get the current value of this variable.
+        :return:
+        &#34;&#34;&#34;
+        return self._lock.with_(io.defer(lambda: self._value))
+
+    def get_rs(self) -&gt; Resource[None, None, A]:
+        &#34;&#34;&#34;
+        Get the current value of this variable.
+        :return:
+        &#34;&#34;&#34;
+        return self._lock.then(resource.defer(lambda: self._value))
+
+    #############
+    #   SETTER  #
+    #############
+
+    def set(self, v: A) -&gt; IO[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h(w) -&gt; None:
+            self._value = w
+
+        return self._lock.with_(io.defer(h, v))
+
+    def set_rs(self, v: A) -&gt; Resource[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h(w) -&gt; None:
+            self._value = w
+
+        return self._lock.then(resource.defer(h, v))
+
+    #####################
+    #   GETTER + SETTER #
+    #####################
+
+    def get_and_set(self, v: A) -&gt; IO[Any, None, A]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable. The previous value is returned.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            old_value = self._value
+            self._value = v
+            return old_value
+
+        return self._lock.with_(io.defer(h))
+
+    def get_and_set_rs(self, v: A) -&gt; Resource[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable. The previous value is returned.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            old_value = self._value
+            self._value = v
+            return old_value
+
+        return self._lock.then(resource.defer(h))
+
+    ###############
+    #    UPDATE   #
+    ###############
+
+    def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; UpdateResult[A, B]:
+            old_value = self._value
+            new_value, ret = f(self._value)
+            self._value = new_value
+            return UpdateResult(old_value, new_value, ret)
+
+        return self._lock.with_(io.defer(h))
+
+    def update_io(
+        self, f: Callable[[A], IO[Any, None, Tuple[A, B]]]
+    ) -&gt; IO[Any, None, UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; IO[Any, None, UpdateResult[A, B]]:
+            old_value = self._value
+
+            def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+                self._value = x[0]
+                return UpdateResult(old_value, self._value, x[1])
+
+            return f(old_value).map(g)
+
+        return self._lock.with_(io.defer_io(h))
+
+    def update_rs(
+        self, f: Callable[[A], Resource[Any, None, Tuple[A, B]]]
+    ) -&gt; Resource[Any, None, UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; Resource[Any, None, UpdateResult[A, B]]:
+            old_value = self._value
+
+            def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+                self._value = x[0]
+                return UpdateResult(old_value, self._value, x[1])
+
+            return f(old_value).map(g)
+
+        return self._lock.then(resource.defer_resource(h))
+
+    ######################
+    #  Creating New Vars #
+    ######################
+
+    def traverse(self, f: Callable[[A], IO[Any, None, B]]) -&gt; IO[Any, None, Var[B]]:
+        &#34;&#34;&#34;
+        Create a new variable by transforming the current value of this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            return f(self._value).flat_map(Var.create)
+
+        return self._lock.with_(io.defer_io(h))
+
+    @classmethod
+    def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+        &#34;&#34;&#34; &#34;
+        Group these variables current values into a list.
+        &#34;&#34;&#34;
+
+        if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
+            args = vars[0]
+        else:
+            args = vars
+        return resource.zip([x._lock for x in args]).with_(
+            io.defer(lambda: [x._value for x in args])
+        )
+
+    def zip_with(self, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+        &#34;&#34;&#34;
+        Group this variable current value with `vars` variable current values.
+
+        :param vals: other variables to combine with self.
+        :return:
+        &#34;&#34;&#34;
+        return Var.zip(self, *vars)
+
+    def ap(self, *arg: Var[A]) -&gt; IO[Any, None, B]:
+        &#34;&#34;&#34;
+        Apply the function contained in this variable to `args` variables.
+
+        :param arg:
+        :return:
+        &#34;&#34;&#34;
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="raffiot.var.Var.create"><code class="name flex">
+<span>def <span class="ident">create</span></span>(<span>a: A) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new variable whose value is <code>a</code>.</p>
+<p>:param a:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def create(cls, a: A) -&gt; IO[Any, None, Var[A]]:
+    &#34;&#34;&#34;
+    Create a new variable whose value is `a`.
+
+    :param a:
+    :return:
+    &#34;&#34;&#34;
+    return resource.reentrant_lock.map(lambda lock: Var(lock, a))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.create_rs"><code class="name flex">
+<span>def <span class="ident">create_rs</span></span>(<span>a: A) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, <a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new variable whose value is <code>a</code>.</p>
+<p>:param a:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def create_rs(cls, a: A) -&gt; Resource[Any, None, Var[A]]:
+    &#34;&#34;&#34;
+    Create a new variable whose value is `a`.
+
+    :param a:
+    :return:
+    &#34;&#34;&#34;
+    return resource.lift_io(resource.reentrant_lock.map(lambda lock: Var(lock, a)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>*vars: <a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>"
+Group these variables current values into a list.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+    &#34;&#34;&#34; &#34;
+    Group these variables current values into a list.
+    &#34;&#34;&#34;
+
+    if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
+        args = vars[0]
+    else:
+        args = vars
+    return resource.zip([x._lock for x in args]).with_(
+        io.defer(lambda: [x._value for x in args])
+    )</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="raffiot.var.Var.ap"><code class="name flex">
+<span>def <span class="ident">ap</span></span>(<span>self, *arg: <a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, ~B]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function contained in this variable to <code>args</code> variables.</p>
+<p>:param arg:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ap(self, *arg: Var[A]) -&gt; IO[Any, None, B]:
+    &#34;&#34;&#34;
+    Apply the function contained in this variable to `args` variables.
+
+    :param arg:
+    :return:
+    &#34;&#34;&#34;
+    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.get"><code class="name flex">
+<span>def <span class="ident">get</span></span>(<span>self) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[NoneType, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get the current value of this variable.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get(self) -&gt; IO[None, None, A]:
+    &#34;&#34;&#34;
+    Get the current value of this variable.
+    :return:
+    &#34;&#34;&#34;
+    return self._lock.with_(io.defer(lambda: self._value))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.get_and_set"><code class="name flex">
+<span>def <span class="ident">get_and_set</span></span>(<span>self, v: A) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable. The previous value is returned.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_and_set(self, v: A) -&gt; IO[Any, None, A]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable. The previous value is returned.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h():
+        old_value = self._value
+        self._value = v
+        return old_value
+
+    return self._lock.with_(io.defer(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.get_and_set_rs"><code class="name flex">
+<span>def <span class="ident">get_and_set_rs</span></span>(<span>self, v: A) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable. The previous value is returned.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_and_set_rs(self, v: A) -&gt; Resource[None, None, None]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable. The previous value is returned.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h():
+        old_value = self._value
+        self._value = v
+        return old_value
+
+    return self._lock.then(resource.defer(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.get_rs"><code class="name flex">
+<span>def <span class="ident">get_rs</span></span>(<span>self) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get the current value of this variable.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_rs(self) -&gt; Resource[None, None, A]:
+    &#34;&#34;&#34;
+    Get the current value of this variable.
+    :return:
+    &#34;&#34;&#34;
+    return self._lock.then(resource.defer(lambda: self._value))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.lock"><code class="name flex">
+<span>def <span class="ident">lock</span></span>(<span>self) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The Reentrant Lock that guarantees exclusive access to this variable.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def lock(self) -&gt; Resource[Any, None, None]:
+    &#34;&#34;&#34;
+    The Reentrant Lock that guarantees exclusive access to this variable.
+    &#34;&#34;&#34;
+    return self._lock</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.set"><code class="name flex">
+<span>def <span class="ident">set</span></span>(<span>self, v: A) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[NoneType, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set(self, v: A) -&gt; IO[None, None, None]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h(w) -&gt; None:
+        self._value = w
+
+    return self._lock.with_(io.defer(h, v))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.set_rs"><code class="name flex">
+<span>def <span class="ident">set_rs</span></span>(<span>self, v: A) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_rs(self, v: A) -&gt; Resource[None, None, None]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h(w) -&gt; None:
+        self._value = w
+
+    return self._lock.then(resource.defer(h, v))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>self, f: Callable[[A], IO[Any, None, B]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[~B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new variable by transforming the current value of this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(self, f: Callable[[A], IO[Any, None, B]]) -&gt; IO[Any, None, Var[B]]:
+    &#34;&#34;&#34;
+    Create a new variable by transforming the current value of this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h():
+        return f(self._value).flat_map(Var.create)
+
+    return self._lock.with_(io.defer_io(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.update"><code class="name flex">
+<span>def <span class="ident">update</span></span>(<span>self, f: Callable[[A], Tuple[A, B]]) ‑> IO[<a title="raffiot.var.UpdateResult" href="#raffiot.var.UpdateResult">UpdateResult</a>[A, B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Update the value contained in this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+    &#34;&#34;&#34;
+    Update the value contained in this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h() -&gt; UpdateResult[A, B]:
+        old_value = self._value
+        new_value, ret = f(self._value)
+        self._value = new_value
+        return UpdateResult(old_value, new_value, ret)
+
+    return self._lock.with_(io.defer(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.update_io"><code class="name flex">
+<span>def <span class="ident">update_io</span></span>(<span>self, f: Callable[[A], IO[Any, None, Tuple[A, B]]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.var.UpdateResult" href="#raffiot.var.UpdateResult">UpdateResult</a>[~A, ~B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Update the value contained in this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_io(
+    self, f: Callable[[A], IO[Any, None, Tuple[A, B]]]
+) -&gt; IO[Any, None, UpdateResult[A, B]]:
+    &#34;&#34;&#34;
+    Update the value contained in this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h() -&gt; IO[Any, None, UpdateResult[A, B]]:
+        old_value = self._value
+
+        def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+            self._value = x[0]
+            return UpdateResult(old_value, self._value, x[1])
+
+        return f(old_value).map(g)
+
+    return self._lock.with_(io.defer_io(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.update_rs"><code class="name flex">
+<span>def <span class="ident">update_rs</span></span>(<span>self, f: Callable[[A], Resource[Any, None, Tuple[A, B]]]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, <a title="raffiot.var.UpdateResult" href="#raffiot.var.UpdateResult">UpdateResult</a>[~A, ~B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Update the value contained in this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_rs(
+    self, f: Callable[[A], Resource[Any, None, Tuple[A, B]]]
+) -&gt; Resource[Any, None, UpdateResult[A, B]]:
+    &#34;&#34;&#34;
+    Update the value contained in this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h() -&gt; Resource[Any, None, UpdateResult[A, B]]:
+        old_value = self._value
+
+        def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+            self._value = x[0]
+            return UpdateResult(old_value, self._value, x[1])
+
+        return f(old_value).map(g)
+
+    return self._lock.then(resource.defer_resource(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.var.Var.zip_with"><code class="name flex">
+<span>def <span class="ident">zip_with</span></span>(<span>self, *vars: <a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Group this variable current value with <code>vars</code> variable current values.</p>
+<p>:param vals: other variables to combine with self.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip_with(self, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+    &#34;&#34;&#34;
+    Group this variable current value with `vars` variable current values.
+
+    :param vals: other variables to combine with self.
+    :return:
+    &#34;&#34;&#34;
+    return Var.zip(self, *vars)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="raffiot" href="index.html">raffiot</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="raffiot.var.UpdateResult" href="#raffiot.var.UpdateResult">UpdateResult</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.var.UpdateResult.new_value" href="#raffiot.var.UpdateResult.new_value">new_value</a></code></li>
+<li><code><a title="raffiot.var.UpdateResult.old_value" href="#raffiot.var.UpdateResult.old_value">old_value</a></code></li>
+<li><code><a title="raffiot.var.UpdateResult.returned" href="#raffiot.var.UpdateResult.returned">returned</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.var.Var.ap" href="#raffiot.var.Var.ap">ap</a></code></li>
+<li><code><a title="raffiot.var.Var.create" href="#raffiot.var.Var.create">create</a></code></li>
+<li><code><a title="raffiot.var.Var.create_rs" href="#raffiot.var.Var.create_rs">create_rs</a></code></li>
+<li><code><a title="raffiot.var.Var.get" href="#raffiot.var.Var.get">get</a></code></li>
+<li><code><a title="raffiot.var.Var.get_and_set" href="#raffiot.var.Var.get_and_set">get_and_set</a></code></li>
+<li><code><a title="raffiot.var.Var.get_and_set_rs" href="#raffiot.var.Var.get_and_set_rs">get_and_set_rs</a></code></li>
+<li><code><a title="raffiot.var.Var.get_rs" href="#raffiot.var.Var.get_rs">get_rs</a></code></li>
+<li><code><a title="raffiot.var.Var.lock" href="#raffiot.var.Var.lock">lock</a></code></li>
+<li><code><a title="raffiot.var.Var.set" href="#raffiot.var.Var.set">set</a></code></li>
+<li><code><a title="raffiot.var.Var.set_rs" href="#raffiot.var.Var.set_rs">set_rs</a></code></li>
+<li><code><a title="raffiot.var.Var.traverse" href="#raffiot.var.Var.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.var.Var.update" href="#raffiot.var.Var.update">update</a></code></li>
+<li><code><a title="raffiot.var.Var.update_io" href="#raffiot.var.Var.update_io">update_io</a></code></li>
+<li><code><a title="raffiot.var.Var.update_rs" href="#raffiot.var.Var.update_rs">update_rs</a></code></li>
+<li><code><a title="raffiot.var.Var.zip" href="#raffiot.var.Var.zip">zip</a></code></li>
+<li><code><a title="raffiot.var.Var.zip_with" href="#raffiot.var.Var.zip_with">zip_with</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.2</a>.</p>
+</footer>
+</body>
+</html>

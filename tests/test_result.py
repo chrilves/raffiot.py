@@ -4,8 +4,8 @@ from unittest import TestCase
 import hypothesis.strategies as st
 from hypothesis import given
 
-from raffiot import MatchError
 from raffiot.result import *
+from raffiot.utils import MatchError
 
 
 class TestResult(TestCase):

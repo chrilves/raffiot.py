@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html" class="active"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html" class="active"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li><li class="chapter-item expanded "><a href="variables.html"><strong aria-hidden="true">8.</strong> Variables</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -231,24 +231,24 @@ do not work this way.
 Calling an <em>asynchronous</em> function <code>fasync</code> usually looks like this.</p>
 <pre><code class="language-python">&gt;&gt;&gt; import time
 &gt;&gt;&gt; from multiprocessing import Pool
-
+&gt;&gt;&gt;
 &gt;&gt;&gt; def f():
 ...  print(&quot;f is running&quot;)
 ...  return 3
-
+&gt;&gt;&gt;
 &gt;&gt;&gt; with Pool(4) as pool: 
 ...   def fasync(callback):
 ...     pool.apply_async(f, callback = callback)
-... 
+...   
 ...   def main():
 ...     print(&quot;fasync not started yet&quot;)
-...
+...   
 ...     def callback(result):
 ...       print(f&quot;fasync finished and returned {result}&quot;)
-...
+...     
 ...     fasync(callback)
 ...     print(&quot;fasync started&quot;)
-... 
+...    
 ...   main()
 ...   time.sleep(0.5)
 fasync not started yet
@@ -264,14 +264,12 @@ finishes.</p>
 <p>With <em>Raffiot</em>'s <code>IO</code> you would write:</p>
 <pre><code class="language-python">&gt;&gt;&gt; import time
 &gt;&gt;&gt; from multiprocessing import Pool
-&gt;&gt;&gt; from raffiot import io
-&gt;&gt;&gt; from raffiot.io import IO
-&gt;&gt;&gt; from raffiot.result import Result, Ok
-
+&gt;&gt;&gt; from raffiot import *
+&gt;&gt;&gt;   
 &gt;&gt;&gt; def f():
 ...   print(&quot;f is running&quot;)
 ...   return 3
-
+&gt;&gt;&gt;  
 &gt;&gt;&gt; with Pool(4) as pool: 
 ...   f_io : IO[None,None,int] = (
 ...     io.async_(
@@ -395,27 +393,26 @@ Ok(success=None)
 may want to avoid several fibers modifying variables at the same time or
 avoiding too many fibers to access some resources.</p>
 <h3 id="reentrant_lock-only-one-fiber-at-a-time"><a class="header" href="#reentrant_lock-only-one-fiber-at-a-time"><code>reentrant_lock</code>: only one fiber at a time.</a></h3>
-<p>The <em>IO</em> <code>reentrant_lock</code> from package <code>raffiot.resource</code> ensures that
-<strong>only one</strong> fiber can run a portion of code <strong>at a time</strong>:</p>
-<pre><code class="language-python">reentrant_lock: IO[Any, None, Resource[Any, None, None]]
+<p>The primitive <code>resource.reentrant_lock</code> ensures that <strong>only one</strong> fiber can run
+a portion of code <strong>at a time</strong>:</p>
+<pre><code class="language-python">resource.reentrant_lock: IO[Any, None, Resource[Any, None, None]]
 </code></pre>
 <p>Let's take an example. The class <code>Shared</code> represents any class defining mutable
 objects. In our example, calling the <code>set</code> method change the object's attribute
 <code>value</code>:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
-&gt;&gt;&gt; from raffiot.io import IO
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 &gt;&gt;&gt; from typing import Any
-&gt;&gt;&gt;
+&gt;&gt;&gt;  
 &gt;&gt;&gt; class Shared:
-...   def __init__(self):
-...     self.value = 0
-...
-...   def get(self) -&gt; int:
-...     return self.value
-... 
-...   def set(self, i: int) -&gt; None:
-...     self.value = i
-...
+...     def __init__(self):
+...         self._value = 0
+...  
+...     def get(self) -&gt; int:
+...         return self._value
+...  
+...     def set(self, i: int) -&gt; None:
+...         self._value = i
+&gt;&gt;&gt;  
 &gt;&gt;&gt; shared_object = Shared()
 </code></pre>
 <p>The <code>increment</code> <em>IO</em> does exactly as its name suggests: it reads the shared
@@ -448,10 +445,9 @@ value is <em>2</em> instead of the expected <em>3</em>. The reason if the issue 
 have read the value <em>1</em> at the same time, and so both written <code>value + 1 == 2</code>
 instead of <em>3</em>. We need to prevent one instance of <code>increment</code> to run if
 another one is already running. We can do so using <code>reentrant_lock</code>:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot.resource import reentrant_lock
-&gt;&gt;&gt; shared_object.get()
+<pre><code class="language-python">&gt;&gt;&gt; shared_object.get()
 2
-&gt;&gt;&gt; reentrant_lock.flat_map(lambda lock:
+&gt;&gt;&gt; resource.reentrant_lock.flat_map(lambda lock:
 ...   io.parallel(
 ...     lock.with_(increment),
 ...     lock.with_(increment)
@@ -478,24 +474,20 @@ always be released, even if the computation fails.</p>
 <p>In addition, the these locks are <strong>reentrant</strong>, which means that the fiber that
 have the lock can still acquire it without blocking.</p>
 <h3 id="semaphore-limited-resource"><a class="header" href="#semaphore-limited-resource"><code>semaphore</code>: limited resource.</a></h3>
-<p>The primitive <code>semaphore</code>, also from package <code>raffiot.resource</code>, is useful to
-simulate limited resources.</p>
+<p>The primitive <code>resource.semaphore</code> is useful to simulate limited resources.</p>
 <p>Imagine you have to call an API for which it is forbidden to make more than
 <em>n</em> concurrent calls, <code>semaphore</code> is the way to go:</p>
-<pre><code class="language-python">semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
+<pre><code class="language-python">resource.semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
 </code></pre>
 <p>The parameter <code>tokens</code> is the number of fibers the semaphore will allow to run
 concurrently:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
-&gt;&gt;&gt; from raffiot.io import IO
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 &gt;&gt;&gt; from typing import Any
-&gt;&gt;&gt;
-&gt;&gt;&gt; from raffiot.resource import semaphore
-&gt;&gt;&gt;
+&gt;&gt;&gt;  
 &gt;&gt;&gt; def fiber(sem, i:int) -&gt; IO[Any, None, None]:
 ...   return sem.with_(io.defer(print, f&quot;Fiber {i} running!&quot;))
-&gt;&gt;&gt;
-&gt;&gt;&gt; semaphore(5).flat_map(lambda sem:
+&gt;&gt;&gt;  
+&gt;&gt;&gt; resource.semaphore(5).flat_map(lambda sem:
 ...   io.parallel([fiber(sem, i) for i in range(100)])
 ... ).run(None)
 </code></pre>
@@ -523,7 +515,7 @@ are busy.</p>
 with the desired epoch:</p>
 <pre><code class="language-python">&gt;&gt;&gt; from time import time
 &gt;&gt;&gt; now : IO[None, None, None] = io.defer(time).flat_map(lambda t: io.defer(print, t))
-&gt;&gt;&gt; time.time()
+&gt;&gt;&gt; time()
 1615136688.9909387
 &gt;&gt;&gt; main : IO[None, None, None] = now.then(io.sleep_until(1615136788), now)
 &gt;&gt;&gt; main.run(None)

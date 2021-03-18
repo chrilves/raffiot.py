@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html" class="active"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html" class="active"><strong aria-hidden="true">7.</strong> Resource Management</a></li><li class="chapter-item expanded "><a href="variables.html"><strong aria-hidden="true">8.</strong> Variables</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -205,9 +205,7 @@ function call.</p>
 <p><code>Resource</code> do compose very well too with the same API as <code>IO</code>.
 In fact <code>Resource</code> is built upon <code>IO</code>. It has almost all of its
 functionalities. Here are the imports for this section:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import resource, io
-&gt;&gt;&gt; from raffiot.resource import Resource
-&gt;&gt;&gt; from raffiot.io import IO
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 &gt;&gt;&gt; from typing import Tuple, List, Any
 </code></pre>
 <p>Let's start by defining an <code>IO</code> that generates a random string
@@ -392,6 +390,10 @@ Panic(exception=Exception('BOOM!'))
                         
 
                         
+                            <a rel="next" href="variables.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
 
                         <div style="clear: both"></div>
                     </nav>
@@ -405,6 +407,10 @@ Panic(exception=Exception('BOOM!'))
                     </a>
                 
 
+                
+                    <a rel="next" href="variables.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
                 
             </nav>
 

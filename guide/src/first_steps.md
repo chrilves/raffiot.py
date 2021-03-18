@@ -19,11 +19,10 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>>
 ```
 
-Start by importing the `io` module and `IO` type:
+Start by importing *Raffiot*:
 
 ```python
->>> from raffiot import io
->>> from raffiot.io import IO
+>>> from raffiot import *
 ```
 
 ## Hello World!

@@ -88,24 +88,24 @@ Calling an *asynchronous* function `fasync` usually looks like this.
 ```python
 >>> import time
 >>> from multiprocessing import Pool
-
+>>>
 >>> def f():
 ...  print("f is running")
 ...  return 3
-
+>>>
 >>> with Pool(4) as pool: 
 ...   def fasync(callback):
 ...     pool.apply_async(f, callback = callback)
-... 
+...   
 ...   def main():
 ...     print("fasync not started yet")
-...
+...   
 ...     def callback(result):
 ...       print(f"fasync finished and returned {result}")
-...
+...     
 ...     fasync(callback)
 ...     print("fasync started")
-... 
+...    
 ...   main()
 ...   time.sleep(0.5)
 fasync not started yet
@@ -126,14 +126,12 @@ With *Raffiot*'s `IO` you would write:
 ```python
 >>> import time
 >>> from multiprocessing import Pool
->>> from raffiot import io
->>> from raffiot.io import IO
->>> from raffiot.result import Result, Ok
-
+>>> from raffiot import *
+>>>   
 >>> def f():
 ...   print("f is running")
 ...   return 3
-
+>>>  
 >>> with Pool(4) as pool: 
 ...   f_io : IO[None,None,int] = (
 ...     io.async_(
@@ -285,11 +283,11 @@ avoiding too many fibers to access some resources.
 
 ### `reentrant_lock`: only one fiber at a time.
 
-The *IO* `reentrant_lock` from package `raffiot.resource` ensures that
-**only one** fiber can run a portion of code **at a time**:
+The primitive `resource.reentrant_lock` ensures that **only one** fiber can run
+a portion of code **at a time**:
 
 ```python
-reentrant_lock: IO[Any, None, Resource[Any, None, None]]
+resource.reentrant_lock: IO[Any, None, Resource[Any, None, None]]
 ```
 
 Let's take an example. The class `Shared` represents any class defining mutable
@@ -297,20 +295,19 @@ objects. In our example, calling the `set` method change the object's attribute
 `value`:
 
 ```python
->>> from raffiot import io
->>> from raffiot.io import IO
+>>> from raffiot import *
 >>> from typing import Any
->>>
+>>>  
 >>> class Shared:
-...   def __init__(self):
-...     self.value = 0
-...
-...   def get(self) -> int:
-...     return self.value
-... 
-...   def set(self, i: int) -> None:
-...     self.value = i
-...
+...     def __init__(self):
+...         self._value = 0
+...  
+...     def get(self) -> int:
+...         return self._value
+...  
+...     def set(self, i: int) -> None:
+...         self._value = i
+>>>  
 >>> shared_object = Shared()
 ```
 
@@ -353,10 +350,9 @@ another one is already running. We can do so using `reentrant_lock`:
 
 
 ```python
->>> from raffiot.resource import reentrant_lock
 >>> shared_object.get()
 2
->>> reentrant_lock.flat_map(lambda lock:
+>>> resource.reentrant_lock.flat_map(lambda lock:
 ...   io.parallel(
 ...     lock.with_(increment),
 ...     lock.with_(increment)
@@ -390,30 +386,26 @@ have the lock can still acquire it without blocking.
 
 ### `semaphore`: limited resource.
 
-The primitive `semaphore`, also from package `raffiot.resource`, is useful to
-simulate limited resources.
+The primitive `resource.semaphore` is useful to simulate limited resources.
 
 Imagine you have to call an API for which it is forbidden to make more than
 *n* concurrent calls, `semaphore` is the way to go:
 
 ```python
-semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
+resource.semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
 ```
 
 The parameter `tokens` is the number of fibers the semaphore will allow to run
 concurrently:
 
 ```python
->>> from raffiot import io
->>> from raffiot.io import IO
+>>> from raffiot import *
 >>> from typing import Any
->>>
->>> from raffiot.resource import semaphore
->>>
+>>>  
 >>> def fiber(sem, i:int) -> IO[Any, None, None]:
 ...   return sem.with_(io.defer(print, f"Fiber {i} running!"))
->>>
->>> semaphore(5).flat_map(lambda sem:
+>>>  
+>>> resource.semaphore(5).flat_map(lambda sem:
 ...   io.parallel([fiber(sem, i) for i in range(100)])
 ... ).run(None)
 ```
@@ -454,7 +446,7 @@ with the desired epoch:
 ```python
 >>> from time import time
 >>> now : IO[None, None, None] = io.defer(time).flat_map(lambda t: io.defer(print, t))
->>> time.time()
+>>> time()
 1615136688.9909387
 >>> main : IO[None, None, None] = now.then(io.sleep_until(1615136788), now)
 >>> main.run(None)

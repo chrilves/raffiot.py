@@ -7,3 +7,4 @@
 - [Combining a list of IOs](./lists.md)
 - [Concurrent Programming](./async.md)
 - [Resource Management](./resource.md)
+- [Variables](./variables.md)

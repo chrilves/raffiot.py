@@ -10,9 +10,9 @@ from typing import TypeVar, Generic, Callable, Any, List, Iterable
 
 from typing_extensions import final
 
-from raffiot import MatchError
 from raffiot._internal import IOTag
 from raffiot.result import Result, Ok, Error, Panic
+from raffiot.utils import MatchError
 
 __all__ = [
     "Fiber",

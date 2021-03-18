@@ -56,9 +56,7 @@ functionalities. Here are the imports for this section:
 
 
 ```python
->>> from raffiot import resource, io
->>> from raffiot.resource import Resource
->>> from raffiot.io import IO
+>>> from raffiot import *
 >>> from typing import Tuple, List, Any
 ```
 

@@ -41,7 +41,7 @@ from dataclasses import dataclass
 
 
 from raffiot.untyped import _runtime
-from raffiot.untyped import io, MatchError
+from raffiot.untyped import io
 from raffiot.untyped._internal import IOTag
 from raffiot.untyped.io import IO
 from raffiot.untyped.result import Result, Ok, Error, Panic
@@ -79,6 +79,8 @@ class Resource:
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
+
+    __slots__ = [&#34;create&#34;]
 
     create: None
     &#34;&#34;&#34;
@@ -149,25 +151,22 @@ class Resource:
 
         def safe_flat_map_a(xa):
             a, close_a = xa
-            try:
 
-                def safe_flat_map_a2(xa2):
-                    a2, close_a2 = xa2
-                    return io.pure((a2, close_a.attempt().then(close_a2)))
+            def safe_flat_map_a2(xa2):
+                a2, close_a2 = xa2
+                return io.pure((a2, close_a.attempt().then(close_a2)))
 
-                return (
-                    f(a)
-                    .create.attempt()
-                    .flat_map(
-                        lambda r: r.fold(
-                            safe_flat_map_a2,
-                            lambda e: close_a.attempt().then(io.error(e)),
-                            lambda p: close_a.attempt().then(io.panic(p)),
-                        )
+            return (
+                f(a)
+                .create.attempt()
+                .flat_map(
+                    lambda r: r.fold(
+                        safe_flat_map_a2,
+                        lambda e: close_a.attempt().then(io.error(e)),
+                        lambda p: close_a.attempt().then(io.panic(p)),
                     )
                 )
-            except Exception as exception:
-                return close_a.attempt().then(io.panic(exception))
+            )
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 
@@ -1178,6 +1177,8 @@ class Resource:
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;create&#34;]
+
     create: None
     &#34;&#34;&#34;
     IO to create one resource along with the IO for releasing it.
@@ -1247,25 +1248,22 @@ class Resource:
 
         def safe_flat_map_a(xa):
             a, close_a = xa
-            try:
 
-                def safe_flat_map_a2(xa2):
-                    a2, close_a2 = xa2
-                    return io.pure((a2, close_a.attempt().then(close_a2)))
+            def safe_flat_map_a2(xa2):
+                a2, close_a2 = xa2
+                return io.pure((a2, close_a.attempt().then(close_a2)))
 
-                return (
-                    f(a)
-                    .create.attempt()
-                    .flat_map(
-                        lambda r: r.fold(
-                            safe_flat_map_a2,
-                            lambda e: close_a.attempt().then(io.error(e)),
-                            lambda p: close_a.attempt().then(io.panic(p)),
-                        )
+            return (
+                f(a)
+                .create.attempt()
+                .flat_map(
+                    lambda r: r.fold(
+                        safe_flat_map_a2,
+                        lambda e: close_a.attempt().then(io.error(e)),
+                        lambda p: close_a.attempt().then(io.panic(p)),
                     )
                 )
-            except Exception as exception:
-                return close_a.attempt().then(io.panic(exception))
+            )
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 
@@ -1405,7 +1403,7 @@ class Resource:
             )
         )</code></pre>
 </details>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
 <dt id="raffiot.untyped.resource.Resource.create"><code class="name">var <span class="ident">create</span> : NoneType</code></dt>
 <dd>
@@ -1575,25 +1573,22 @@ The resource created by the first one (self) can be used to create the second (f
 
     def safe_flat_map_a(xa):
         a, close_a = xa
-        try:
 
-            def safe_flat_map_a2(xa2):
-                a2, close_a2 = xa2
-                return io.pure((a2, close_a.attempt().then(close_a2)))
+        def safe_flat_map_a2(xa2):
+            a2, close_a2 = xa2
+            return io.pure((a2, close_a.attempt().then(close_a2)))
 
-            return (
-                f(a)
-                .create.attempt()
-                .flat_map(
-                    lambda r: r.fold(
-                        safe_flat_map_a2,
-                        lambda e: close_a.attempt().then(io.error(e)),
-                        lambda p: close_a.attempt().then(io.panic(p)),
-                    )
+        return (
+            f(a)
+            .create.attempt()
+            .flat_map(
+                lambda r: r.fold(
+                    safe_flat_map_a2,
+                    lambda e: close_a.attempt().then(io.error(e)),
+                    lambda p: close_a.attempt().then(io.panic(p)),
                 )
             )
-        except Exception as exception:
-            return close_a.attempt().then(io.panic(exception))
+        )
 
     return Resource(self.create.flat_map(safe_flat_map_a))</code></pre>
 </details>

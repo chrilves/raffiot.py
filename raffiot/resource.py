@@ -12,7 +12,7 @@ from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 from typing_extensions import final
 
 from raffiot import _runtime
-from raffiot import io, MatchError
+from raffiot import io
 from raffiot._internal import IOTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
@@ -60,6 +60,8 @@ class Resource(Generic[R, E, A]):
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     """
+
+    __slots__ = ["create"]
 
     create: IO[R, E, Tuple[A, IO[R, Any, Any]]]
     """
@@ -134,27 +136,24 @@ class Resource(Generic[R, E, A]):
             xa: Tuple[A, IO[R, E, None]]
         ) -> IO[R, E, Tuple[A2, IO[R, E, None]]]:
             a, close_a = xa
-            try:
 
-                def safe_flat_map_a2(
-                    xa2: Tuple[A2, IO[R, Any, None]]
-                ) -> IO[R, E, Tuple[A2, IO[R, Any, None]]]:
-                    a2, close_a2 = xa2
-                    return io.pure((a2, close_a.attempt().then(close_a2)))
+            def safe_flat_map_a2(
+                xa2: Tuple[A2, IO[R, Any, None]]
+            ) -> IO[R, E, Tuple[A2, IO[R, Any, None]]]:
+                a2, close_a2 = xa2
+                return io.pure((a2, close_a.attempt().then(close_a2)))
 
-                return (
-                    f(a)
-                    .create.attempt()
-                    .flat_map(
-                        lambda r: r.fold(
-                            safe_flat_map_a2,
-                            lambda e: close_a.attempt().then(io.error(e)),
-                            lambda p: close_a.attempt().then(io.panic(p)),
-                        )
+            return (
+                f(a)
+                .create.attempt()
+                .flat_map(
+                    lambda r: r.fold(
+                        safe_flat_map_a2,
+                        lambda e: close_a.attempt().then(io.error(e)),
+                        lambda p: close_a.attempt().then(io.panic(p)),
                     )
                 )
-            except Exception as exception:
-                return close_a.attempt().then(io.panic(exception))
+            )
 
         return Resource(self.create.flat_map(safe_flat_map_a))
 

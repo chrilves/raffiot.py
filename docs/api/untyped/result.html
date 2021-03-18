@@ -32,9 +32,12 @@ Data structure to represent the result of computation.
 &#34;&#34;&#34;
 
 from __future__ import annotations
-from dataclasses import dataclass
-from raffiot.untyped import MatchError
+
 from collections import abc
+from dataclasses import dataclass
+
+
+from raffiot.untyped.utils import MatchError
 
 __all__ = [
     &#34;safe&#34;,
@@ -414,6 +417,8 @@ class Ok(Result):
     The result of a successful computation.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;success&#34;]
+
     success: None
 
 
@@ -424,6 +429,8 @@ class Error(Result):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;error&#34;]
+
     error: None
 
 
@@ -433,6 +440,8 @@ class Panic(Result):
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
+
+    __slots__ = [&#34;exception&#34;]
 
     exception: None
 
@@ -703,17 +712,19 @@ class Error(Result):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;error&#34;]
+
     error: None</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li><a title="raffiot.untyped.result.Result" href="#raffiot.untyped.result.Result">Result</a></li>
 </ul>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
 <dt id="raffiot.untyped.result.Error.error"><code class="name">var <span class="ident">error</span> : NoneType</code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -756,17 +767,19 @@ class Ok(Result):
     The result of a successful computation.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;success&#34;]
+
     success: None</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li><a title="raffiot.untyped.result.Result" href="#raffiot.untyped.result.Result">Result</a></li>
 </ul>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
 <dt id="raffiot.untyped.result.Ok.success"><code class="name">var <span class="ident">success</span> : NoneType</code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -811,17 +824,19 @@ class Panic(Result):
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;exception&#34;]
+
     exception: None</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li><a title="raffiot.untyped.result.Result" href="#raffiot.untyped.result.Result">Result</a></li>
 </ul>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
 <dt id="raffiot.untyped.result.Panic.exception"><code class="name">var <span class="ident">exception</span> : NoneType</code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>

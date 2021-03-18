@@ -1,89 +1,46 @@
 from unittest import TestCase
 
-import hypothesis.strategies as st
-from hypothesis import given
-
-from raffiot.val import *
-from raffiot.result import Ok
 from raffiot import io
+from raffiot.result import Ok
+from raffiot.val import *
+
+x = 5
+y = 6
+z = 7
 
 
 class TestVal(TestCase):
     def test_get(self):
-        assert Val(5).get() == 5
+        assert Val(x).get() == x
 
     def test_get_io(self):
-        return Val(5).get_io().run(None) == Ok(5)
+        return Val(x).get_io().run(None) == Ok(x)
 
     def get_rs(self):
-        return Val(5).get_rs().use(io.pure).run(None) == Ok(5)
+        return Val(x).get_rs().use(io.pure).run(None) == Ok(x)
 
     def test_pure(self):
-        assert Val.pure(5) == Val(5)
+        assert Val.pure(x) == Val(x)
 
     def test_map(self):
-        assert Val(5).map(lambda x: 10 * x) == Val(50)
+        assert Val(x).map(lambda i: y * i) == Val(y * x)
+
+    def test_traverse(self):
+        assert Val(x).traverse(lambda i: io.pure(y * i)).run(None) == Ok(Val(y * x))
 
     def test_flat_map(self):
-        assert Val(5).flat_map(lambda x: Val(10 * x)) == Val(50)
+        assert Val(x).flat_map(lambda i: Val(y * i)) == Val(y * x)
+
+    def test_flatten(self):
+        assert Val(Val(x)).flatten() == Val(x)
 
     def test_zip(self):
-        assert Val.zip(Val(5), Val("toto")) == Val([5, "toto"])
+        assert Val.zip(Val(x), Val(y)) == Val([x, y])
 
     def test_zip_with(self):
-        assert Val(5).zip_with(Val("toto")) == Val([5, "toto"])
+        assert Val(x).zip_with(Val(y)) == Val([x, y])
 
     def test_ap(self):
-        assert Val(lambda x, y: f"x={x}, y={y}").ap(Val(5), Val("toto")) == Val(
-            "x=5, y=toto"
+        assert Val(lambda i, j: f"x={i}, y={j}").ap(Val(x), Val(y)) == Val(
+            f"x={x}, y={y}"
         )
-
-
-class TestVar(TestCase):
-    def test_get(self):
-        assert Var(5).get() == 5
-
-    def test_get_io(self):
-        return Var(5).get_io().run(None) == Ok(5)
-
-    def get_rs(self):
-        return Var(5).get_rs().use(io.pure).run(None) == Ok(5)
-
-    def test_set(self):
-        x = Var(5)
-        x.set(7)
-        assert x.get() == 7
-
-    def test_set_io(self):
-        x = Var(5)
-        x.set_io(7).run(None)
-        assert x.get() == 7
-
-    def test_set_rs(self):
-        x = Var(5)
-        x.set_rs(7).use(io.pure).run(None)
-        assert x.get() == 7
-
-    def test_pure(self):
-        assert Var.pure(5) == Var(5)
-
-    def test_map(self):
-        assert Var(5).map(lambda x: 10 * x) == Var(50)
-
-    def test_flat_map(self):
-        assert Var(5).flat_map(lambda x: Var(10 * x)) == Var(50)
-
-    def test_zip(self):
-        assert Var.zip(Var(5), Var("toto")) == Var([5, "toto"])
-
-    def test_zip_with(self):
-        assert Var(5).zip_with(Var("toto")) == Var([5, "toto"])
-
-    def test_ap(self):
-        assert Var(lambda x, y: f"x={x}, y={y}").ap(Var(5), Var("toto")) == Var(
-            "x=5, y=toto"
-        )
-
-
-def test_sequence():
-    assert sequence(5, 6, 7) == 7

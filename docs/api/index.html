@@ -26,33 +26,30 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">from dataclasses import dataclass
-
-from typing_extensions import final
+<pre><code class="python">from raffiot import io, resource, result
+from raffiot.utils import MatchError, seq
+from raffiot.result import Result, Ok, Error, Panic
+from raffiot.io import IO
+from raffiot.resource import Resource
+from raffiot.val import Val
+from raffiot.var import Var, UpdateResult
 
 __all__ = [
+    &#34;io&#34;,
+    &#34;resource&#34;,
+    &#34;result&#34;,
     &#34;MatchError&#34;,
-]
-
-
-@final
-@dataclass
-class MatchError(Exception):
-    &#34;&#34;&#34;
-    Exception for pattern matching errors (used internally, should NEVER happen).
-    &#34;&#34;&#34;
-
-    message: str
-
-
-@final
-@dataclass
-class RuntimeFailure(Exception):
-    &#34;&#34;&#34;
-    A failure of the Runtime system.
-    &#34;&#34;&#34;
-
-    message: str</code></pre>
+    &#34;seq&#34;,
+    &#34;Result&#34;,
+    &#34;Ok&#34;,
+    &#34;Error&#34;,
+    &#34;Panic&#34;,
+    &#34;IO&#34;,
+    &#34;Resource&#34;,
+    &#34;Val&#34;,
+    &#34;Var&#34;,
+    &#34;UpdateResult&#34;,
+]</code></pre>
 </details>
 </section>
 <section>
@@ -75,7 +72,15 @@ Ensure that create resources are always nicely released after use.</p></div>
 <dd>
 <div class="desc"></div>
 </dd>
+<dt><code class="name"><a title="raffiot.utils" href="utils.html">raffiot.utils</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
 <dt><code class="name"><a title="raffiot.val" href="val.html">raffiot.val</a></code></dt>
+<dd>
+<div class="desc"><p>Local Variables to work around Python annoying limitations about lambdas …</p></div>
+</dd>
+<dt><code class="name"><a title="raffiot.var" href="var.html">raffiot.var</a></code></dt>
 <dd>
 <div class="desc"><p>Local Variables to work around Python annoying limitations about lambdas …</p></div>
 </dd>
@@ -84,13 +89,820 @@ Ensure that create resources are always nicely released after use.</p></div>
 <section>
 </section>
 <section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="raffiot.seq"><code class="name flex">
+<span>def <span class="ident">seq</span></span>(<span>*a: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The result is the result of the last argument.</p>
+<p>Accepts a single list or multiple arguments.
+:param a:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def seq(*a: Any) -&gt; Any:
+    &#34;&#34;&#34;
+    The result is the result of the last argument.
+
+    Accepts a single list or multiple arguments.
+    :param a:
+    :return:
+    &#34;&#34;&#34;
+    if len(a) == 1 and isinstance(a[0], abc.Iterable):
+        return a[0][-1]
+    return a[-1]</code></pre>
+</details>
+</dd>
+</dl>
 </section>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="raffiot.Error"><code class="flex name class">
+<span>class <span class="ident">Error</span></span>
+<span>(</span><span>error: E)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The result of a computation that failed on an excepted normal error case.
+The program is still in a valid state and can progress safely.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass
+class Error(Result[E, A]):
+    &#34;&#34;&#34;
+    The result of a computation that failed on an excepted normal error case.
+    The program is still in a valid state and can progress safely.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;error&#34;]
+
+    error: E</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a></li>
+<li>typing.Generic</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.Error.error"><code class="name">var <span class="ident">error</span> : ~E</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a></b></code>:
+<ul class="hlist">
+<li><code><a title="raffiot.result.Result.flatten" href="result.html#raffiot.result.Result.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.result.Result.is_error" href="result.html#raffiot.result.Result.is_error">is_error</a></code></li>
+<li><code><a title="raffiot.result.Result.is_ok" href="result.html#raffiot.result.Result.is_ok">is_ok</a></code></li>
+<li><code><a title="raffiot.result.Result.is_panic" href="result.html#raffiot.result.Result.is_panic">is_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.raise_on_panic" href="result.html#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_ap" href="result.html#raffiot.result.Result.unsafe_ap">unsafe_ap</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_catch" href="result.html#raffiot.result.Result.unsafe_catch">unsafe_catch</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_flat_map" href="result.html#raffiot.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_fold" href="result.html#raffiot.result.Result.unsafe_fold">unsafe_fold</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_fold_raise" href="result.html#raffiot.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map" href="result.html#raffiot.result.Result.unsafe_map">unsafe_map</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map_error" href="result.html#raffiot.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map_panic" href="result.html#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_recover" href="result.html#raffiot.result.Result.unsafe_recover">unsafe_recover</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_tri_map" href="result.html#raffiot.result.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.result.Result.zip" href="result.html#raffiot.result.Result.zip">zip</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="raffiot.IO"><code class="flex name class">
+<span>class <span class="ident">IO</span></span>
+<span>(</span><span>_IO__tag, _IO__fields)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Represent a computation that computes a value of type A,
+may fail with an error (expected failure) of type E and have access
+anytime to a read-only context of type R.</p>
+<p>/!\ <strong>VERY IMPORTANT</strong> /!\</p>
+<ol>
+<li><strong>DO NEVER SUB-CLASS IO</strong>: it would break the API.</li>
+<li><strong>DO NEVER INSTANTIATE an IO DIRECTLY</strong>: use <strong>only</strong> the functions
+ands methods in this module.</li>
+<li>The IO is <strong>LAZY</strong>:
+no code is run until you invoke the run method.</li>
+<li>The IO never raises exceptions (unless there is a bug):
+it returns panics instead.</li>
+<li>The IO is stack-safe, but you need to make sure your own code is too!
+use defer and defer_io to avoid stack-overflow.</li>
+</ol>
+<p>Have a look to the documentation and examples to learn how to use it.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+class IO(Generic[R, E, A]):
+    &#34;&#34;&#34;
+    Represent a computation that computes a value of type A,
+    may fail with an error (expected failure) of type E and have access
+    anytime to a read-only context of type R.
+
+    /!\\ **VERY IMPORTANT** /!\\
+
+    1. **DO NEVER SUB-CLASS IO**: it would break the API.
+    2. **DO NEVER INSTANTIATE an IO DIRECTLY**: use **only** the functions
+       ands methods in this module.
+    3. The IO is **LAZY**:
+        no code is run until you invoke the run method.
+    4. The IO never raises exceptions (unless there is a bug):
+        it returns panics instead.
+    5. The IO is stack-safe, but you need to make sure your own code is too!
+        use defer and defer_io to avoid stack-overflow.
+
+    Have a look to the documentation and examples to learn how to use it.
+    &#34;&#34;&#34;
+
+    __slots__ = &#34;__tag&#34;, &#34;__fields&#34;
+
+    def __init__(self, __tag, __fields):
+        self.__tag = __tag
+        self.__fields = __fields
+
+    def map(self, f: Callable[[A], A2]) -&gt; IO[R, E, A2]:
+        &#34;&#34;&#34;
+        Transform the computed value with f if the computation is successful.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(IOTag.MAP, (self, f))
+
+    def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, A2]:
+        &#34;&#34;&#34;
+        Chain two computations.
+        The result of the first one (self) can be used in the second (f).
+        &#34;&#34;&#34;
+        return IO(IOTag.FLATMAP, (self, f))
+
+    def then(self, *others: IO[R, E, A2]) -&gt; IO[R, E, A2]:
+        &#34;&#34;&#34;
+        Chain two computations.
+        The result of the first one (self) is dropped.
+        &#34;&#34;&#34;
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.SEQUENCE, list((self, *others[0])))
+        return IO(IOTag.SEQUENCE, list((self, *others)))
+
+    def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
+        &#34;&#34;&#34;
+        Pack a list of IO (including self) into an IO computing the list
+        of all values.
+
+        If one IO fails, the whole computation fails.
+        &#34;&#34;&#34;
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.ZIP, list((self, *others[0])))
+        return IO(IOTag.ZIP, list((self, *others)))
+
+    def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[Fiber]]:
+        &#34;&#34;&#34;
+        Run all these IO (including self) in parallel.
+        Return the list of fibers, in the same order.
+
+        Each Fiber represent a parallel computation. Call
+
+        &gt;&gt;&gt; wait([fiber1, fiber2, ...])
+
+        to wait until the computations of fiber1, fiber2, etc are done.
+        :param l: the list of IO to run in parallel.
+        :return: the same list where each IO has been replaced by its Fiber
+        &#34;&#34;&#34;
+        if len(others) == 1 and isinstance(others[0], abc.Iterable):
+            return IO(IOTag.PARALLEL, list((self, *others[0])))
+        return IO(IOTag.PARALLEL, list((self, *others)))
+
+    def flatten(self):
+        &#34;&#34;&#34;
+        Concatenation function on IO
+        &#34;&#34;&#34;
+        if self.__tag == 0:
+            return self.__fields
+        return IO(IOTag.FLATTEN, self)
+
+    # Reader API
+
+    def contra_map_read(self, f: Callable[[R2], R]) -&gt; IO[R2, E, A]:
+        &#34;&#34;&#34;
+        Transform the context with f.
+        Note that f is not from R to R2 but from R2 to R!
+        &#34;&#34;&#34;
+        return IO(IOTag.CONTRA_MAP_READ, (f, self))
+
+    # Error API
+
+    def catch(self, handler: Callable[[E], IO[R, E, A]]) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        React to errors (the except part of a try-except).
+
+        On error, call the handler with the error.
+        &#34;&#34;&#34;
+        return IO(IOTag.CATCH, (self, handler))
+
+    def map_error(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
+        &#34;&#34;&#34;
+        Transform the stored error if the computation fails on an error.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(IOTag.MAP_ERROR, (self, f))
+
+    # Panic
+
+    def recover(self, handler: Callable[[Exception], IO[R, E, A]]) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        React to panics (the except part of a try-except).
+
+        On panic, call the handler with the exception.
+        &#34;&#34;&#34;
+        return IO(IOTag.RECOVER, (self, handler))
+
+    def map_panic(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
+        &#34;&#34;&#34;
+        Transform the exception stored if the computation fails on a panic.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return IO(IOTag.MAP_PANIC, (self, f))
+
+    def run(self, context: R, pool_size: int = 1, nighttime=0.01) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        Run the computation.
+
+        Note that a IO is a data structure, no action is performed until you
+        call run. You may view an IO value as a function declaration.
+        Declaring a function does not execute its body. Only calling the
+        function does. Likewise, declaring an IO does not execute its content,
+        only running the IO does.
+
+        Note that the return value is a  `Result[E,A]`.
+        No exception will be raised by run (unless there is a bug), run will
+        returns a panic instead!
+        &#34;&#34;&#34;
+        from raffiot._runtime import SharedState
+
+        return SharedState(pool_size, nighttime).run(self, context)
+
+    def ap(self: IO[R, E, Callable[[X], A]], *arg: IO[R, E, X]) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
+
+        If self computes a function `f: [X1,...,XN] -&gt; A`
+        and arg computes a value `x1: X1`,...,`xn: Xn`
+        then self.ap(arg) computes `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+
+    def attempt(self) -&gt; IO[R, E, Result[E, A]]:
+        &#34;&#34;&#34;
+        Transform this computation that may fail into a computation
+        that never fails but returns a Result[E,A].
+
+        - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+        - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+
+        Note that errors and panics stop the computation, unless a catch or
+        recover reacts to such failures. But using map, flat_map, flatten and
+        ap is sometimes easier than using catch and recover. attempt transforms
+        a failed computation into a successful computation returning a failure,
+        thus enabling you to use map, flat_map, ... to deal with errors.
+        &#34;&#34;&#34;
+        return IO(IOTag.ATTEMPT, self)
+
+    def finally_(self, io: IO[R, Any, Any]) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        After having computed self, but before returning its result,
+        execute the io computation.
+
+        This is extremely useful when you need to perform an action,
+        unconditionally, at the end of a computation, without changing
+        its result, like releasing a resource.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))
+
+    def on_failure(
+        self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
+    ) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        Combined form of catch and recover.
+        React to any failure of the computation.
+        Do nothing if the computation is successful.
+
+        - The handler will be called on `Error(e)` if the computation fails with error e.
+        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will never be called on `Ok(a)`.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(
+            lambda r: r.unsafe_fold(
+                pure,
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
+            )
+        )
+
+    def then_keep(self, *args: IO[R, E, A]) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        Equivalent to `then(*args) but, on success, the computed value
+        is self&#39;s one.
+
+        Used to execute some IO after a successful computation without
+        changing its value.
+        :param args:
+        :return:
+        &#34;&#34;&#34;
+        return self.flat_map(lambda a: sequence(args).then(pure(a)))
+
+    def __str__(self) -&gt; str:
+        if self.__tag == IOTag.PURE:
+            return f&#34;Pure({self.__fields})&#34;
+        if self.__tag == IOTag.MAP:
+            return f&#34;Map({self.__fields})&#34;
+        if self.__tag == IOTag.FLATMAP:
+            return f&#34;FlatMap({self.__fields})&#34;
+        if self.__tag == IOTag.FLATTEN:
+            return f&#34;Flatten({self.__fields})&#34;
+        if self.__tag == IOTag.SEQUENCE:
+            return f&#34;Sequence({self.__fields})&#34;
+        if self.__tag == IOTag.ZIP:
+            return f&#34;Zip({self.__fields})&#34;
+        if self.__tag == IOTag.DEFER:
+            return f&#34;Defer({self.__fields})&#34;
+        if self.__tag == IOTag.DEFER_IO:
+            return f&#34;DeferIO({self.__fields})&#34;
+        if self.__tag == IOTag.ATTEMPT:
+            return f&#34;Attempt({self.__fields})&#34;
+        if self.__tag == IOTag.READ:
+            return f&#34;Read({self.__fields})&#34;
+        if self.__tag == IOTag.CONTRA_MAP_READ:
+            return f&#34;ContraMapRead({self.__fields})&#34;
+        if self.__tag == IOTag.ERROR:
+            return f&#34;Error({self.__fields})&#34;
+        if self.__tag == IOTag.CATCH:
+            return f&#34;Catch({self.__fields})&#34;
+        if self.__tag == IOTag.MAP_ERROR:
+            return f&#34;MapError({self.__fields})&#34;
+        if self.__tag == IOTag.PANIC:
+            return f&#34;Panic({self.__fields})&#34;
+        if self.__tag == IOTag.RECOVER:
+            return f&#34;Recover({self.__fields})&#34;
+        if self.__tag == IOTag.MAP_PANIC:
+            return f&#34;MapPanic({self.__fields})&#34;
+        if self.__tag == IOTag.YIELD:
+            return f&#34;Yield({self.__fields})&#34;
+        if self.__tag == IOTag.ASYNC:
+            return f&#34;Async({self.__fields})&#34;
+        if self.__tag == IOTag.DEFER_READ:
+            return f&#34;DeferRead({self.__fields})&#34;
+        if self.__tag == IOTag.DEFER_READ_IO:
+            return f&#34;DeferReadIO({self.__fields})&#34;
+        if self.__tag == IOTag.PARALLEL:
+            return f&#34;Parallel({self.__fields})&#34;
+        if self.__tag == IOTag.WAIT:
+            return f&#34;Wait({self.__fields})&#34;
+        if self.__tag == IOTag.SLEEP_UNTIL:
+            return f&#34;SleepUntil({self.__fields})&#34;
+        if self.__tag == IOTag.REC:
+            return f&#34;Rec({self.__fields})&#34;
+        if self.__tag == IOTag.ACQUIRE:
+            return f&#34;Acquire({self.__fields})&#34;
+        if self.__tag == IOTag.RELEASE:
+            return f&#34;Release({self.__fields})&#34;
+
+    def __repr__(self):
+        return str(self)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="raffiot.IO.ap"><code class="name flex">
+<span>def <span class="ident">ap</span></span>(<span>self: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, Callable[[X], A]], *arg: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, X]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Noting functions from [X1,&hellip;,XN] to A: <code>[X1, ..., Xn] -&gt; A</code>.</p>
+<p>If self computes a function <code>f: [X1,...,XN] -&gt; A</code>
+and arg computes a value <code>x1: X1</code>,&hellip;,<code>xn: Xn</code>
+then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ap(self: IO[R, E, Callable[[X], A]], *arg: IO[R, E, X]) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
+
+    If self computes a function `f: [X1,...,XN] -&gt; A`
+    and arg computes a value `x1: X1`,...,`xn: Xn`
+    then self.ap(arg) computes `f(x1,...,xn): A`.
+    &#34;&#34;&#34;
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.attempt"><code class="name flex">
+<span>def <span class="ident">attempt</span></span>(<span>self) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform this computation that may fail into a computation
+that never fails but returns a Result[E,A].</p>
+<ul>
+<li>If <code>self</code> successfully computes a, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a>(a)</code>.</li>
+<li>If <code>self</code> fails on error e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.Error" href="#raffiot.Error">Error</a>(e)</code>.</li>
+<li>If <code>self</code> fails on panic p, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(p)</code>.</li>
+</ul>
+<p>Note that errors and panics stop the computation, unless a catch or
+recover reacts to such failures. But using map, flat_map, flatten and
+ap is sometimes easier than using catch and recover. attempt transforms
+a failed computation into a successful computation returning a failure,
+thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def attempt(self) -&gt; IO[R, E, Result[E, A]]:
+    &#34;&#34;&#34;
+    Transform this computation that may fail into a computation
+    that never fails but returns a Result[E,A].
+
+    - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+    - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+    - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+
+    Note that errors and panics stop the computation, unless a catch or
+    recover reacts to such failures. But using map, flat_map, flatten and
+    ap is sometimes easier than using catch and recover. attempt transforms
+    a failed computation into a successful computation returning a failure,
+    thus enabling you to use map, flat_map, ... to deal with errors.
+    &#34;&#34;&#34;
+    return IO(IOTag.ATTEMPT, self)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.catch"><code class="name flex">
+<span>def <span class="ident">catch</span></span>(<span>self, handler: Callable[[E], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to errors (the except part of a try-except).</p>
+<p>On error, call the handler with the error.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def catch(self, handler: Callable[[E], IO[R, E, A]]) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    React to errors (the except part of a try-except).
+
+    On error, call the handler with the error.
+    &#34;&#34;&#34;
+    return IO(IOTag.CATCH, (self, handler))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.contra_map_read"><code class="name flex">
+<span>def <span class="ident">contra_map_read</span></span>(<span>self, f: Callable[[R2], R]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R2, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the context with f.
+Note that f is not from R to R2 but from R2 to R!</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def contra_map_read(self, f: Callable[[R2], R]) -&gt; IO[R2, E, A]:
+    &#34;&#34;&#34;
+    Transform the context with f.
+    Note that f is not from R to R2 but from R2 to R!
+    &#34;&#34;&#34;
+    return IO(IOTag.CONTRA_MAP_READ, (f, self))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.finally_"><code class="name flex">
+<span>def <span class="ident">finally_</span></span>(<span>self, io: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, Any, Any]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>After having computed self, but before returning its result,
+execute the io computation.</p>
+<p>This is extremely useful when you need to perform an action,
+unconditionally, at the end of a computation, without changing
+its result, like releasing a resource.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def finally_(self, io: IO[R, Any, Any]) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    After having computed self, but before returning its result,
+    execute the io computation.
+
+    This is extremely useful when you need to perform an action,
+    unconditionally, at the end of a computation, without changing
+    its result, like releasing a resource.
+    &#34;&#34;&#34;
+    return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.flat_map"><code class="name flex">
+<span>def <span class="ident">flat_map</span></span>(<span>self, f: Callable[[A], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A2]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Chain two computations.
+The result of the first one (self) can be used in the second (f).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flat_map(self, f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, A2]:
+    &#34;&#34;&#34;
+    Chain two computations.
+    The result of the first one (self) can be used in the second (f).
+    &#34;&#34;&#34;
+    return IO(IOTag.FLATMAP, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.flatten"><code class="name flex">
+<span>def <span class="ident">flatten</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Concatenation function on IO</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flatten(self):
+    &#34;&#34;&#34;
+    Concatenation function on IO
+    &#34;&#34;&#34;
+    if self.__tag == 0:
+        return self.__fields
+    return IO(IOTag.FLATTEN, self)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.map"><code class="name flex">
+<span>def <span class="ident">map</span></span>(<span>self, f: Callable[[A], A2]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the computed value with f if the computation is successful.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map(self, f: Callable[[A], A2]) -&gt; IO[R, E, A2]:
+    &#34;&#34;&#34;
+    Transform the computed value with f if the computation is successful.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return IO(IOTag.MAP, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.map_error"><code class="name flex">
+<span>def <span class="ident">map_error</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E2, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the stored error if the computation fails on an error.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map_error(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
+    &#34;&#34;&#34;
+    Transform the stored error if the computation fails on an error.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return IO(IOTag.MAP_ERROR, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.map_panic"><code class="name flex">
+<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E2, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the exception stored if the computation fails on a panic.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map_panic(self, f: Callable[[E], E2]) -&gt; IO[R, E2, A]:
+    &#34;&#34;&#34;
+    Transform the exception stored if the computation fails on a panic.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return IO(IOTag.MAP_PANIC, (self, f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.on_failure"><code class="name flex">
+<span>def <span class="ident">on_failure</span></span>(<span>self, handler: Callable[[<a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, Any]], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Combined form of catch and recover.
+React to any failure of the computation.
+Do nothing if the computation is successful.</p>
+<ul>
+<li>The handler will be called on <code><a title="raffiot.Error" href="#raffiot.Error">Error</a>(e)</code> if the computation fails with error e.</li>
+<li>The handler will be called on <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(p)</code> if the computation fails with panic p.</li>
+<li>The handler will never be called on <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a>(a)</code>.</li>
+</ul></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def on_failure(
+    self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
+) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Combined form of catch and recover.
+    React to any failure of the computation.
+    Do nothing if the computation is successful.
+
+    - The handler will be called on `Error(e)` if the computation fails with error e.
+    - The handler will be called on `Panic(p)` if the computation fails with panic p.
+    - The handler will never be called on `Ok(a)`.
+    &#34;&#34;&#34;
+    return self.attempt().flat_map(
+        lambda r: r.unsafe_fold(
+            pure,
+            lambda e: handler(Error(e)),
+            lambda p: handler(Panic(p)),
+        )
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.parallel"><code class="name flex">
+<span>def <span class="ident">parallel</span></span>(<span>self: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A], *others: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, X]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[<a title="raffiot.io.Fiber" href="io.html#raffiot.io.Fiber">Fiber</a>]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run all these IO (including self) in parallel.
+Return the list of fibers, in the same order.</p>
+<p>Each Fiber represent a parallel computation. Call</p>
+<pre><code class="language-python-repl">&gt;&gt;&gt; wait([fiber1, fiber2, ...])
+</code></pre>
+<p>to wait until the computations of fiber1, fiber2, etc are done.
+:param l: the list of IO to run in parallel.
+:return: the same list where each IO has been replaced by its Fiber</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[Fiber]]:
+    &#34;&#34;&#34;
+    Run all these IO (including self) in parallel.
+    Return the list of fibers, in the same order.
+
+    Each Fiber represent a parallel computation. Call
+
+    &gt;&gt;&gt; wait([fiber1, fiber2, ...])
+
+    to wait until the computations of fiber1, fiber2, etc are done.
+    :param l: the list of IO to run in parallel.
+    :return: the same list where each IO has been replaced by its Fiber
+    &#34;&#34;&#34;
+    if len(others) == 1 and isinstance(others[0], abc.Iterable):
+        return IO(IOTag.PARALLEL, list((self, *others[0])))
+    return IO(IOTag.PARALLEL, list((self, *others)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.recover"><code class="name flex">
+<span>def <span class="ident">recover</span></span>(<span>self, handler: Callable[[Exception], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to panics (the except part of a try-except).</p>
+<p>On panic, call the handler with the exception.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def recover(self, handler: Callable[[Exception], IO[R, E, A]]) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    React to panics (the except part of a try-except).
+
+    On panic, call the handler with the exception.
+    &#34;&#34;&#34;
+    return IO(IOTag.RECOVER, (self, handler))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.run"><code class="name flex">
+<span>def <span class="ident">run</span></span>(<span>self, context: R, pool_size: int = 1, nighttime=0.01) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run the computation.</p>
+<p>Note that a IO is a data structure, no action is performed until you
+call run. You may view an IO value as a function declaration.
+Declaring a function does not execute its body. Only calling the
+function does. Likewise, declaring an IO does not execute its content,
+only running the IO does.</p>
+<p>Note that the return value is a
+<code><a title="raffiot.Result" href="#raffiot.Result">Result</a>[E,A]</code>.
+No exception will be raised by run (unless there is a bug), run will
+returns a panic instead!</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def run(self, context: R, pool_size: int = 1, nighttime=0.01) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    Run the computation.
+
+    Note that a IO is a data structure, no action is performed until you
+    call run. You may view an IO value as a function declaration.
+    Declaring a function does not execute its body. Only calling the
+    function does. Likewise, declaring an IO does not execute its content,
+    only running the IO does.
+
+    Note that the return value is a  `Result[E,A]`.
+    No exception will be raised by run (unless there is a bug), run will
+    returns a panic instead!
+    &#34;&#34;&#34;
+    from raffiot._runtime import SharedState
+
+    return SharedState(pool_size, nighttime).run(self, context)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.then"><code class="name flex">
+<span>def <span class="ident">then</span></span>(<span>self, *others: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A2]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Chain two computations.
+The result of the first one (self) is dropped.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def then(self, *others: IO[R, E, A2]) -&gt; IO[R, E, A2]:
+    &#34;&#34;&#34;
+    Chain two computations.
+    The result of the first one (self) is dropped.
+    &#34;&#34;&#34;
+    if len(others) == 1 and isinstance(others[0], abc.Iterable):
+        return IO(IOTag.SEQUENCE, list((self, *others[0])))
+    return IO(IOTag.SEQUENCE, list((self, *others)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.then_keep"><code class="name flex">
+<span>def <span class="ident">then_keep</span></span>(<span>self, *args: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Equivalent to `then(*args) but, on success, the computed value
+is self's one.</p>
+<p>Used to execute some IO after a successful computation without
+changing its value.
+:param args:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def then_keep(self, *args: IO[R, E, A]) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Equivalent to `then(*args) but, on success, the computed value
+    is self&#39;s one.
+
+    Used to execute some IO after a successful computation without
+    changing its value.
+    :param args:
+    :return:
+    &#34;&#34;&#34;
+    return self.flat_map(lambda a: sequence(args).then(pure(a)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.IO.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A], *others: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, X]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pack a list of IO (including self) into an IO computing the list
+of all values.</p>
+<p>If one IO fails, the whole computation fails.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
+    &#34;&#34;&#34;
+    Pack a list of IO (including self) into an IO computing the list
+    of all values.
+
+    If one IO fails, the whole computation fails.
+    &#34;&#34;&#34;
+    if len(others) == 1 and isinstance(others[0], abc.Iterable):
+        return IO(IOTag.ZIP, list((self, *others[0])))
+    return IO(IOTag.ZIP, list((self, *others)))</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
 <dt id="raffiot.MatchError"><code class="flex name class">
 <span>class <span class="ident">MatchError</span></span>
-<span>(</span><span>message: str)</span>
+<span>(</span><span>message: None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Exception for pattern matching errors (used internally, should NEVER happen).</p></div>
@@ -98,25 +910,2893 @@ Ensure that create resources are always nicely released after use.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@final
-@dataclass
+<pre><code class="python">@dataclass
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    message: str</code></pre>
+    __slots__ = [&#34;message&#34;]
+
+    message: None</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
-<dt id="raffiot.MatchError.message"><code class="name">var <span class="ident">message</span> : str</code></dt>
+<dt id="raffiot.MatchError.message"><code class="name">var <span class="ident">message</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.Ok"><code class="flex name class">
+<span>class <span class="ident">Ok</span></span>
+<span>(</span><span>success: A)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The result of a successful computation.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass
+class Ok(Result[E, A]):
+    &#34;&#34;&#34;
+    The result of a successful computation.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;success&#34;]
+
+    success: A</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a></li>
+<li>typing.Generic</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.Ok.success"><code class="name">var <span class="ident">success</span> : ~A</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a></b></code>:
+<ul class="hlist">
+<li><code><a title="raffiot.result.Result.flatten" href="result.html#raffiot.result.Result.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.result.Result.is_error" href="result.html#raffiot.result.Result.is_error">is_error</a></code></li>
+<li><code><a title="raffiot.result.Result.is_ok" href="result.html#raffiot.result.Result.is_ok">is_ok</a></code></li>
+<li><code><a title="raffiot.result.Result.is_panic" href="result.html#raffiot.result.Result.is_panic">is_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.raise_on_panic" href="result.html#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_ap" href="result.html#raffiot.result.Result.unsafe_ap">unsafe_ap</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_catch" href="result.html#raffiot.result.Result.unsafe_catch">unsafe_catch</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_flat_map" href="result.html#raffiot.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_fold" href="result.html#raffiot.result.Result.unsafe_fold">unsafe_fold</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_fold_raise" href="result.html#raffiot.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map" href="result.html#raffiot.result.Result.unsafe_map">unsafe_map</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map_error" href="result.html#raffiot.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map_panic" href="result.html#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_recover" href="result.html#raffiot.result.Result.unsafe_recover">unsafe_recover</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_tri_map" href="result.html#raffiot.result.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.result.Result.zip" href="result.html#raffiot.result.Result.zip">zip</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="raffiot.Panic"><code class="flex name class">
+<span>class <span class="ident">Panic</span></span>
+<span>(</span><span>exception: Exception)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The result of a computation that failed unexpectedly.
+The program is not in a valid state and must terminate safely.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass
+class Panic(Result[E, A]):
+    &#34;&#34;&#34;
+    The result of a computation that failed unexpectedly.
+    The program is not in a valid state and must terminate safely.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;exception&#34;]
+
+    exception: Exception</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a></li>
+<li>typing.Generic</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.Panic.exception"><code class="name">var <span class="ident">exception</span> : Exception</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a></b></code>:
+<ul class="hlist">
+<li><code><a title="raffiot.result.Result.flatten" href="result.html#raffiot.result.Result.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.result.Result.is_error" href="result.html#raffiot.result.Result.is_error">is_error</a></code></li>
+<li><code><a title="raffiot.result.Result.is_ok" href="result.html#raffiot.result.Result.is_ok">is_ok</a></code></li>
+<li><code><a title="raffiot.result.Result.is_panic" href="result.html#raffiot.result.Result.is_panic">is_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.raise_on_panic" href="result.html#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_ap" href="result.html#raffiot.result.Result.unsafe_ap">unsafe_ap</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_catch" href="result.html#raffiot.result.Result.unsafe_catch">unsafe_catch</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_flat_map" href="result.html#raffiot.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_fold" href="result.html#raffiot.result.Result.unsafe_fold">unsafe_fold</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_fold_raise" href="result.html#raffiot.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map" href="result.html#raffiot.result.Result.unsafe_map">unsafe_map</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map_error" href="result.html#raffiot.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_map_panic" href="result.html#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_recover" href="result.html#raffiot.result.Result.unsafe_recover">unsafe_recover</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_tri_map" href="result.html#raffiot.result.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.result.Result.zip" href="result.html#raffiot.result.Result.zip">zip</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="raffiot.Resource"><code class="flex name class">
+<span>class <span class="ident">Resource</span></span>
+<span>(</span><span>create: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, Tuple[A, <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, Any, Any]]])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Essentially an IO-powered data structure that produces resources of type A,
+can fail with errors of type E and read a context of type R.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass
+class Resource(Generic[R, E, A]):
+    &#34;&#34;&#34;
+    Essentially an IO-powered data structure that produces resources of type A,
+    can fail with errors of type E and read a context of type R.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;create&#34;]
+
+    create: IO[R, E, Tuple[A, IO[R, Any, Any]]]
+    &#34;&#34;&#34;
+    IO to create one resource along with the IO for releasing it.
+    
+    On success, this IO must produce a `Tuple[A, IO[R,Any,Any]`:
+        - The first value of the tuple, of type `A`, is the created resource.
+        - The second value of the tuple, of type `IO[R,Any,Any]`, is the IO that
+            release the first value.
+    
+    For example:
+        
+        &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(
+        &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+    &#34;&#34;&#34;
+
+    def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
+        &#34;&#34;&#34;
+        Create a resource a:A and use it in fun.
+
+        Once created, the resource a:A is guaranteed to be released (by running
+        its releasing IO). The return value if the result of fun(a).
+
+        This is the only way to use a resource.
+        &#34;&#34;&#34;
+
+        def safe_use(x: Tuple[A, IO[R, E, None]]) -&gt; IO[R, E, X]:
+            a, close = x
+            return (
+                io.defer_io(fun, a)
+                .attempt()
+                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            )
+
+        return self.create.flat_map(safe_use)
+
+    def with_(self, the_io: IO[R, E, X]) -&gt; IO[R, E, X]:
+        &#34;&#34;&#34;
+        Create a resource a:A but does not use it in the IO.
+
+        Once created, the resource a:A is guaranteed to be released (by running
+        its releasing IO). The return value if the result of the_io.
+
+        This is an alias for self.use(lambda _: the_io)
+        &#34;&#34;&#34;
+        return self.use(lambda _: the_io)
+
+    def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
+        &#34;&#34;&#34;
+        Transform the created resource with f if the creation is successful.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+
+        def safe_map(
+            x: Tuple[A, IO[R, E, None]]
+        ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
+            a, close = x
+            try:
+                return io.pure((f(a), close))
+            except Exception as exception:
+                return close.attempt().then(io.panic(exception))
+
+        return Resource(self.create.flat_map(safe_map))
+
+    def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
+        &#34;&#34;&#34;
+        Chain two Resource.
+        The resource created by the first one (self) can be used to create the second (f).
+        &#34;&#34;&#34;
+
+        def safe_flat_map_a(
+            xa: Tuple[A, IO[R, E, None]]
+        ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
+            a, close_a = xa
+
+            def safe_flat_map_a2(
+                xa2: Tuple[A2, IO[R, Any, None]]
+            ) -&gt; IO[R, E, Tuple[A2, IO[R, Any, None]]]:
+                a2, close_a2 = xa2
+                return io.pure((a2, close_a.attempt().then(close_a2)))
+
+            return (
+                f(a)
+                .create.attempt()
+                .flat_map(
+                    lambda r: r.fold(
+                        safe_flat_map_a2,
+                        lambda e: close_a.attempt().then(io.error(e)),
+                        lambda p: close_a.attempt().then(io.panic(p)),
+                    )
+                )
+            )
+
+        return Resource(self.create.flat_map(safe_flat_map_a))
+
+    def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
+        &#34;&#34;&#34;
+        Chain two Resource.
+        The resource created by the first one (self) is dropped.
+        &#34;&#34;&#34;
+        return self.flat_map(lambda _: rs)
+
+    def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
+        &#34;&#34;&#34;
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
+
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
+        &#34;&#34;&#34;
+        return zip((self, *rs))
+
+    def ap(
+        self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
+    ) -&gt; Resource[R, E, A]:
+        &#34;&#34;&#34;
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
+
+        If self computes a function `f: [X1,...,XN] -&gt; A`
+        and arg computes a value `x1: X1`,...,`xn: Xn`
+        then self.ap(arg) computes `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+
+    def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+        &#34;&#34;&#34;
+        Concatenation function on Resource
+        &#34;&#34;&#34;
+        return self.flat_map(lambda x: x)
+
+    # Reader API
+
+    def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
+        &#34;&#34;&#34;
+        Transform the context with f.
+        Note that f is not from R to R2 but from R2 to R!
+        &#34;&#34;&#34;
+        return Resource(
+            self.create.contra_map_read(f).map(
+                lambda x: (x[0], x[1].contra_map_read(f))
+            )
+        )
+
+    # Error API
+
+    def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+        &#34;&#34;&#34;
+        React to errors (the except part of a try-except).
+
+        On error, call the handler with the error.
+        &#34;&#34;&#34;
+        return Resource(self.create.catch(lambda e: handler(e).create))
+
+    def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
+        &#34;&#34;&#34;
+        Transform the stored error if the resource creation fails on an error.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return Resource(self.create.map_error(f))
+
+    # Panic
+
+    def recover(
+        self, handler: Callable[[Exception], Resource[R, E, A]]
+    ) -&gt; Resource[R, E, A]:
+        &#34;&#34;&#34;
+        React to panics (the except part of a try-except).
+
+        On panic, call the handler with the exception.
+        &#34;&#34;&#34;
+        return Resource(self.create.recover(lambda p: handler(p).create))
+
+    def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
+        &#34;&#34;&#34;
+        Transform the exception stored if the computation fails on a panic.
+        Do nothing otherwise.
+        &#34;&#34;&#34;
+        return Resource(
+            self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+        )
+
+    def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
+        &#34;&#34;&#34;
+        Transform this Resource that may fail into a Resource
+        that never fails but creates a Result[E,A].
+
+        - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+        - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+
+        Note that errors and panics stop the resource creation, unless a catch or
+        recover reacts to such failures. But using map, flat_map, flatten and
+        ap is sometimes easier than using catch and recover. attempt transforms
+        a failed resource creation into a successful resource creation returning a failure,
+        thus enabling you to use map, flat_map, ... to deal with errors.
+        &#34;&#34;&#34;
+        return Resource(
+            self.create.attempt().map(
+                lambda x: x.fold(
+                    lambda v: (Ok(v[0]), v[1]),
+                    lambda e: (Error(e), io.pure(None)),
+                    lambda p: (Panic(p), io.pure(None)),
+                )
+            )
+        )
+
+    def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
+        &#34;&#34;&#34;
+        After having computed self, but before returning its result,
+        execute the rs Resource creation.
+
+        This is extremely useful when you need to perform an action,
+        unconditionally, at the end of a resource creation, without changing
+        its result, like executing a lifted IO.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
+
+    def on_failure(
+        self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
+    ) -&gt; IO[R, E, A]:
+        &#34;&#34;&#34;
+        Combined form of catch and recover.
+        React to any failure of the resource creation.
+        Do nothing if the resource creation is successful.
+
+        - The handler will be called on `Error(e)` if the resource creation fails with error e.
+        - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
+        - The handler will never be called on `Ok(a)`.
+        &#34;&#34;&#34;
+        return self.attempt().flat_map(
+            lambda r: r.fold(
+                pure,
+                lambda e: handler(Error(e)),
+                lambda p: handler(Panic(p)),
+            )
+        )</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.Resource.create"><code class="name">var <span class="ident">create</span> : <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, typing.Tuple[~A, <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, typing.Any, typing.Any]]]</code></dt>
+<dd>
+<div class="desc"><p>IO to create one resource along with the IO for releasing it.</p>
+<p>On success, this IO must produce a <code>Tuple[A, <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R,Any,Any]</code>:
+- The first value of the tuple, of type <code>A</code>, is the created resource.
+- The second value of the tuple, of type <code><a title="raffiot.IO" href="#raffiot.IO">IO</a>[R,Any,Any]</code>, is the IO that
+release the first value.</p>
+<p>For example:</p>
+<pre><code>&gt;&gt;&gt; Resource(io.defer(lambda: open("file")).map(
+&gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+</code></pre></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="raffiot.Resource.ap"><code class="name flex">
+<span>def <span class="ident">ap</span></span>(<span>self: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, Callable[[X], A]], *arg: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, X]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Noting functions from [X1,&hellip;,XN] to A: <code>[X1, ..., Xn] -&gt; A</code>.</p>
+<p>If self computes a function <code>f: [X1,...,XN] -&gt; A</code>
+and arg computes a value <code>x1: X1</code>,&hellip;,<code>xn: Xn</code>
+then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ap(
+    self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
+) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
+
+    If self computes a function `f: [X1,...,XN] -&gt; A`
+    and arg computes a value `x1: X1`,...,`xn: Xn`
+    then self.ap(arg) computes `f(x1,...,xn): A`.
+    &#34;&#34;&#34;
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.attempt"><code class="name flex">
+<span>def <span class="ident">attempt</span></span>(<span>self) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, typing.Any, <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform this Resource that may fail into a Resource
+that never fails but creates a Result[E,A].</p>
+<ul>
+<li>If self successfully computes a, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a>(a)</code>.</li>
+<li>If self fails on error e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.Error" href="#raffiot.Error">Error</a>(e)</code>.</li>
+<li>If self fails on panic p, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(p)</code>.</li>
+</ul>
+<p>Note that errors and panics stop the resource creation, unless a catch or
+recover reacts to such failures. But using map, flat_map, flatten and
+ap is sometimes easier than using catch and recover. attempt transforms
+a failed resource creation into a successful resource creation returning a failure,
+thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def attempt(self) -&gt; IO[R, Any, Result[E, A]]:
+    &#34;&#34;&#34;
+    Transform this Resource that may fail into a Resource
+    that never fails but creates a Result[E,A].
+
+    - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
+    - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+    - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+
+    Note that errors and panics stop the resource creation, unless a catch or
+    recover reacts to such failures. But using map, flat_map, flatten and
+    ap is sometimes easier than using catch and recover. attempt transforms
+    a failed resource creation into a successful resource creation returning a failure,
+    thus enabling you to use map, flat_map, ... to deal with errors.
+    &#34;&#34;&#34;
+    return Resource(
+        self.create.attempt().map(
+            lambda x: x.fold(
+                lambda v: (Ok(v[0]), v[1]),
+                lambda e: (Error(e), io.pure(None)),
+                lambda p: (Panic(p), io.pure(None)),
+            )
+        )
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.catch"><code class="name flex">
+<span>def <span class="ident">catch</span></span>(<span>self, handler: Callable[[E], <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to errors (the except part of a try-except).</p>
+<p>On error, call the handler with the error.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    React to errors (the except part of a try-except).
+
+    On error, call the handler with the error.
+    &#34;&#34;&#34;
+    return Resource(self.create.catch(lambda e: handler(e).create))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.contra_map_read"><code class="name flex">
+<span>def <span class="ident">contra_map_read</span></span>(<span>self, f: Callable[[R2], R]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R2, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the context with f.
+Note that f is not from R to R2 but from R2 to R!</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def contra_map_read(self, f: Callable[[R2], R]) -&gt; Resource[R2, E, A]:
+    &#34;&#34;&#34;
+    Transform the context with f.
+    Note that f is not from R to R2 but from R2 to R!
+    &#34;&#34;&#34;
+    return Resource(
+        self.create.contra_map_read(f).map(
+            lambda x: (x[0], x[1].contra_map_read(f))
+        )
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.finally_"><code class="name flex">
+<span>def <span class="ident">finally_</span></span>(<span>self, rs: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, Any, Any]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>After having computed self, but before returning its result,
+execute the rs Resource creation.</p>
+<p>This is extremely useful when you need to perform an action,
+unconditionally, at the end of a resource creation, without changing
+its result, like executing a lifted IO.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def finally_(self, rs: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    After having computed self, but before returning its result,
+    execute the rs Resource creation.
+
+    This is extremely useful when you need to perform an action,
+    unconditionally, at the end of a resource creation, without changing
+    its result, like executing a lifted IO.
+    &#34;&#34;&#34;
+    return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.flat_map"><code class="name flex">
+<span>def <span class="ident">flat_map</span></span>(<span>self, f: Callable[[A], <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, A2]]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Chain two Resource.
+The resource created by the first one (self) can be used to create the second (f).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flat_map(self, f: Callable[[A], Resource[R, E, A2]]) -&gt; Resource[R, E, A2]:
+    &#34;&#34;&#34;
+    Chain two Resource.
+    The resource created by the first one (self) can be used to create the second (f).
+    &#34;&#34;&#34;
+
+    def safe_flat_map_a(
+        xa: Tuple[A, IO[R, E, None]]
+    ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
+        a, close_a = xa
+
+        def safe_flat_map_a2(
+            xa2: Tuple[A2, IO[R, Any, None]]
+        ) -&gt; IO[R, E, Tuple[A2, IO[R, Any, None]]]:
+            a2, close_a2 = xa2
+            return io.pure((a2, close_a.attempt().then(close_a2)))
+
+        return (
+            f(a)
+            .create.attempt()
+            .flat_map(
+                lambda r: r.fold(
+                    safe_flat_map_a2,
+                    lambda e: close_a.attempt().then(io.error(e)),
+                    lambda p: close_a.attempt().then(io.panic(p)),
+                )
+            )
+        )
+
+    return Resource(self.create.flat_map(safe_flat_map_a))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.flatten"><code class="name flex">
+<span>def <span class="ident">flatten</span></span>(<span>self: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Concatenation function on Resource</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    Concatenation function on Resource
+    &#34;&#34;&#34;
+    return self.flat_map(lambda x: x)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.map"><code class="name flex">
+<span>def <span class="ident">map</span></span>(<span>self, f: Callable[[A], A2]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the created resource with f if the creation is successful.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map(self, f: Callable[[A], A2]) -&gt; Resource[R, E, A2]:
+    &#34;&#34;&#34;
+    Transform the created resource with f if the creation is successful.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+
+    def safe_map(
+        x: Tuple[A, IO[R, E, None]]
+    ) -&gt; IO[R, E, Tuple[A2, IO[R, E, None]]]:
+        a, close = x
+        try:
+            return io.pure((f(a), close))
+        except Exception as exception:
+            return close.attempt().then(io.panic(exception))
+
+    return Resource(self.create.flat_map(safe_map))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.map_error"><code class="name flex">
+<span>def <span class="ident">map_error</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E2, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the stored error if the resource creation fails on an error.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map_error(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
+    &#34;&#34;&#34;
+    Transform the stored error if the resource creation fails on an error.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return Resource(self.create.map_error(f))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.map_panic"><code class="name flex">
+<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E2, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the exception stored if the computation fails on a panic.
+Do nothing otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map_panic(self, f: Callable[[E], E2]) -&gt; Resource[R, E2, A]:
+    &#34;&#34;&#34;
+    Transform the exception stored if the computation fails on a panic.
+    Do nothing otherwise.
+    &#34;&#34;&#34;
+    return Resource(
+        self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.on_failure"><code class="name flex">
+<span>def <span class="ident">on_failure</span></span>(<span>self, handler: Callable[[<a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, Any]], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Combined form of catch and recover.
+React to any failure of the resource creation.
+Do nothing if the resource creation is successful.</p>
+<ul>
+<li>The handler will be called on <code><a title="raffiot.Error" href="#raffiot.Error">Error</a>(e)</code> if the resource creation fails with error e.</li>
+<li>The handler will be called on <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(p)</code> if the resource creation fails with panic p.</li>
+<li>The handler will never be called on <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a>(a)</code>.</li>
+</ul></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def on_failure(
+    self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
+) -&gt; IO[R, E, A]:
+    &#34;&#34;&#34;
+    Combined form of catch and recover.
+    React to any failure of the resource creation.
+    Do nothing if the resource creation is successful.
+
+    - The handler will be called on `Error(e)` if the resource creation fails with error e.
+    - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
+    - The handler will never be called on `Ok(a)`.
+    &#34;&#34;&#34;
+    return self.attempt().flat_map(
+        lambda r: r.fold(
+            pure,
+            lambda e: handler(Error(e)),
+            lambda p: handler(Panic(p)),
+        )
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.recover"><code class="name flex">
+<span>def <span class="ident">recover</span></span>(<span>self, handler: Callable[[Exception], <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to panics (the except part of a try-except).</p>
+<p>On panic, call the handler with the exception.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def recover(
+    self, handler: Callable[[Exception], Resource[R, E, A]]
+) -&gt; Resource[R, E, A]:
+    &#34;&#34;&#34;
+    React to panics (the except part of a try-except).
+
+    On panic, call the handler with the exception.
+    &#34;&#34;&#34;
+    return Resource(self.create.recover(lambda p: handler(p).create))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.then"><code class="name flex">
+<span>def <span class="ident">then</span></span>(<span>self, rs: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, A2]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Chain two Resource.
+The resource created by the first one (self) is dropped.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def then(self, rs: Resource[R, E, A2]) -&gt; Resource[R, E, A2]:
+    &#34;&#34;&#34;
+    Chain two Resource.
+    The resource created by the first one (self) is dropped.
+    &#34;&#34;&#34;
+    return self.flat_map(lambda _: rs)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.use"><code class="name flex">
+<span>def <span class="ident">use</span></span>(<span>self, fun: Callable[[A], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, X]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~X]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a resource a:A and use it in fun.</p>
+<p>Once created, the resource a:A is guaranteed to be released (by running
+its releasing IO). The return value if the result of fun(a).</p>
+<p>This is the only way to use a resource.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def use(self, fun: Callable[[A], IO[R, E, X]]) -&gt; IO[R, E, X]:
+    &#34;&#34;&#34;
+    Create a resource a:A and use it in fun.
+
+    Once created, the resource a:A is guaranteed to be released (by running
+    its releasing IO). The return value if the result of fun(a).
+
+    This is the only way to use a resource.
+    &#34;&#34;&#34;
+
+    def safe_use(x: Tuple[A, IO[R, E, None]]) -&gt; IO[R, E, X]:
+        a, close = x
+        return (
+            io.defer_io(fun, a)
+            .attempt()
+            .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+        )
+
+    return self.create.flat_map(safe_use)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.with_"><code class="name flex">
+<span>def <span class="ident">with_</span></span>(<span>self, the_io: <a title="raffiot.IO" href="#raffiot.IO">IO</a>[R, E, X]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~X]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a resource a:A but does not use it in the IO.</p>
+<p>Once created, the resource a:A is guaranteed to be released (by running
+its releasing IO). The return value if the result of the_io.</p>
+<p>This is an alias for self.use(lambda _: the_io)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def with_(self, the_io: IO[R, E, X]) -&gt; IO[R, E, X]:
+    &#34;&#34;&#34;
+    Create a resource a:A but does not use it in the IO.
+
+    Once created, the resource a:A is guaranteed to be released (by running
+    its releasing IO). The return value if the result of the_io.
+
+    This is an alias for self.use(lambda _: the_io)
+    &#34;&#34;&#34;
+    return self.use(lambda _: the_io)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Resource.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, A], *rs: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[R, E, A]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pack a list of resources (including self) into a Resource creating the
+list of all resources.</p>
+<p>If one resource creation fails, the whole creation fails (opened resources
+are released then).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip(self: Resource[R, E, A], *rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
+    &#34;&#34;&#34;
+    Pack a list of resources (including self) into a Resource creating the
+    list of all resources.
+
+    If one resource creation fails, the whole creation fails (opened resources
+    are released then).
+    &#34;&#34;&#34;
+    return zip((self, *rs))</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.Result"><code class="flex name class">
+<span>class <span class="ident">Result</span></span>
+</code></dt>
+<dd>
+<div class="desc"><p>The Result[E,A] data structure represents the result of a computation. It has
+3 possible cases:</p>
+<ul>
+<li><em>Ok(some_value: A)</em>
+The computation succeeded.
+The value some_value, of type A, is the result of the computation</li>
+<li><em>Error(some_error: E)</em>
+The computation failed with an expected error.
+The error some_error, of type E, is the expected error encountered.</li>
+<li><em>Panic(some_exception: Exception)</em>
+The computation failed on an unexpected error.
+The exception some_exception is the unexpected error encountered.</li>
+</ul>
+<p>The distinction between errors (expected failures) and panics (unexpected
+failures) is essential.</p>
+<p>Errors are failures your program is prepared to deal with safely. An error
+simply means some operation was not successful, but your program is still
+behaving nicely. Nothing terribly wrong happened. Generally errors belong to
+your business domain. You can take any type as E.</p>
+<p>Panics, on the contrary, are failures you never expected. Your computation
+can not progress further. All you can do when panics occur, is stopping your
+computation gracefully (like releasing resources before dying). The panic type
+is always Exception.</p>
+<p>As an example, if your program is an HTTP server. Errors are bad requests
+(error code 400) while panics are internal server errors (error code 500).
+Receiving bad request is part of the normal life of any HTTP server, it must
+know how to reply nicely. But internal server errors are bugs.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Result(Generic[E, A]):
+    &#34;&#34;&#34;
+    The Result[E,A] data structure represents the result of a computation. It has
+    3 possible cases:
+
+    - *Ok(some_value: A)*
+            The computation succeeded.
+            The value some_value, of type A, is the result of the computation
+    - *Error(some_error: E)*
+            The computation failed with an expected error.
+            The error some_error, of type E, is the expected error encountered.
+    - *Panic(some_exception: Exception)*
+            The computation failed on an unexpected error.
+            The exception some_exception is the unexpected error encountered.
+
+    The distinction between errors (expected failures) and panics (unexpected
+    failures) is essential.
+
+    Errors are failures your program is prepared to deal with safely. An error
+    simply means some operation was not successful, but your program is still
+    behaving nicely. Nothing terribly wrong happened. Generally errors belong to
+    your business domain. You can take any type as E.
+
+    Panics, on the contrary, are failures you never expected. Your computation
+    can not progress further. All you can do when panics occur, is stopping your
+    computation gracefully (like releasing resources before dying). The panic type
+    is always Exception.
+
+    As an example, if your program is an HTTP server. Errors are bad requests
+    (error code 400) while panics are internal server errors (error code 500).
+    Receiving bad request is part of the normal life of any HTTP server, it must
+    know how to reply nicely. But internal server errors are bugs.
+    &#34;&#34;&#34;
+
+    @final
+    def unsafe_fold(
+        self,
+        on_success: Callable[[A], X],
+        on_error: Callable[[E], X],
+        on_panic: Callable[[Exception], X],
+    ) -&gt; X:
+        &#34;&#34;&#34;
+        Transform this Result[E,A] into X.
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
+        :param on_panic: is called if this result is a `Panic`.
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return on_success(self.success)
+        if isinstance(self, Error):
+            return on_error(self.error)
+        if isinstance(self, Panic):
+            return on_panic(self.exception)
+        raise MatchError(f&#34;{self} should be a Result&#34;)
+
+    @final
+    @safe
+    def fold(
+        self,
+        on_success: Callable[[A], X],
+        on_error: Callable[[E], X],
+        on_panic: Callable[[Exception], X],
+    ) -&gt; X:
+        &#34;&#34;&#34;
+        Transform this Result[E,A] into X.
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
+        :param on_panic: is called if this result is a `Panic`.
+        :return:
+        &#34;&#34;&#34;
+        return self.unsafe_fold(on_success, on_error, on_panic)
+
+    @final
+    def unsafe_fold_raise(
+        self, on_success: Callable[[A], X], on_error: Callable[[E], X]
+    ) -&gt; X:
+        &#34;&#34;&#34;
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
+        But raise the stored exception is this is a panic.
+
+        It is useful to raise an exception on panics.
+
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return on_success(self.success)
+        if isinstance(self, Error):
+            return on_error(self.error)
+        if isinstance(self, Panic):
+            raise self.exception
+        raise MatchError(f&#34;{self} should be a Result&#34;)
+
+    @final
+    @safe
+    def fold_raise(self, on_success: Callable[[A], X], on_error: Callable[[E], X]) -&gt; X:
+        &#34;&#34;&#34;
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
+        But raise the stored exception is this is a panic.
+
+        It is useful to raise an exception on panics.
+
+        :param on_success: is called if this result is a `Ok`.
+        :param on_error: is called if this result is a `Error`.
+        :return:
+        &#34;&#34;&#34;
+        return self.unsafe_fold_raise(on_success, on_error)
+
+    @final
+    def unsafe_flat_map(self, f: Callable[[A], Result[E, A2]]) -&gt; Result[E, A2]:
+        &#34;&#34;&#34;
+        The usual monadic operation called
+            - bind, &gt;&gt;=: in Haskell
+            - flatMap: in Scala
+            - andThem: in Elm
+            ...
+
+        Chain operations returning results.
+
+        :param f: operation to perform it this result is an `Ok`.
+        :return: the result combined result.
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return f(self.success)
+        return self
+
+    @final
+    @safe
+    def flat_map(self, f: Callable[[A], Result[E, A2]]) -&gt; Result[E, A2]:
+        &#34;&#34;&#34;
+        The usual monadic operation called
+            - bind, &gt;&gt;=: in Haskell
+            - flatMap: in Scala
+            - andThem: in Elm
+            ...
+
+        Chain operations returning results.
+
+        :param f: operation to perform it this result is an `Ok`.
+        :return: the result combined result.
+        &#34;&#34;&#34;
+        return self.unsafe_flat_map(f)
+
+    @final
+    def unsafe_tri_map(
+        self,
+        f: Callable[[A], A2],
+        g: Callable[[E], E2],
+        h: Callable[[Exception], Exception],
+    ) -&gt; Result[E2, A2]:
+        &#34;&#34;&#34;
+        Transform the value/error/exception stored in this result.
+        :param f: how to transform the value a if this result is `Ok(a)`
+        :param g: how to transform the error e if this result is `Error(e)`
+        :param h: how to transform the exception p if this result is `Panic(p)`
+        :return: the &#34;same&#34; result with the stored value transformed.
+        &#34;&#34;&#34;
+        return self.unsafe_fold(
+            lambda x: Ok(f(x)),
+            lambda x: Error(g(x)),
+            lambda x: Panic(h(x)),
+        )
+
+    @final
+    @safe
+    def tri_map(
+        self,
+        f: Callable[[A], A2],
+        g: Callable[[E], E2],
+        h: Callable[[Exception], Exception],
+    ) -&gt; Result[E2, A2]:
+        &#34;&#34;&#34;
+        Transform the value/error/exception stored in this result.
+        :param f: how to transform the value a if this result is `Ok(a)`
+        :param g: how to transform the error e if this result is `Error(e)`
+        :param h: how to transform the exception p if this result is `Panic(p)`
+        :return: the &#34;same&#34; result with the stored value transformed.
+        &#34;&#34;&#34;
+        return self.unsafe_tri_map(f, g, h)
+
+    @final
+    def is_ok(self) -&gt; bool:
+        &#34;&#34;&#34;
+        :return: True if this result is an `Ok`
+        &#34;&#34;&#34;
+        return isinstance(self, Ok)
+
+    @final
+    def is_error(self) -&gt; bool:
+        &#34;&#34;&#34;
+        :return: True if this result is an `Error`
+        &#34;&#34;&#34;
+        return isinstance(self, Error)
+
+    @final
+    def is_panic(self) -&gt; bool:
+        &#34;&#34;&#34;
+        :return: True if this result is an `Panic`
+        &#34;&#34;&#34;
+        return isinstance(self, Panic)
+
+    @final
+    def unsafe_map(self, f: Callable[[A], A2]) -&gt; Result[E, A2]:
+        &#34;&#34;&#34;
+        Transform the value stored in `Ok`, it this result is an `Ok`.
+        :param f: the transformation function.
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return Ok(f(self.success))
+        return self
+
+    @final
+    @safe
+    def map(self, f: Callable[[A], A2]) -&gt; Result[E, A2]:
+        &#34;&#34;&#34;
+        Transform the value stored in `Ok`, it this result is an `Ok`.
+        :param f: the transformation function.
+        :return:
+        &#34;&#34;&#34;
+        return self.unsafe_map(f)
+
+    @final
+    def zip(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -&gt; Result[E, List[A]]:
+        &#34;&#34;&#34;
+        Transform a list of Result (including self) into a Result of list.
+
+        Is Ok is all results are Ok.
+        Is Error some are Ok, but at least one is an error but no panics.
+        Is Panic is there is at least one panic.
+        &#34;&#34;&#34;
+        return zip((self, *arg))
+
+    @final
+    def unsafe_ap(
+        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+    ) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        Noting functions from X to A: `[X1, ..., Xn] -&gt; A`.
+
+        If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+        and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
+
+    @final
+    @safe
+    def ap(self: Result[E, Callable[[X], A]], *arg: Result[E, X]) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        Noting functions from [X1,...,XN] to A: `[X1, ..., Xn] -&gt; A`.
+
+        If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+        and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
+        `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
+        &#34;&#34;&#34;
+        return self.unsafe_ap(*arg)
+
+    @final
+    def flatten(self: Result[E, Result[E, A]]) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        The concatenation function on results.
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return self.success
+        return self
+
+    @final
+    def unsafe_map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
+        &#34;&#34;&#34;
+        Transform the error stored if this result is an `Error`.
+        :param f: the transformation function
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(self, Error):
+            return Error(f(self.error))
+        return self  # type: ignore
+
+    @final
+    @safe
+    def map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
+        &#34;&#34;&#34;
+        Transform the error stored if this result is an `Error`.
+        :param f: the transformation function
+        :return:
+        &#34;&#34;&#34;
+        return self.unsafe_map_error(f)
+
+    @final
+    def unsafe_catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        React to errors (the except part of a try-except).
+
+        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        Otherwise, do nothing.
+        &#34;&#34;&#34;
+        if isinstance(self, Error):
+            return handler(self.error)
+        return self
+
+    @final
+    @safe
+    def catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        React to errors (the except part of a try-except).
+
+        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        Otherwise, do nothing.
+        &#34;&#34;&#34;
+        return self.unsafe_catch(handler)
+
+    @final
+    def unsafe_map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        Transform the exception stored if this result is a `Panic(some_exception)`.
+        &#34;&#34;&#34;
+        if isinstance(self, Panic):
+            return Panic(f(self.exception))
+        return self
+
+    @final
+    @safe
+    def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        Transform the exception stored if this result is a `Panic(some_exception)`.
+        &#34;&#34;&#34;
+        return self.unsafe_map_panic(f)
+
+    @final
+    def unsafe_recover(
+        self, handler: Callable[[Exception], Result[E, A]]
+    ) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        React to panics (the except part of a try-except).
+
+        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        Otherwise do nothing.
+        &#34;&#34;&#34;
+        if isinstance(self, Panic):
+            return handler(self.exception)
+        return self
+
+    @final
+    @safe
+    def recover(self, handler: Callable[[Exception], Result[E, A]]) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        React to panics (the except part of a try-except).
+
+        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        Otherwise do nothing.
+        &#34;&#34;&#34;
+        return self.unsafe_recover(handler)
+
+    @final
+    def raise_on_panic(self) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        If this result is an `Ok` or `Error`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exception.
+
+        Use with extreme care since it raise exception.
+        &#34;&#34;&#34;
+        if isinstance(self, Panic):
+            raise self.exception
+        return self</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="raffiot.result.Error" href="result.html#raffiot.result.Error">Error</a></li>
+<li><a title="raffiot.result.Ok" href="result.html#raffiot.result.Ok">Ok</a></li>
+<li><a title="raffiot.result.Panic" href="result.html#raffiot.result.Panic">Panic</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="raffiot.Result.ap"><code class="name flex">
+<span>def <span class="ident">ap</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
 <dd>
 <div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.catch"><code class="name flex">
+<span>def <span class="ident">catch</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.flat_map"><code class="name flex">
+<span>def <span class="ident">flat_map</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.flatten"><code class="name flex">
+<span>def <span class="ident">flatten</span></span>(<span>self: <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The concatenation function on results.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def flatten(self: Result[E, Result[E, A]]) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    The concatenation function on results.
+    &#34;&#34;&#34;
+    if isinstance(self, Ok):
+        return self.success
+    return self</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.fold"><code class="name flex">
+<span>def <span class="ident">fold</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.fold_raise"><code class="name flex">
+<span>def <span class="ident">fold_raise</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.is_error"><code class="name flex">
+<span>def <span class="ident">is_error</span></span>(<span>self) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>:return: True if this result is an <code><a title="raffiot.Error" href="#raffiot.Error">Error</a></code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def is_error(self) -&gt; bool:
+    &#34;&#34;&#34;
+    :return: True if this result is an `Error`
+    &#34;&#34;&#34;
+    return isinstance(self, Error)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.is_ok"><code class="name flex">
+<span>def <span class="ident">is_ok</span></span>(<span>self) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>:return: True if this result is an <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def is_ok(self) -&gt; bool:
+    &#34;&#34;&#34;
+    :return: True if this result is an `Ok`
+    &#34;&#34;&#34;
+    return isinstance(self, Ok)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.is_panic"><code class="name flex">
+<span>def <span class="ident">is_panic</span></span>(<span>self) ‑> bool</span>
+</code></dt>
+<dd>
+<div class="desc"><p>:return: True if this result is an <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a></code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def is_panic(self) -&gt; bool:
+    &#34;&#34;&#34;
+    :return: True if this result is an `Panic`
+    &#34;&#34;&#34;
+    return isinstance(self, Panic)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.map"><code class="name flex">
+<span>def <span class="ident">map</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.map_error"><code class="name flex">
+<span>def <span class="ident">map_error</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.map_panic"><code class="name flex">
+<span>def <span class="ident">map_panic</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.raise_on_panic"><code class="name flex">
+<span>def <span class="ident">raise_on_panic</span></span>(<span>self) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>If this result is an <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code> or <code><a title="raffiot.Error" href="#raffiot.Error">Error</a></code>, do nothing.
+If it is a <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(some_exception)</code>, raise the exception.</p>
+<p>Use with extreme care since it raise exception.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def raise_on_panic(self) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    If this result is an `Ok` or `Error`, do nothing.
+    If it is a `Panic(some_exception)`, raise the exception.
+
+    Use with extreme care since it raise exception.
+    &#34;&#34;&#34;
+    if isinstance(self, Panic):
+        raise self.exception
+    return self</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.recover"><code class="name flex">
+<span>def <span class="ident">recover</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.tri_map"><code class="name flex">
+<span>def <span class="ident">tri_map</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
+    try:
+        return f(*args, **kwargs)
+    except Exception as exception:
+        return Panic(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_ap"><code class="name flex">
+<span>def <span class="ident">unsafe_ap</span></span>(<span>self: <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, Callable[[X], A]], *arg: <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, X]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Noting functions from X to A: <code>[X1, ..., Xn] -&gt; A</code>.</p>
+<p>If this result represent a computation returning a function <code>f: [X1,...,XN] -&gt; A</code>
+and arg represent a computation returning a value <code>x1: X1</code>,&hellip;,<code>xn: Xn</code>, then
+<code>self.ap(arg)</code> represents the computation returning <code>f(x1,...,xn): A</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_ap(
+    self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    Noting functions from X to A: `[X1, ..., Xn] -&gt; A`.
+
+    If this result represent a computation returning a function `f: [X1,...,XN] -&gt; A`
+    and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
+    `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
+    &#34;&#34;&#34;
+    return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_catch"><code class="name flex">
+<span>def <span class="ident">unsafe_catch</span></span>(<span>self, handler: Callable[[E], <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to errors (the except part of a try-except).</p>
+<p>If this result is an <code><a title="raffiot.Error" href="#raffiot.Error">Error</a>(some_error)</code>, then replace it with <code>handler(some_error)</code>.
+Otherwise, do nothing.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    React to errors (the except part of a try-except).
+
+    If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+    Otherwise, do nothing.
+    &#34;&#34;&#34;
+    if isinstance(self, Error):
+        return handler(self.error)
+    return self</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_flat_map"><code class="name flex">
+<span>def <span class="ident">unsafe_flat_map</span></span>(<span>self, f: Callable[[A], <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, A2]]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The usual monadic operation called
+- bind, &gt;&gt;=: in Haskell
+- flatMap: in Scala
+- andThem: in Elm
+&hellip;</p>
+<p>Chain operations returning results.</p>
+<p>:param f: operation to perform it this result is an <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code>.
+:return: the result combined result.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_flat_map(self, f: Callable[[A], Result[E, A2]]) -&gt; Result[E, A2]:
+    &#34;&#34;&#34;
+    The usual monadic operation called
+        - bind, &gt;&gt;=: in Haskell
+        - flatMap: in Scala
+        - andThem: in Elm
+        ...
+
+    Chain operations returning results.
+
+    :param f: operation to perform it this result is an `Ok`.
+    :return: the result combined result.
+    &#34;&#34;&#34;
+    if isinstance(self, Ok):
+        return f(self.success)
+    return self</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_fold"><code class="name flex">
+<span>def <span class="ident">unsafe_fold</span></span>(<span>self, on_success: Callable[[A], X], on_error: Callable[[E], X], on_panic: Callable[[Exception], X]) ‑> ~X</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform this Result[E,A] into X.
+:param on_success: is called if this result is a <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code>.
+:param on_error: is called if this result is a <code><a title="raffiot.Error" href="#raffiot.Error">Error</a></code>.
+:param on_panic: is called if this result is a <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a></code>.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_fold(
+    self,
+    on_success: Callable[[A], X],
+    on_error: Callable[[E], X],
+    on_panic: Callable[[Exception], X],
+) -&gt; X:
+    &#34;&#34;&#34;
+    Transform this Result[E,A] into X.
+    :param on_success: is called if this result is a `Ok`.
+    :param on_error: is called if this result is a `Error`.
+    :param on_panic: is called if this result is a `Panic`.
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(self, Ok):
+        return on_success(self.success)
+    if isinstance(self, Error):
+        return on_error(self.error)
+    if isinstance(self, Panic):
+        return on_panic(self.exception)
+    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_fold_raise"><code class="name flex">
+<span>def <span class="ident">unsafe_fold_raise</span></span>(<span>self, on_success: Callable[[A], X], on_error: Callable[[E], X]) ‑> ~X</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform this <code><a title="raffiot.Result" href="#raffiot.Result">Result</a>[E,A]</code> into <code>X</code> if this result is an <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code> or <code><a title="raffiot.Error" href="#raffiot.Error">Error</a></code>.
+But raise the stored exception is this is a panic.</p>
+<p>It is useful to raise an exception on panics.</p>
+<p>:param on_success: is called if this result is a <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code>.
+:param on_error: is called if this result is a <code><a title="raffiot.Error" href="#raffiot.Error">Error</a></code>.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_fold_raise(
+    self, on_success: Callable[[A], X], on_error: Callable[[E], X]
+) -&gt; X:
+    &#34;&#34;&#34;
+    Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
+    But raise the stored exception is this is a panic.
+
+    It is useful to raise an exception on panics.
+
+    :param on_success: is called if this result is a `Ok`.
+    :param on_error: is called if this result is a `Error`.
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(self, Ok):
+        return on_success(self.success)
+    if isinstance(self, Error):
+        return on_error(self.error)
+    if isinstance(self, Panic):
+        raise self.exception
+    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_map"><code class="name flex">
+<span>def <span class="ident">unsafe_map</span></span>(<span>self, f: Callable[[A], A2]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the value stored in <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code>, it this result is an <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code>.
+:param f: the transformation function.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_map(self, f: Callable[[A], A2]) -&gt; Result[E, A2]:
+    &#34;&#34;&#34;
+    Transform the value stored in `Ok`, it this result is an `Ok`.
+    :param f: the transformation function.
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(self, Ok):
+        return Ok(f(self.success))
+    return self</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_map_error"><code class="name flex">
+<span>def <span class="ident">unsafe_map_error</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E2, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the error stored if this result is an <code><a title="raffiot.Error" href="#raffiot.Error">Error</a></code>.
+:param f: the transformation function
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
+    &#34;&#34;&#34;
+    Transform the error stored if this result is an `Error`.
+    :param f: the transformation function
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(self, Error):
+        return Error(f(self.error))
+    return self  # type: ignore</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_map_panic"><code class="name flex">
+<span>def <span class="ident">unsafe_map_panic</span></span>(<span>self, f: Callable[[Exception], Exception]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the exception stored if this result is a <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(some_exception)</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    Transform the exception stored if this result is a `Panic(some_exception)`.
+    &#34;&#34;&#34;
+    if isinstance(self, Panic):
+        return Panic(f(self.exception))
+    return self</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_recover"><code class="name flex">
+<span>def <span class="ident">unsafe_recover</span></span>(<span>self, handler: Callable[[Exception], <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>React to panics (the except part of a try-except).</p>
+<p>If this result is a <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(exception)</code>, replace it by <code>handler(exception)</code>.
+Otherwise do nothing.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_recover(
+    self, handler: Callable[[Exception], Result[E, A]]
+) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    React to panics (the except part of a try-except).
+
+    If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+    Otherwise do nothing.
+    &#34;&#34;&#34;
+    if isinstance(self, Panic):
+        return handler(self.exception)
+    return self</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.unsafe_tri_map"><code class="name flex">
+<span>def <span class="ident">unsafe_tri_map</span></span>(<span>self, f: Callable[[A], A2], g: Callable[[E], E2], h: Callable[[Exception], Exception]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E2, ~A2]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform the value/error/exception stored in this result.
+:param f: how to transform the value a if this result is <code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a>(a)</code>
+:param g: how to transform the error e if this result is <code><a title="raffiot.Error" href="#raffiot.Error">Error</a>(e)</code>
+:param h: how to transform the exception p if this result is <code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a>(p)</code>
+:return: the "same" result with the stored value transformed.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_tri_map(
+    self,
+    f: Callable[[A], A2],
+    g: Callable[[E], E2],
+    h: Callable[[Exception], Exception],
+) -&gt; Result[E2, A2]:
+    &#34;&#34;&#34;
+    Transform the value/error/exception stored in this result.
+    :param f: how to transform the value a if this result is `Ok(a)`
+    :param g: how to transform the error e if this result is `Error(e)`
+    :param h: how to transform the exception p if this result is `Panic(p)`
+    :return: the &#34;same&#34; result with the stored value transformed.
+    &#34;&#34;&#34;
+    return self.unsafe_fold(
+        lambda x: Ok(f(x)),
+        lambda x: Error(g(x)),
+        lambda x: Panic(h(x)),
+    )</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Result.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, Callable[[X], A]], *arg: <a title="raffiot.Result" href="#raffiot.Result">Result</a>[E, X]) ‑> <a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~E, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform a list of Result (including self) into a Result of list.</p>
+<p>Is Ok is all results are Ok.
+Is Error some are Ok, but at least one is an error but no panics.
+Is Panic is there is at least one panic.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def zip(
+    self: Result[E, Callable[[X], A]], *arg: Result[E, X]
+) -&gt; Result[E, List[A]]:
+    &#34;&#34;&#34;
+    Transform a list of Result (including self) into a Result of list.
+
+    Is Ok is all results are Ok.
+    Is Error some are Ok, but at least one is an error but no panics.
+    Is Panic is there is at least one panic.
+    &#34;&#34;&#34;
+    return zip((self, *arg))</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.UpdateResult"><code class="flex name class">
+<span>class <span class="ident">UpdateResult</span></span>
+<span>(</span><span>old_value: A, new_value: A, returned: B)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The result of the <code>update</code> methods of <code><a title="raffiot.Var" href="#raffiot.Var">Var</a></code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass
+class UpdateResult(Generic[A, B]):
+    &#34;&#34;&#34;
+    The result of the `update` methods of `Var`.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;]
+
+    &#34;&#34;&#34;
+    The result of an Update
+    &#34;&#34;&#34;
+
+    old_value: A
+    &#34;&#34;&#34;
+    The value before the Update
+    &#34;&#34;&#34;
+
+    new_value: A
+    &#34;&#34;&#34;
+    The value after the update
+    &#34;&#34;&#34;
+
+    returned: B
+    &#34;&#34;&#34;
+    The result produced by the update
+    &#34;&#34;&#34;</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.UpdateResult.new_value"><code class="name">var <span class="ident">new_value</span> : ~A</code></dt>
+<dd>
+<div class="desc"><p>The value after the update</p></div>
+</dd>
+<dt id="raffiot.UpdateResult.old_value"><code class="name">var <span class="ident">old_value</span> : ~A</code></dt>
+<dd>
+<div class="desc"><p>The value before the Update</p></div>
+</dd>
+<dt id="raffiot.UpdateResult.returned"><code class="name">var <span class="ident">returned</span> : ~B</code></dt>
+<dd>
+<div class="desc"><p>The result produced by the update</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.Val"><code class="flex name class">
+<span>class <span class="ident">Val</span></span>
+<span>(</span><span>value: A)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Immutable Value.</p>
+<p>Used to create local "variables" in lambdas.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass(frozen=True)
+class Val(Generic[A]):
+    &#34;&#34;&#34;
+    Immutable Value.
+
+    Used to create local &#34;variables&#34; in lambdas.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;value&#34;]
+
+    value: A
+
+    def get(self) -&gt; A:
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
+        return self.value
+
+    def get_io(self) -&gt; IO[None, None, A]:
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
+        return io.defer(self.get)
+
+    def get_rs(self) -&gt; Resource[None, None, A]:
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
+        return resource.defer(self.get)
+
+    @classmethod
+    def pure(cls, a: A) -&gt; Val[A]:
+        &#34;&#34;&#34;
+        Create a new Val with value `a`
+
+        :param a: the value of this val.
+        :return:
+        &#34;&#34;&#34;
+        return Val(a)
+
+    def map(self, f: Callable[[A], B]) -&gt; Val[B]:
+        &#34;&#34;&#34;
+        Create a new Val from this one by applying this **pure** function.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+        return Val(f(self.value))
+
+    def traverse(self, f: Callable[[A], IO[B]]) -&gt; IO[Val[B]]:
+        &#34;&#34;&#34;
+        Create a new Val from this one by applying this `IO` function.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        return io.defer_io(f, self.value).map(Val)
+
+    def flat_map(self, f: Callable[[A], Val[B]]) -&gt; Val[B]:
+        &#34;&#34;&#34;
+        Create a new Val from this one.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+        return f(self.value)
+
+    def flatten(self) -&gt; Val[B]:  # A = Val[B]
+        &#34;&#34;&#34; &#34;
+        Flatten this `Val[Val[A]]` into a `Val[A]`
+        &#34;&#34;&#34;
+
+        return Val(self.value.value)
+
+    @classmethod
+    def zip(cls, *vals: Any) -&gt; Val[List[A]]:
+        &#34;&#34;&#34; &#34;
+        Group these list of Val into a Val of List
+        &#34;&#34;&#34;
+
+        if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
+            return Val([x.value for x in vals[0]])
+        return Val([x.value for x in vals])
+
+    def zip_with(self, *vals: Any) -&gt; Val[List[A]]:
+        &#34;&#34;&#34;
+        Group this Val with other Val into a list of Val.
+
+        :param vals: other Val to combine with self.
+        :return:
+        &#34;&#34;&#34;
+
+        return Val.zip(self, *vals)
+
+    def ap(self, *arg: Val[A]) -&gt; Val[B]:
+        &#34;&#34;&#34;
+        Apply the function contained in this Val to `args` Vals.
+
+        :param arg:
+        :return:
+        &#34;&#34;&#34;
+
+        if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
+            l = [x.value for x in arg[0]]
+        else:
+            l = [x.value for x in arg]
+        return Val(self.value(*l))</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="raffiot.Val.pure"><code class="name flex">
+<span>def <span class="ident">pure</span></span>(<span>a: A) ‑> <a title="raffiot.val.Val" href="val.html#raffiot.val.Val">Val</a>[~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new Val with value <code>a</code></p>
+<p>:param a: the value of this val.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def pure(cls, a: A) -&gt; Val[A]:
+    &#34;&#34;&#34;
+    Create a new Val with value `a`
+
+    :param a: the value of this val.
+    :return:
+    &#34;&#34;&#34;
+    return Val(a)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>*vals: Any) ‑> <a title="raffiot.val.Val" href="val.html#raffiot.val.Val">Val</a>[typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>"
+Group these list of Val into a Val of List</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def zip(cls, *vals: Any) -&gt; Val[List[A]]:
+    &#34;&#34;&#34; &#34;
+    Group these list of Val into a Val of List
+    &#34;&#34;&#34;
+
+    if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
+        return Val([x.value for x in vals[0]])
+    return Val([x.value for x in vals])</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.Val.value"><code class="name">var <span class="ident">value</span> : ~A</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="raffiot.Val.ap"><code class="name flex">
+<span>def <span class="ident">ap</span></span>(<span>self, *arg: <a title="raffiot.Val" href="#raffiot.Val">Val</a>[A]) ‑> <a title="raffiot.val.Val" href="val.html#raffiot.val.Val">Val</a>[~B]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function contained in this Val to <code>args</code> Vals.</p>
+<p>:param arg:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ap(self, *arg: Val[A]) -&gt; Val[B]:
+    &#34;&#34;&#34;
+    Apply the function contained in this Val to `args` Vals.
+
+    :param arg:
+    :return:
+    &#34;&#34;&#34;
+
+    if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
+        l = [x.value for x in arg[0]]
+    else:
+        l = [x.value for x in arg]
+    return Val(self.value(*l))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.flat_map"><code class="name flex">
+<span>def <span class="ident">flat_map</span></span>(<span>self, f: Callable[[A], <a title="raffiot.Val" href="#raffiot.Val">Val</a>[B]]) ‑> <a title="raffiot.val.Val" href="val.html#raffiot.val.Val">Val</a>[~B]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new Val from this one.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flat_map(self, f: Callable[[A], Val[B]]) -&gt; Val[B]:
+    &#34;&#34;&#34;
+    Create a new Val from this one.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+    return f(self.value)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.flatten"><code class="name flex">
+<span>def <span class="ident">flatten</span></span>(<span>self) ‑> <a title="raffiot.val.Val" href="val.html#raffiot.val.Val">Val</a>[~B]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>"
+Flatten this <code><a title="raffiot.Val" href="#raffiot.Val">Val</a>[<a title="raffiot.Val" href="#raffiot.Val">Val</a>[A]]</code> into a <code><a title="raffiot.Val" href="#raffiot.Val">Val</a>[A]</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flatten(self) -&gt; Val[B]:  # A = Val[B]
+    &#34;&#34;&#34; &#34;
+    Flatten this `Val[Val[A]]` into a `Val[A]`
+    &#34;&#34;&#34;
+
+    return Val(self.value.value)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.get"><code class="name flex">
+<span>def <span class="ident">get</span></span>(<span>self) ‑> ~A</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get this Val value.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get(self) -&gt; A:
+    &#34;&#34;&#34;
+    Get this Val value.
+    :return:
+    &#34;&#34;&#34;
+    return self.value</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.get_io"><code class="name flex">
+<span>def <span class="ident">get_io</span></span>(<span>self) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[NoneType, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get this Val value.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_io(self) -&gt; IO[None, None, A]:
+    &#34;&#34;&#34;
+    Get this Val value.
+    :return:
+    &#34;&#34;&#34;
+    return io.defer(self.get)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.get_rs"><code class="name flex">
+<span>def <span class="ident">get_rs</span></span>(<span>self) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get this Val value.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_rs(self) -&gt; Resource[None, None, A]:
+    &#34;&#34;&#34;
+    Get this Val value.
+    :return:
+    &#34;&#34;&#34;
+    return resource.defer(self.get)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.map"><code class="name flex">
+<span>def <span class="ident">map</span></span>(<span>self, f: Callable[[A], B]) ‑> <a title="raffiot.val.Val" href="val.html#raffiot.val.Val">Val</a>[~B]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new Val from this one by applying this <strong>pure</strong> function.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def map(self, f: Callable[[A], B]) -&gt; Val[B]:
+    &#34;&#34;&#34;
+    Create a new Val from this one by applying this **pure** function.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+    return Val(f(self.value))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>self, f: Callable[[A], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[B]]) ‑> <a title="raffiot.IO" href="#raffiot.IO">IO</a>[<a title="raffiot.Val" href="#raffiot.Val">Val</a>[B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new Val from this one by applying this <code><a title="raffiot.IO" href="#raffiot.IO">IO</a></code> function.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(self, f: Callable[[A], IO[B]]) -&gt; IO[Val[B]]:
+    &#34;&#34;&#34;
+    Create a new Val from this one by applying this `IO` function.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    return io.defer_io(f, self.value).map(Val)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Val.zip_with"><code class="name flex">
+<span>def <span class="ident">zip_with</span></span>(<span>self, *vals: Any) ‑> <a title="raffiot.val.Val" href="val.html#raffiot.val.Val">Val</a>[typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Group this Val with other Val into a list of Val.</p>
+<p>:param vals: other Val to combine with self.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip_with(self, *vals: Any) -&gt; Val[List[A]]:
+    &#34;&#34;&#34;
+    Group this Val with other Val into a list of Val.
+
+    :param vals: other Val to combine with self.
+    :return:
+    &#34;&#34;&#34;
+
+    return Val.zip(self, *vals)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.Var"><code class="flex name class">
+<span>class <span class="ident">Var</span></span>
+<span>(</span><span>lock: <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[Any, None, None], value: A)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A mutable variable.
+<strong>All</strong> concurrent access are protected using a Reentrant Lock.</p>
+<p><strong>IMPORTANT:</strong> /!\ <strong>NEVER CREATE VARIABLES BY THE CONSTRUCTOT !!!!</strong> /!\</p>
+<p>Use <code><a title="raffiot.Var.create" href="#raffiot.Var.create">Var.create()</a> instead.</code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+class Var(Generic[A]):
+    &#34;&#34;&#34;
+    A mutable variable.
+    **All** concurrent access are protected using a Reentrant Lock.
+
+    **IMPORTANT:** /!\\ **NEVER CREATE VARIABLES BY THE CONSTRUCTOT !!!!** /!\\
+
+    Use `Var.create instead.`
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;_lock&#34;, &#34;_value&#34;]
+
+    def __init__(self, lock: Resource[Any, None, None], value: A):
+        self._lock = lock
+        self._value = value
+
+    def lock(self) -&gt; Resource[Any, None, None]:
+        &#34;&#34;&#34;
+        The Reentrant Lock that guarantees exclusive access to this variable.
+        &#34;&#34;&#34;
+        return self._lock
+
+    @classmethod
+    def create(cls, a: A) -&gt; IO[Any, None, Var[A]]:
+        &#34;&#34;&#34;
+        Create a new variable whose value is `a`.
+
+        :param a:
+        :return:
+        &#34;&#34;&#34;
+        return resource.reentrant_lock.map(lambda lock: Var(lock, a))
+
+    @classmethod
+    def create_rs(cls, a: A) -&gt; Resource[Any, None, Var[A]]:
+        &#34;&#34;&#34;
+        Create a new variable whose value is `a`.
+
+        :param a:
+        :return:
+        &#34;&#34;&#34;
+        return resource.lift_io(resource.reentrant_lock.map(lambda lock: Var(lock, a)))
+
+    #############
+    #   GETTER  #
+    #############
+
+    def get(self) -&gt; IO[None, None, A]:
+        &#34;&#34;&#34;
+        Get the current value of this variable.
+        :return:
+        &#34;&#34;&#34;
+        return self._lock.with_(io.defer(lambda: self._value))
+
+    def get_rs(self) -&gt; Resource[None, None, A]:
+        &#34;&#34;&#34;
+        Get the current value of this variable.
+        :return:
+        &#34;&#34;&#34;
+        return self._lock.then(resource.defer(lambda: self._value))
+
+    #############
+    #   SETTER  #
+    #############
+
+    def set(self, v: A) -&gt; IO[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h(w) -&gt; None:
+            self._value = w
+
+        return self._lock.with_(io.defer(h, v))
+
+    def set_rs(self, v: A) -&gt; Resource[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h(w) -&gt; None:
+            self._value = w
+
+        return self._lock.then(resource.defer(h, v))
+
+    #####################
+    #   GETTER + SETTER #
+    #####################
+
+    def get_and_set(self, v: A) -&gt; IO[Any, None, A]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable. The previous value is returned.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            old_value = self._value
+            self._value = v
+            return old_value
+
+        return self._lock.with_(io.defer(h))
+
+    def get_and_set_rs(self, v: A) -&gt; Resource[None, None, None]:
+        &#34;&#34;&#34;
+        Assign a new value to this variable. The previous value is returned.
+
+        :param v:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            old_value = self._value
+            self._value = v
+            return old_value
+
+        return self._lock.then(resource.defer(h))
+
+    ###############
+    #    UPDATE   #
+    ###############
+
+    def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; UpdateResult[A, B]:
+            old_value = self._value
+            new_value, ret = f(self._value)
+            self._value = new_value
+            return UpdateResult(old_value, new_value, ret)
+
+        return self._lock.with_(io.defer(h))
+
+    def update_io(
+        self, f: Callable[[A], IO[Any, None, Tuple[A, B]]]
+    ) -&gt; IO[Any, None, UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; IO[Any, None, UpdateResult[A, B]]:
+            old_value = self._value
+
+            def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+                self._value = x[0]
+                return UpdateResult(old_value, self._value, x[1])
+
+            return f(old_value).map(g)
+
+        return self._lock.with_(io.defer_io(h))
+
+    def update_rs(
+        self, f: Callable[[A], Resource[Any, None, Tuple[A, B]]]
+    ) -&gt; Resource[Any, None, UpdateResult[A, B]]:
+        &#34;&#34;&#34;
+        Update the value contained in this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h() -&gt; Resource[Any, None, UpdateResult[A, B]]:
+            old_value = self._value
+
+            def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+                self._value = x[0]
+                return UpdateResult(old_value, self._value, x[1])
+
+            return f(old_value).map(g)
+
+        return self._lock.then(resource.defer_resource(h))
+
+    ######################
+    #  Creating New Vars #
+    ######################
+
+    def traverse(self, f: Callable[[A], IO[Any, None, B]]) -&gt; IO[Any, None, Var[B]]:
+        &#34;&#34;&#34;
+        Create a new variable by transforming the current value of this variable.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        def h():
+            return f(self._value).flat_map(Var.create)
+
+        return self._lock.with_(io.defer_io(h))
+
+    @classmethod
+    def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+        &#34;&#34;&#34; &#34;
+        Group these variables current values into a list.
+        &#34;&#34;&#34;
+
+        if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
+            args = vars[0]
+        else:
+            args = vars
+        return resource.zip([x._lock for x in args]).with_(
+            io.defer(lambda: [x._value for x in args])
+        )
+
+    def zip_with(self, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+        &#34;&#34;&#34;
+        Group this variable current value with `vars` variable current values.
+
+        :param vals: other variables to combine with self.
+        :return:
+        &#34;&#34;&#34;
+        return Var.zip(self, *vars)
+
+    def ap(self, *arg: Var[A]) -&gt; IO[Any, None, B]:
+        &#34;&#34;&#34;
+        Apply the function contained in this variable to `args` variables.
+
+        :param arg:
+        :return:
+        &#34;&#34;&#34;
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>typing.Generic</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="raffiot.Var.create"><code class="name flex">
+<span>def <span class="ident">create</span></span>(<span>a: A) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.var.Var" href="var.html#raffiot.var.Var">Var</a>[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new variable whose value is <code>a</code>.</p>
+<p>:param a:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def create(cls, a: A) -&gt; IO[Any, None, Var[A]]:
+    &#34;&#34;&#34;
+    Create a new variable whose value is `a`.
+
+    :param a:
+    :return:
+    &#34;&#34;&#34;
+    return resource.reentrant_lock.map(lambda lock: Var(lock, a))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.create_rs"><code class="name flex">
+<span>def <span class="ident">create_rs</span></span>(<span>a: A) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, <a title="raffiot.var.Var" href="var.html#raffiot.var.Var">Var</a>[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new variable whose value is <code>a</code>.</p>
+<p>:param a:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def create_rs(cls, a: A) -&gt; Resource[Any, None, Var[A]]:
+    &#34;&#34;&#34;
+    Create a new variable whose value is `a`.
+
+    :param a:
+    :return:
+    &#34;&#34;&#34;
+    return resource.lift_io(resource.reentrant_lock.map(lambda lock: Var(lock, a)))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.zip"><code class="name flex">
+<span>def <span class="ident">zip</span></span>(<span>*vars: <a title="raffiot.Var" href="#raffiot.Var">Var</a>[A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>"
+Group these variables current values into a list.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+    &#34;&#34;&#34; &#34;
+    Group these variables current values into a list.
+    &#34;&#34;&#34;
+
+    if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
+        args = vars[0]
+    else:
+        args = vars
+    return resource.zip([x._lock for x in args]).with_(
+        io.defer(lambda: [x._value for x in args])
+    )</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="raffiot.Var.ap"><code class="name flex">
+<span>def <span class="ident">ap</span></span>(<span>self, *arg: <a title="raffiot.Var" href="#raffiot.Var">Var</a>[A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, ~B]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function contained in this variable to <code>args</code> variables.</p>
+<p>:param arg:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ap(self, *arg: Var[A]) -&gt; IO[Any, None, B]:
+    &#34;&#34;&#34;
+    Apply the function contained in this variable to `args` variables.
+
+    :param arg:
+    :return:
+    &#34;&#34;&#34;
+    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.get"><code class="name flex">
+<span>def <span class="ident">get</span></span>(<span>self) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[NoneType, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get the current value of this variable.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get(self) -&gt; IO[None, None, A]:
+    &#34;&#34;&#34;
+    Get the current value of this variable.
+    :return:
+    &#34;&#34;&#34;
+    return self._lock.with_(io.defer(lambda: self._value))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.get_and_set"><code class="name flex">
+<span>def <span class="ident">get_and_set</span></span>(<span>self, v: A) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable. The previous value is returned.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_and_set(self, v: A) -&gt; IO[Any, None, A]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable. The previous value is returned.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h():
+        old_value = self._value
+        self._value = v
+        return old_value
+
+    return self._lock.with_(io.defer(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.get_and_set_rs"><code class="name flex">
+<span>def <span class="ident">get_and_set_rs</span></span>(<span>self, v: A) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable. The previous value is returned.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_and_set_rs(self, v: A) -&gt; Resource[None, None, None]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable. The previous value is returned.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h():
+        old_value = self._value
+        self._value = v
+        return old_value
+
+    return self._lock.then(resource.defer(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.get_rs"><code class="name flex">
+<span>def <span class="ident">get_rs</span></span>(<span>self) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Get the current value of this variable.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_rs(self) -&gt; Resource[None, None, A]:
+    &#34;&#34;&#34;
+    Get the current value of this variable.
+    :return:
+    &#34;&#34;&#34;
+    return self._lock.then(resource.defer(lambda: self._value))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.lock"><code class="name flex">
+<span>def <span class="ident">lock</span></span>(<span>self) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The Reentrant Lock that guarantees exclusive access to this variable.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def lock(self) -&gt; Resource[Any, None, None]:
+    &#34;&#34;&#34;
+    The Reentrant Lock that guarantees exclusive access to this variable.
+    &#34;&#34;&#34;
+    return self._lock</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.set"><code class="name flex">
+<span>def <span class="ident">set</span></span>(<span>self, v: A) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[NoneType, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set(self, v: A) -&gt; IO[None, None, None]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h(w) -&gt; None:
+        self._value = w
+
+    return self._lock.with_(io.defer(h, v))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.set_rs"><code class="name flex">
+<span>def <span class="ident">set_rs</span></span>(<span>self, v: A) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[NoneType, NoneType, NoneType]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Assign a new value to this variable.</p>
+<p>:param v:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_rs(self, v: A) -&gt; Resource[None, None, None]:
+    &#34;&#34;&#34;
+    Assign a new value to this variable.
+
+    :param v:
+    :return:
+    &#34;&#34;&#34;
+
+    def h(w) -&gt; None:
+        self._value = w
+
+    return self._lock.then(resource.defer(h, v))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>self, f: Callable[[A], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[Any, None, B]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.var.Var" href="var.html#raffiot.var.Var">Var</a>[~B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new variable by transforming the current value of this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(self, f: Callable[[A], IO[Any, None, B]]) -&gt; IO[Any, None, Var[B]]:
+    &#34;&#34;&#34;
+    Create a new variable by transforming the current value of this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h():
+        return f(self._value).flat_map(Var.create)
+
+    return self._lock.with_(io.defer_io(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.update"><code class="name flex">
+<span>def <span class="ident">update</span></span>(<span>self, f: Callable[[A], Tuple[A, B]]) ‑> <a title="raffiot.IO" href="#raffiot.IO">IO</a>[<a title="raffiot.UpdateResult" href="#raffiot.UpdateResult">UpdateResult</a>[A, B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Update the value contained in this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+    &#34;&#34;&#34;
+    Update the value contained in this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h() -&gt; UpdateResult[A, B]:
+        old_value = self._value
+        new_value, ret = f(self._value)
+        self._value = new_value
+        return UpdateResult(old_value, new_value, ret)
+
+    return self._lock.with_(io.defer(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.update_io"><code class="name flex">
+<span>def <span class="ident">update_io</span></span>(<span>self, f: Callable[[A], <a title="raffiot.IO" href="#raffiot.IO">IO</a>[Any, None, Tuple[A, B]]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, <a title="raffiot.var.UpdateResult" href="var.html#raffiot.var.UpdateResult">UpdateResult</a>[~A, ~B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Update the value contained in this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_io(
+    self, f: Callable[[A], IO[Any, None, Tuple[A, B]]]
+) -&gt; IO[Any, None, UpdateResult[A, B]]:
+    &#34;&#34;&#34;
+    Update the value contained in this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h() -&gt; IO[Any, None, UpdateResult[A, B]]:
+        old_value = self._value
+
+        def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+            self._value = x[0]
+            return UpdateResult(old_value, self._value, x[1])
+
+        return f(old_value).map(g)
+
+    return self._lock.with_(io.defer_io(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.update_rs"><code class="name flex">
+<span>def <span class="ident">update_rs</span></span>(<span>self, f: Callable[[A], <a title="raffiot.Resource" href="#raffiot.Resource">Resource</a>[Any, None, Tuple[A, B]]]) ‑> <a title="raffiot.resource.Resource" href="resource.html#raffiot.resource.Resource">Resource</a>[typing.Any, NoneType, <a title="raffiot.var.UpdateResult" href="var.html#raffiot.var.UpdateResult">UpdateResult</a>[~A, ~B]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Update the value contained in this variable.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def update_rs(
+    self, f: Callable[[A], Resource[Any, None, Tuple[A, B]]]
+) -&gt; Resource[Any, None, UpdateResult[A, B]]:
+    &#34;&#34;&#34;
+    Update the value contained in this variable.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    def h() -&gt; Resource[Any, None, UpdateResult[A, B]]:
+        old_value = self._value
+
+        def g(x: Tuple[A, B]) -&gt; UpdateResult[A, B]:
+            self._value = x[0]
+            return UpdateResult(old_value, self._value, x[1])
+
+        return f(old_value).map(g)
+
+    return self._lock.then(resource.defer_resource(h))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.Var.zip_with"><code class="name flex">
+<span>def <span class="ident">zip_with</span></span>(<span>self, *vars: <a title="raffiot.Var" href="#raffiot.Var">Var</a>[A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, typing.List[~A]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Group this variable current value with <code>vars</code> variable current values.</p>
+<p>:param vals: other variables to combine with self.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip_with(self, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+    &#34;&#34;&#34;
+    Group this variable current value with `vars` variable current values.
+
+    :param vals: other variables to combine with self.
+    :return:
+    &#34;&#34;&#34;
+    return Var.zip(self, *vars)</code></pre>
+</details>
 </dd>
 </dl>
 </dd>
@@ -135,15 +3815,161 @@ class MatchError(Exception):
 <li><code><a title="raffiot.resource" href="resource.html">raffiot.resource</a></code></li>
 <li><code><a title="raffiot.result" href="result.html">raffiot.result</a></code></li>
 <li><code><a title="raffiot.untyped" href="untyped/index.html">raffiot.untyped</a></code></li>
+<li><code><a title="raffiot.utils" href="utils.html">raffiot.utils</a></code></li>
 <li><code><a title="raffiot.val" href="val.html">raffiot.val</a></code></li>
+<li><code><a title="raffiot.var" href="var.html">raffiot.var</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="raffiot.seq" href="#raffiot.seq">seq</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
+<h4><code><a title="raffiot.Error" href="#raffiot.Error">Error</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.Error.error" href="#raffiot.Error.error">error</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.IO" href="#raffiot.IO">IO</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.IO.ap" href="#raffiot.IO.ap">ap</a></code></li>
+<li><code><a title="raffiot.IO.attempt" href="#raffiot.IO.attempt">attempt</a></code></li>
+<li><code><a title="raffiot.IO.catch" href="#raffiot.IO.catch">catch</a></code></li>
+<li><code><a title="raffiot.IO.contra_map_read" href="#raffiot.IO.contra_map_read">contra_map_read</a></code></li>
+<li><code><a title="raffiot.IO.finally_" href="#raffiot.IO.finally_">finally_</a></code></li>
+<li><code><a title="raffiot.IO.flat_map" href="#raffiot.IO.flat_map">flat_map</a></code></li>
+<li><code><a title="raffiot.IO.flatten" href="#raffiot.IO.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.IO.map" href="#raffiot.IO.map">map</a></code></li>
+<li><code><a title="raffiot.IO.map_error" href="#raffiot.IO.map_error">map_error</a></code></li>
+<li><code><a title="raffiot.IO.map_panic" href="#raffiot.IO.map_panic">map_panic</a></code></li>
+<li><code><a title="raffiot.IO.on_failure" href="#raffiot.IO.on_failure">on_failure</a></code></li>
+<li><code><a title="raffiot.IO.parallel" href="#raffiot.IO.parallel">parallel</a></code></li>
+<li><code><a title="raffiot.IO.recover" href="#raffiot.IO.recover">recover</a></code></li>
+<li><code><a title="raffiot.IO.run" href="#raffiot.IO.run">run</a></code></li>
+<li><code><a title="raffiot.IO.then" href="#raffiot.IO.then">then</a></code></li>
+<li><code><a title="raffiot.IO.then_keep" href="#raffiot.IO.then_keep">then_keep</a></code></li>
+<li><code><a title="raffiot.IO.zip" href="#raffiot.IO.zip">zip</a></code></li>
+</ul>
+</li>
+<li>
 <h4><code><a title="raffiot.MatchError" href="#raffiot.MatchError">MatchError</a></code></h4>
 <ul class="">
 <li><code><a title="raffiot.MatchError.message" href="#raffiot.MatchError.message">message</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.Ok" href="#raffiot.Ok">Ok</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.Ok.success" href="#raffiot.Ok.success">success</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.Panic" href="#raffiot.Panic">Panic</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.Panic.exception" href="#raffiot.Panic.exception">exception</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.Resource" href="#raffiot.Resource">Resource</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.Resource.ap" href="#raffiot.Resource.ap">ap</a></code></li>
+<li><code><a title="raffiot.Resource.attempt" href="#raffiot.Resource.attempt">attempt</a></code></li>
+<li><code><a title="raffiot.Resource.catch" href="#raffiot.Resource.catch">catch</a></code></li>
+<li><code><a title="raffiot.Resource.contra_map_read" href="#raffiot.Resource.contra_map_read">contra_map_read</a></code></li>
+<li><code><a title="raffiot.Resource.create" href="#raffiot.Resource.create">create</a></code></li>
+<li><code><a title="raffiot.Resource.finally_" href="#raffiot.Resource.finally_">finally_</a></code></li>
+<li><code><a title="raffiot.Resource.flat_map" href="#raffiot.Resource.flat_map">flat_map</a></code></li>
+<li><code><a title="raffiot.Resource.flatten" href="#raffiot.Resource.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.Resource.map" href="#raffiot.Resource.map">map</a></code></li>
+<li><code><a title="raffiot.Resource.map_error" href="#raffiot.Resource.map_error">map_error</a></code></li>
+<li><code><a title="raffiot.Resource.map_panic" href="#raffiot.Resource.map_panic">map_panic</a></code></li>
+<li><code><a title="raffiot.Resource.on_failure" href="#raffiot.Resource.on_failure">on_failure</a></code></li>
+<li><code><a title="raffiot.Resource.recover" href="#raffiot.Resource.recover">recover</a></code></li>
+<li><code><a title="raffiot.Resource.then" href="#raffiot.Resource.then">then</a></code></li>
+<li><code><a title="raffiot.Resource.use" href="#raffiot.Resource.use">use</a></code></li>
+<li><code><a title="raffiot.Resource.with_" href="#raffiot.Resource.with_">with_</a></code></li>
+<li><code><a title="raffiot.Resource.zip" href="#raffiot.Resource.zip">zip</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.Result" href="#raffiot.Result">Result</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.Result.ap" href="#raffiot.Result.ap">ap</a></code></li>
+<li><code><a title="raffiot.Result.catch" href="#raffiot.Result.catch">catch</a></code></li>
+<li><code><a title="raffiot.Result.flat_map" href="#raffiot.Result.flat_map">flat_map</a></code></li>
+<li><code><a title="raffiot.Result.flatten" href="#raffiot.Result.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.Result.fold" href="#raffiot.Result.fold">fold</a></code></li>
+<li><code><a title="raffiot.Result.fold_raise" href="#raffiot.Result.fold_raise">fold_raise</a></code></li>
+<li><code><a title="raffiot.Result.is_error" href="#raffiot.Result.is_error">is_error</a></code></li>
+<li><code><a title="raffiot.Result.is_ok" href="#raffiot.Result.is_ok">is_ok</a></code></li>
+<li><code><a title="raffiot.Result.is_panic" href="#raffiot.Result.is_panic">is_panic</a></code></li>
+<li><code><a title="raffiot.Result.map" href="#raffiot.Result.map">map</a></code></li>
+<li><code><a title="raffiot.Result.map_error" href="#raffiot.Result.map_error">map_error</a></code></li>
+<li><code><a title="raffiot.Result.map_panic" href="#raffiot.Result.map_panic">map_panic</a></code></li>
+<li><code><a title="raffiot.Result.raise_on_panic" href="#raffiot.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.Result.recover" href="#raffiot.Result.recover">recover</a></code></li>
+<li><code><a title="raffiot.Result.tri_map" href="#raffiot.Result.tri_map">tri_map</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_ap" href="#raffiot.Result.unsafe_ap">unsafe_ap</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_catch" href="#raffiot.Result.unsafe_catch">unsafe_catch</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_flat_map" href="#raffiot.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_fold" href="#raffiot.Result.unsafe_fold">unsafe_fold</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_fold_raise" href="#raffiot.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_map" href="#raffiot.Result.unsafe_map">unsafe_map</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_map_error" href="#raffiot.Result.unsafe_map_error">unsafe_map_error</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_map_panic" href="#raffiot.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_recover" href="#raffiot.Result.unsafe_recover">unsafe_recover</a></code></li>
+<li><code><a title="raffiot.Result.unsafe_tri_map" href="#raffiot.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
+<li><code><a title="raffiot.Result.zip" href="#raffiot.Result.zip">zip</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.UpdateResult" href="#raffiot.UpdateResult">UpdateResult</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.UpdateResult.new_value" href="#raffiot.UpdateResult.new_value">new_value</a></code></li>
+<li><code><a title="raffiot.UpdateResult.old_value" href="#raffiot.UpdateResult.old_value">old_value</a></code></li>
+<li><code><a title="raffiot.UpdateResult.returned" href="#raffiot.UpdateResult.returned">returned</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.Val" href="#raffiot.Val">Val</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.Val.ap" href="#raffiot.Val.ap">ap</a></code></li>
+<li><code><a title="raffiot.Val.flat_map" href="#raffiot.Val.flat_map">flat_map</a></code></li>
+<li><code><a title="raffiot.Val.flatten" href="#raffiot.Val.flatten">flatten</a></code></li>
+<li><code><a title="raffiot.Val.get" href="#raffiot.Val.get">get</a></code></li>
+<li><code><a title="raffiot.Val.get_io" href="#raffiot.Val.get_io">get_io</a></code></li>
+<li><code><a title="raffiot.Val.get_rs" href="#raffiot.Val.get_rs">get_rs</a></code></li>
+<li><code><a title="raffiot.Val.map" href="#raffiot.Val.map">map</a></code></li>
+<li><code><a title="raffiot.Val.pure" href="#raffiot.Val.pure">pure</a></code></li>
+<li><code><a title="raffiot.Val.traverse" href="#raffiot.Val.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.Val.value" href="#raffiot.Val.value">value</a></code></li>
+<li><code><a title="raffiot.Val.zip" href="#raffiot.Val.zip">zip</a></code></li>
+<li><code><a title="raffiot.Val.zip_with" href="#raffiot.Val.zip_with">zip_with</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.Var" href="#raffiot.Var">Var</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.Var.ap" href="#raffiot.Var.ap">ap</a></code></li>
+<li><code><a title="raffiot.Var.create" href="#raffiot.Var.create">create</a></code></li>
+<li><code><a title="raffiot.Var.create_rs" href="#raffiot.Var.create_rs">create_rs</a></code></li>
+<li><code><a title="raffiot.Var.get" href="#raffiot.Var.get">get</a></code></li>
+<li><code><a title="raffiot.Var.get_and_set" href="#raffiot.Var.get_and_set">get_and_set</a></code></li>
+<li><code><a title="raffiot.Var.get_and_set_rs" href="#raffiot.Var.get_and_set_rs">get_and_set_rs</a></code></li>
+<li><code><a title="raffiot.Var.get_rs" href="#raffiot.Var.get_rs">get_rs</a></code></li>
+<li><code><a title="raffiot.Var.lock" href="#raffiot.Var.lock">lock</a></code></li>
+<li><code><a title="raffiot.Var.set" href="#raffiot.Var.set">set</a></code></li>
+<li><code><a title="raffiot.Var.set_rs" href="#raffiot.Var.set_rs">set_rs</a></code></li>
+<li><code><a title="raffiot.Var.traverse" href="#raffiot.Var.traverse">traverse</a></code></li>
+<li><code><a title="raffiot.Var.update" href="#raffiot.Var.update">update</a></code></li>
+<li><code><a title="raffiot.Var.update_io" href="#raffiot.Var.update_io">update_io</a></code></li>
+<li><code><a title="raffiot.Var.update_rs" href="#raffiot.Var.update_rs">update_rs</a></code></li>
+<li><code><a title="raffiot.Var.zip" href="#raffiot.Var.zip">zip</a></code></li>
+<li><code><a title="raffiot.Var.zip_with" href="#raffiot.Var.zip_with">zip_with</a></code></li>
 </ul>
 </li>
 </ul>

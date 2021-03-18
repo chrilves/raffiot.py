@@ -3,23 +3,20 @@ Local Variables to work around Python annoying limitations about lambdas.
 
 Python forbids local variables and
 """
-
 from __future__ import annotations
 
-from typing_extensions import final
+from collections import abc
 from dataclasses import dataclass
 from typing import Generic, TypeVar, Callable, List, Any
+
+from typing_extensions import final
+
 from raffiot import io, resource
 from raffiot.io import IO
 from raffiot.resource import Resource
-from collections import abc
-from abc import ABC
-
 
 __all__ = [
     "Val",
-    "Var",
-    "sequence",
 ]
 
 
@@ -27,93 +24,115 @@ A = TypeVar("A")
 B = TypeVar("B")
 
 
-@dataclass
+@final
+@dataclass(frozen=True)
 class Val(Generic[A]):
+    """
+    Immutable Value.
+
+    Used to create local "variables" in lambdas.
+    """
+
+    __slots__ = ["value"]
+
     value: A
 
-    @final
     def get(self) -> A:
+        """
+        Get this Val value.
+        :return:
+        """
         return self.value
 
-    @final
     def get_io(self) -> IO[None, None, A]:
+        """
+        Get this Val value.
+        :return:
+        """
         return io.defer(self.get)
 
-    @final
     def get_rs(self) -> Resource[None, None, A]:
+        """
+        Get this Val value.
+        :return:
+        """
         return resource.defer(self.get)
 
     @classmethod
     def pure(cls, a: A) -> Val[A]:
+        """
+        Create a new Val with value `a`
+
+        :param a: the value of this val.
+        :return:
+        """
         return Val(a)
 
     def map(self, f: Callable[[A], B]) -> Val[B]:
+        """
+        Create a new Val from this one by applying this **pure** function.
+
+        :param f:
+        :return:
+        """
         return Val(f(self.value))
 
+    def traverse(self, f: Callable[[A], IO[B]]) -> IO[Val[B]]:
+        """
+        Create a new Val from this one by applying this `IO` function.
+
+        :param f:
+        :return:
+        """
+
+        return io.defer_io(f, self.value).map(Val)
+
     def flat_map(self, f: Callable[[A], Val[B]]) -> Val[B]:
+        """
+        Create a new Val from this one.
+
+        :param f:
+        :return:
+        """
         return f(self.value)
+
+    def flatten(self) -> Val[B]:  # A = Val[B]
+        """ "
+        Flatten this `Val[Val[A]]` into a `Val[A]`
+        """
+
+        return Val(self.value.value)
 
     @classmethod
     def zip(cls, *vals: Any) -> Val[List[A]]:
+        """ "
+        Group these list of Val into a Val of List
+        """
+
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
         return Val([x.value for x in vals])
 
     def zip_with(self, *vals: Any) -> Val[List[A]]:
+        """
+        Group this Val with other Val into a list of Val.
+
+        :param vals: other Val to combine with self.
+        :return:
+        """
+
         return Val.zip(self, *vals)
 
     def ap(self, *arg: Val[A]) -> Val[B]:
+        """
+        Apply the function contained in this Val to `args` Vals.
+
+        :param arg:
+        :return:
+        """
+
         if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
         return Val(self.value(*l))
-
-
-@final
-@dataclass
-class Var(Val[A]):
-    value: A
-
-    def set(self, v: A) -> A:
-        old = self.value
-        self.value = v
-        return old
-
-    def set_io(self, v: A) -> IO[None, None, None]:
-        return io.defer(self.set, v)
-
-    def set_rs(self, v: A) -> Resource[None, None, None]:
-        return resource.defer(self.set, v)
-
-    @classmethod
-    def pure(cls, a: A) -> Var[A]:
-        return Var(a)
-
-    def map(self, f: Callable[[A], B]) -> Var[B]:
-        return Var(f(self.value))
-
-    def flat_map(self, f: Callable[[A], Var[B]]) -> Var[B]:
-        return f(self.value)
-
-    @classmethod
-    def zip(cls, *vars: Any) -> Val[List[A]]:
-        if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
-            return Var([x.value for x in vars[0]])
-        return Var([x.value for x in vars])
-
-    def zip_with(self, *vars: Any) -> Val[List[A]]:
-        return Var.zip(self, *vars)
-
-    def ap(self, *arg: Any) -> Val[B]:
-        if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
-            l = [x.value for x in arg[0]]
-        else:
-            l = [x.value for x in arg]
-        return Var(self.value(*l))
-
-
-def sequence(*a: Any) -> Any:
-    if len(a) == 1 and isinstance(a[0], abc.Iterable):
-        return a[0][-1]
-    return a[-1]

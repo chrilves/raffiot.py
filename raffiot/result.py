@@ -3,11 +3,14 @@ Data structure to represent the result of computation.
 """
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any, List, Iterable
-from typing_extensions import final
-from dataclasses import dataclass
-from raffiot import MatchError
+
 from collections import abc
+from dataclasses import dataclass
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
+
+from typing_extensions import final
+
+from raffiot.utils import MatchError
 
 __all__ = [
     "safe",
@@ -429,6 +432,8 @@ class Ok(Result[E, A]):
     The result of a successful computation.
     """
 
+    __slots__ = ["success"]
+
     success: A
 
 
@@ -440,6 +445,8 @@ class Error(Result[E, A]):
     The program is still in a valid state and can progress safely.
     """
 
+    __slots__ = ["error"]
+
     error: E
 
 
@@ -450,6 +457,8 @@ class Panic(Result[E, A]):
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     """
+
+    __slots__ = ["exception"]
 
     exception: Exception
 

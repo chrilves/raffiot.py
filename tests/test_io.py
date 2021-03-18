@@ -1,15 +1,14 @@
 import time
-from concurrent.futures import Executor
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Any, TypeVar
 from unittest import TestCase
 
 import hypothesis.strategies as st
 from hypothesis import given
 
-from raffiot import MatchError
 from raffiot.io import *
 from raffiot.result import Result, Ok, Error, Panic
-from concurrent.futures import ThreadPoolExecutor
+from raffiot.utils import MatchError
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)

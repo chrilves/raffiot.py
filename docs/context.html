@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html" class="active"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html" class="active"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li><li class="chapter-item expanded "><a href="variables.html"><strong aria-hidden="true">8.</strong> Variables</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -188,21 +188,21 @@ The context behaves like a global variable inside the running <code>IO</code>.
 But you can pass every call to <code>run</code> a different context.
 The context behaves like a local variable between different calls to <code>run</code>.</p>
 <h2 id="read--accessing-the-shared-context"><a class="header" href="#read--accessing-the-shared-context"><code>read</code> : accessing the shared context.</a></h2>
-<p>To access the context, just call the function <code>io.read()</code>. Its result
+<p>To access the context, just call the function <code>io.read</code>. Its result
 is the context:</p>
-<pre><code class="language-python">&gt;&gt;&gt; main : IO[int,None,int] = io.read()
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[int,None,int] = io.read
 &gt;&gt;&gt; main.run(5)
 Ok(success=5)
 &gt;&gt;&gt; main.run(77)
 Ok(success=77)
 </code></pre>
 <p>This example is indeed trivial. But imagine that <code>main</code> can be
-a very big program. You can call <code>io.read()</code> anywhere in <code>main</code> to
+a very big program. You can call <code>io.read</code> anywhere in <code>main</code> to
 get the context. It saves you the huge burden of passing the context
-from <code>run</code> to every function until it reaches the location of <code>io.read()</code>.</p>
+from <code>run</code> to every function until it reaches the location of <code>io.read</code>.</p>
 <h2 id="contra_map_read--transforming-the-shared-context"><a class="header" href="#contra_map_read--transforming-the-shared-context"><code>contra_map_read</code> : transforming the shared context.</a></h2>
 <p>As I said, the context behaves as a local global variable.
-With <code>io.read()</code> you have seen its global behaviour.
+With <code>io.read</code> you have seen its global behaviour.
 The method <code>contra_map_read</code> transforms the context, but only
 for the <code>IO</code> it is being called on.
 Note that the context is transformed before the <code>IO</code> is executed.</p>
@@ -211,7 +211,7 @@ alter the context. For example, your program may start with <code>None</code>
 as context, read its configuration to instantiate the services it wants
 to inject and then change to context to pass these services everywhere
 for dependency injection.</p>
-<pre><code class="language-python">&gt;&gt;&gt; main : IO[str,None,int] = io.read().contra_map_read(lambda s: len(s))
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[str,None,int] = io.read.contra_map_read(lambda s: len(s))
 &gt;&gt;&gt; main.run(&quot;Hello&quot;)
 Ok(success=5)
 </code></pre>
@@ -226,7 +226,7 @@ you want to execute later. But unlike <code>io.defer</code>, this function:</p>
 </ul>
 <p>The last point is important because it means the function can raise
 errors while <code>io.defer</code> can only raise panics.</p>
-<pre><code class="language-python">&gt;&gt;&gt; def f(context:int) -&gt; Result[str,int]:
+<pre><code class="language-python">&gt;&gt;&gt; def f(context:int, i: int) -&gt; Result[str,int]:
 ...   if context &gt; 0:
 ...     return Ok(context + i)
 ...   else:
@@ -255,8 +255,7 @@ Error(error='Ooups!')
 <h2 id="use-case-dependency-injection"><a class="header" href="#use-case-dependency-injection">Use Case: Dependency Injection</a></h2>
 <p>As a demonstration of how dependency injection works in <em>Raffiot</em>,
 create and fill the file <code>dependency_injection.py</code> as below:</p>
-<pre><code class="language-python">from raffiot import io
-from raffiot.io import IO
+<pre><code class="language-python">from raffiot import *
 
 import sys
 from dataclasses import dataclass
@@ -300,7 +299,7 @@ class LocalFileSytemService(Service):
 
 
 main : IO[Service,NotFound,List[str]] = (
-  io.read()
+  io.read
   .flat_map(lambda service:
     service.get(&quot;index.html&quot;)
     .flat_map(lambda x:

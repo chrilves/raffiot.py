@@ -31,8 +31,7 @@ it doing as little damage as possible.
 For the rest of this section, you will need these imports.
 
 ```python
->>> from raffiot import result
->>> from raffiot.result import Result, Ok, Error, Panic
+>>> from raffiot import *
 ```
 
 ### `Ok(success:A)` : A Success

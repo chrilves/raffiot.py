@@ -97,7 +97,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li><li class="chapter-item expanded "><a href="variables.html"><strong aria-hidden="true">8.</strong> Variables</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -241,9 +241,8 @@ Python 3.9.1 (default, Dec 13 2020, 11:55:53)
 Type &quot;help&quot;, &quot;copyright&quot;, &quot;credits&quot; or &quot;license&quot; for more information.
 &gt;&gt;&gt;
 </code></pre>
-<p>Start by importing the <code>io</code> module and <code>IO</code> type:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
-&gt;&gt;&gt; from raffiot.io import IO
+<p>Start by importing <em>Raffiot</em>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 </code></pre>
 <h2 id="hello-world"><a class="header" href="#hello-world">Hello World!</a></h2>
 <p>Let's start by the classic <em>&quot;Hello World!&quot;</em>:</p>
@@ -454,8 +453,7 @@ Panics should never happen, but sometimes even the most improbable events
 do occur. When panics happen, consider your computation lost. Terminate
 it doing as little damage as possible.</p>
 <p>For the rest of this section, you will need these imports.</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import result
-&gt;&gt;&gt; from raffiot.result import Result, Ok, Error, Panic
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 </code></pre>
 <h3 id="oksuccessa--a-success"><a class="header" href="#oksuccessa--a-success"><code>Ok(success:A)</code> : A Success</a></h3>
 <p>When a computation successfully return some value <code>a</code> of type <code>A</code>,
@@ -754,21 +752,21 @@ The context behaves like a global variable inside the running <code>IO</code>.
 But you can pass every call to <code>run</code> a different context.
 The context behaves like a local variable between different calls to <code>run</code>.</p>
 <h2 id="read--accessing-the-shared-context"><a class="header" href="#read--accessing-the-shared-context"><code>read</code> : accessing the shared context.</a></h2>
-<p>To access the context, just call the function <code>io.read()</code>. Its result
+<p>To access the context, just call the function <code>io.read</code>. Its result
 is the context:</p>
-<pre><code class="language-python">&gt;&gt;&gt; main : IO[int,None,int] = io.read()
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[int,None,int] = io.read
 &gt;&gt;&gt; main.run(5)
 Ok(success=5)
 &gt;&gt;&gt; main.run(77)
 Ok(success=77)
 </code></pre>
 <p>This example is indeed trivial. But imagine that <code>main</code> can be
-a very big program. You can call <code>io.read()</code> anywhere in <code>main</code> to
+a very big program. You can call <code>io.read</code> anywhere in <code>main</code> to
 get the context. It saves you the huge burden of passing the context
-from <code>run</code> to every function until it reaches the location of <code>io.read()</code>.</p>
+from <code>run</code> to every function until it reaches the location of <code>io.read</code>.</p>
 <h2 id="contra_map_read--transforming-the-shared-context"><a class="header" href="#contra_map_read--transforming-the-shared-context"><code>contra_map_read</code> : transforming the shared context.</a></h2>
 <p>As I said, the context behaves as a local global variable.
-With <code>io.read()</code> you have seen its global behaviour.
+With <code>io.read</code> you have seen its global behaviour.
 The method <code>contra_map_read</code> transforms the context, but only
 for the <code>IO</code> it is being called on.
 Note that the context is transformed before the <code>IO</code> is executed.</p>
@@ -777,7 +775,7 @@ alter the context. For example, your program may start with <code>None</code>
 as context, read its configuration to instantiate the services it wants
 to inject and then change to context to pass these services everywhere
 for dependency injection.</p>
-<pre><code class="language-python">&gt;&gt;&gt; main : IO[str,None,int] = io.read().contra_map_read(lambda s: len(s))
+<pre><code class="language-python">&gt;&gt;&gt; main : IO[str,None,int] = io.read.contra_map_read(lambda s: len(s))
 &gt;&gt;&gt; main.run(&quot;Hello&quot;)
 Ok(success=5)
 </code></pre>
@@ -792,7 +790,7 @@ you want to execute later. But unlike <code>io.defer</code>, this function:</p>
 </ul>
 <p>The last point is important because it means the function can raise
 errors while <code>io.defer</code> can only raise panics.</p>
-<pre><code class="language-python">&gt;&gt;&gt; def f(context:int) -&gt; Result[str,int]:
+<pre><code class="language-python">&gt;&gt;&gt; def f(context:int, i: int) -&gt; Result[str,int]:
 ...   if context &gt; 0:
 ...     return Ok(context + i)
 ...   else:
@@ -821,8 +819,7 @@ Error(error='Ooups!')
 <h2 id="use-case-dependency-injection"><a class="header" href="#use-case-dependency-injection">Use Case: Dependency Injection</a></h2>
 <p>As a demonstration of how dependency injection works in <em>Raffiot</em>,
 create and fill the file <code>dependency_injection.py</code> as below:</p>
-<pre><code class="language-python">from raffiot import io
-from raffiot.io import IO
+<pre><code class="language-python">from raffiot import *
 
 import sys
 from dataclasses import dataclass
@@ -866,7 +863,7 @@ class LocalFileSytemService(Service):
 
 
 main : IO[Service,NotFound,List[str]] = (
-  io.read()
+  io.read
   .flat_map(lambda service:
     service.get(&quot;index.html&quot;)
     .flat_map(lambda x:
@@ -1030,24 +1027,24 @@ do not work this way.
 Calling an <em>asynchronous</em> function <code>fasync</code> usually looks like this.</p>
 <pre><code class="language-python">&gt;&gt;&gt; import time
 &gt;&gt;&gt; from multiprocessing import Pool
-
+&gt;&gt;&gt;
 &gt;&gt;&gt; def f():
 ...  print(&quot;f is running&quot;)
 ...  return 3
-
+&gt;&gt;&gt;
 &gt;&gt;&gt; with Pool(4) as pool: 
 ...   def fasync(callback):
 ...     pool.apply_async(f, callback = callback)
-... 
+...   
 ...   def main():
 ...     print(&quot;fasync not started yet&quot;)
-...
+...   
 ...     def callback(result):
 ...       print(f&quot;fasync finished and returned {result}&quot;)
-...
+...     
 ...     fasync(callback)
 ...     print(&quot;fasync started&quot;)
-... 
+...    
 ...   main()
 ...   time.sleep(0.5)
 fasync not started yet
@@ -1063,14 +1060,12 @@ finishes.</p>
 <p>With <em>Raffiot</em>'s <code>IO</code> you would write:</p>
 <pre><code class="language-python">&gt;&gt;&gt; import time
 &gt;&gt;&gt; from multiprocessing import Pool
-&gt;&gt;&gt; from raffiot import io
-&gt;&gt;&gt; from raffiot.io import IO
-&gt;&gt;&gt; from raffiot.result import Result, Ok
-
+&gt;&gt;&gt; from raffiot import *
+&gt;&gt;&gt;   
 &gt;&gt;&gt; def f():
 ...   print(&quot;f is running&quot;)
 ...   return 3
-
+&gt;&gt;&gt;  
 &gt;&gt;&gt; with Pool(4) as pool: 
 ...   f_io : IO[None,None,int] = (
 ...     io.async_(
@@ -1194,27 +1189,26 @@ Ok(success=None)
 may want to avoid several fibers modifying variables at the same time or
 avoiding too many fibers to access some resources.</p>
 <h3 id="reentrant_lock-only-one-fiber-at-a-time"><a class="header" href="#reentrant_lock-only-one-fiber-at-a-time"><code>reentrant_lock</code>: only one fiber at a time.</a></h3>
-<p>The <em>IO</em> <code>reentrant_lock</code> from package <code>raffiot.resource</code> ensures that
-<strong>only one</strong> fiber can run a portion of code <strong>at a time</strong>:</p>
-<pre><code class="language-python">reentrant_lock: IO[Any, None, Resource[Any, None, None]]
+<p>The primitive <code>resource.reentrant_lock</code> ensures that <strong>only one</strong> fiber can run
+a portion of code <strong>at a time</strong>:</p>
+<pre><code class="language-python">resource.reentrant_lock: IO[Any, None, Resource[Any, None, None]]
 </code></pre>
 <p>Let's take an example. The class <code>Shared</code> represents any class defining mutable
 objects. In our example, calling the <code>set</code> method change the object's attribute
 <code>value</code>:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
-&gt;&gt;&gt; from raffiot.io import IO
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 &gt;&gt;&gt; from typing import Any
-&gt;&gt;&gt;
+&gt;&gt;&gt;  
 &gt;&gt;&gt; class Shared:
-...   def __init__(self):
-...     self.value = 0
-...
-...   def get(self) -&gt; int:
-...     return self.value
-... 
-...   def set(self, i: int) -&gt; None:
-...     self.value = i
-...
+...     def __init__(self):
+...         self._value = 0
+...  
+...     def get(self) -&gt; int:
+...         return self._value
+...  
+...     def set(self, i: int) -&gt; None:
+...         self._value = i
+&gt;&gt;&gt;  
 &gt;&gt;&gt; shared_object = Shared()
 </code></pre>
 <p>The <code>increment</code> <em>IO</em> does exactly as its name suggests: it reads the shared
@@ -1247,10 +1241,9 @@ value is <em>2</em> instead of the expected <em>3</em>. The reason if the issue 
 have read the value <em>1</em> at the same time, and so both written <code>value + 1 == 2</code>
 instead of <em>3</em>. We need to prevent one instance of <code>increment</code> to run if
 another one is already running. We can do so using <code>reentrant_lock</code>:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot.resource import reentrant_lock
-&gt;&gt;&gt; shared_object.get()
+<pre><code class="language-python">&gt;&gt;&gt; shared_object.get()
 2
-&gt;&gt;&gt; reentrant_lock.flat_map(lambda lock:
+&gt;&gt;&gt; resource.reentrant_lock.flat_map(lambda lock:
 ...   io.parallel(
 ...     lock.with_(increment),
 ...     lock.with_(increment)
@@ -1277,24 +1270,20 @@ always be released, even if the computation fails.</p>
 <p>In addition, the these locks are <strong>reentrant</strong>, which means that the fiber that
 have the lock can still acquire it without blocking.</p>
 <h3 id="semaphore-limited-resource"><a class="header" href="#semaphore-limited-resource"><code>semaphore</code>: limited resource.</a></h3>
-<p>The primitive <code>semaphore</code>, also from package <code>raffiot.resource</code>, is useful to
-simulate limited resources.</p>
+<p>The primitive <code>resource.semaphore</code> is useful to simulate limited resources.</p>
 <p>Imagine you have to call an API for which it is forbidden to make more than
 <em>n</em> concurrent calls, <code>semaphore</code> is the way to go:</p>
-<pre><code class="language-python">semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
+<pre><code class="language-python">resource.semaphote(tokens: int): IO[Any, None, Resource[Any, None, None]]
 </code></pre>
 <p>The parameter <code>tokens</code> is the number of fibers the semaphore will allow to run
 concurrently:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import io
-&gt;&gt;&gt; from raffiot.io import IO
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 &gt;&gt;&gt; from typing import Any
-&gt;&gt;&gt;
-&gt;&gt;&gt; from raffiot.resource import semaphore
-&gt;&gt;&gt;
+&gt;&gt;&gt;  
 &gt;&gt;&gt; def fiber(sem, i:int) -&gt; IO[Any, None, None]:
 ...   return sem.with_(io.defer(print, f&quot;Fiber {i} running!&quot;))
-&gt;&gt;&gt;
-&gt;&gt;&gt; semaphore(5).flat_map(lambda sem:
+&gt;&gt;&gt;  
+&gt;&gt;&gt; resource.semaphore(5).flat_map(lambda sem:
 ...   io.parallel([fiber(sem, i) for i in range(100)])
 ... ).run(None)
 </code></pre>
@@ -1322,7 +1311,7 @@ are busy.</p>
 with the desired epoch:</p>
 <pre><code class="language-python">&gt;&gt;&gt; from time import time
 &gt;&gt;&gt; now : IO[None, None, None] = io.defer(time).flat_map(lambda t: io.defer(print, t))
-&gt;&gt;&gt; time.time()
+&gt;&gt;&gt; time()
 1615136688.9909387
 &gt;&gt;&gt; main : IO[None, None, None] = now.then(io.sleep_until(1615136788), now)
 &gt;&gt;&gt; main.run(None)
@@ -1375,9 +1364,7 @@ function call.</p>
 <p><code>Resource</code> do compose very well too with the same API as <code>IO</code>.
 In fact <code>Resource</code> is built upon <code>IO</code>. It has almost all of its
 functionalities. Here are the imports for this section:</p>
-<pre><code class="language-python">&gt;&gt;&gt; from raffiot import resource, io
-&gt;&gt;&gt; from raffiot.resource import Resource
-&gt;&gt;&gt; from raffiot.io import IO
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 &gt;&gt;&gt; from typing import Tuple, List, Any
 </code></pre>
 <p>Let's start by defining an <code>IO</code> that generates a random string
@@ -1549,6 +1536,114 @@ Error(error='Oups!')
 Opening PSUNW6M5
 Closing PSUNW6M5
 Panic(exception=Exception('BOOM!'))
+</code></pre>
+<h1 id="variables"><a class="header" href="#variables">Variables</a></h1>
+<p><code>IO</code> is heavily expression based but <em>Python</em> does not allow to define local
+variables in expressions. <em>Raffiot</em> provides two types to work around this
+limitation: <code>Val</code> and <code>Var</code>. A <code>Val</code> is an immutable variable while a <code>Var</code> is
+a mutable variable.</p>
+<h2 id="immutable-variables"><a class="header" href="#immutable-variables">Immutable Variables</a></h2>
+<p>Immutable variables can be created very easily by using the class <code>Val</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
+&gt;&gt;&gt; Val(5)
+Val(value=5)
+</code></pre>
+<p><code>Val</code> has most of the usual operations like <code>map</code>, <code>flat_map</code>, <code>zip</code>, etc.
+Please have a look the the <a href="./api/index.html">API</a> for a complete list of
+methods.</p>
+<p>For example, Python's forbids this syntax:</p>
+<pre><code class="language-python">&gt;&gt;&gt; lambda x:
+&gt;&gt;&gt;   y = x + 5
+&gt;&gt;&gt;   print(f&quot;y={y}&quot;)
+</code></pre>
+<p>because it only allows lambdas to contain one single expression.
+To simulate this behaviour, you can use:</p>
+<pre><code class="language-python">&gt;&gt;&gt; lambda x: Val(x+5).map(lambda y: print(f&quot;y={y}&quot;))
+</code></pre>
+<p>We totally agree that the first syntax is far superior, but until Python allows
+lambda to declare local variables, this is probably the best we can get.</p>
+<h2 id="mutable-variables"><a class="header" href="#mutable-variables">Mutable Variables</a></h2>
+<p><em>Raffiot</em>'s mutable variable are not only mutable variables. They are designed
+to play nicely with concurrency. <strong>Every access to the a <code>Var</code> is exclusive</strong>,
+which means only one fiber is allowed to read or modify the variable at any
+time.</p>
+<h3 id="varcreate-varcreate_rs-the-only-ways-to-create-a-mutable-variable"><a class="header" href="#varcreate-varcreate_rs-the-only-ways-to-create-a-mutable-variable"><code>Var.create</code>, <code>Var.create_rs</code>: the only ways to create a mutable variable</a></h3>
+<p>Because a <code>Var</code> is not just a value, it can only be created either by the <em>IO</em>
+<code>Var.create(a:A)</code> of type <code>IO[Any,None,Var[A]]</code> or the <em>Resource</em>
+<code>Var.create(a:A)</code> of type <code>Resource[Any,None,Var[A]]</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from typing import Any
+&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(5).flat_map(lambda var1: var1.set(7).then(var1.get()))
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=7)
+&gt;&gt;&gt; main_rs: Resource[Any,None,None] = (
+...   Var.create_rs(5).flat_map(lambda var1: var1.set_rs(7).then(var1.get_rs()))
+... )
+&gt;&gt;&gt; main_rs.use(io.pure).run(None)
+Ok(success=7)
+</code></pre>
+<p>As you can see, you can use the methods <code>get</code>/<code>set</code> to get/set the current value
+as an <code>IO</code> or <code>get_rs</code>/<code>set_rs</code> to get/set the current value as a <code>Resource</code>.</p>
+<p>Alternatively, you can use the method <code>get_and_set</code> and <code>get_and_set_rs</code> to
+assign a new value to the variable and get the previous value at the same time.</p>
+<h3 id="update-modifying-the-current-value"><a class="header" href="#update-modifying-the-current-value"><code>update</code>: modifying the current value</a></h3>
+<p>When you need to update the current value of a variable <code>var:Var[A]</code>, use the
+<code>update</code> method.
+It takes as input a function <code>f: Callable[[A], Tuple[A,B]]</code>. This function will
+receive the current value of the variable and must return a pair
+<code>(new_value, returned)</code>. The <code>new_value</code> will become the new value of the
+variable. The value <code>returned</code> serves to output some value if you want to.</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(5).flat_map(lambda v: v.update(lambda x: (x+1, 2*x)))
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=UpdateResult(old_value=5, new_value=6, returned=10))
+</code></pre>
+<p>The functions <code>update_io</code> and <code>update_rs</code> are respectively for <em>IO</em> and
+<em>Resource</em> functions.</p>
+<h3 id="traverse-creating-a-new-variable-from-another-one"><a class="header" href="#traverse-creating-a-new-variable-from-another-one"><code>traverse</code>: creating a new variable from another one.</a></h3>
+<p>The <code>traverse</code> methods create a new variable using an existing one:</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(5)
+...      .flat_map(lambda var1: var1.traverse(lambda x: io.defer(print, x)
+...                                                       .then(io.pure(x+1))
+...                                          )
+...                                  .flat_map(lambda var2: var2.get())
+...       )
+... )
+5
+Ok(success=6)
+</code></pre>
+<h3 id="zip-getting-the-values-of-a-group-of-variables"><a class="header" href="#zip-getting-the-values-of-a-group-of-variables"><code>zip</code>: Getting the values of a group of variables</a></h3>
+<p>The <code>zip</code> class method regroup the values a list of variable. All concurrent
+access to the variables are forbidden during the zip to ensure consistent
+reading of the variables values:*</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   io.zip(Var.create(0), Var.create(1))
+...     .flat_map(lambda vars:
+...       Var.zip(vars[0], vars[1])
+...     )
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=[0, 1])
+</code></pre>
+<p>Note: the <code>zip_with</code> instance method is equivalent.</p>
+<h3 id="ap-combining-the-values-of-a-group-of-variables"><a class="header" href="#ap-combining-the-values-of-a-group-of-variables"><code>ap</code>: Combining the values of a group of variables</a></h3>
+<p>The <code>zip</code> class method regroup the values a list of variable. All concurrent
+access to the variables are forbidden during the zip to ensure consistent
+reading of the variables values:*</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(lambda x, y: x + y)
+...      .flat_map(lambda var_fun:
+...         io.zip(Var.create(2), Var.create(3))
+...           .flat_map(lambda vars:
+...             var_fun.ap(vars[0], vars[1])
+...           )
+...     )
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=5)
 </code></pre>
 
                     </main>

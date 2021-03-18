@@ -31,11 +31,11 @@ The context behaves like a local variable between different calls to `run`.
 
 ## `read` : accessing the shared context.
 
-To access the context, just call the function `io.read()`. Its result
+To access the context, just call the function `io.read`. Its result
 is the context:
 
 ```python
->>> main : IO[int,None,int] = io.read()
+>>> main : IO[int,None,int] = io.read
 >>> main.run(5)
 Ok(success=5)
 >>> main.run(77)
@@ -43,15 +43,15 @@ Ok(success=77)
 ```
 
 This example is indeed trivial. But imagine that `main` can be
-a very big program. You can call `io.read()` anywhere in `main` to
+a very big program. You can call `io.read` anywhere in `main` to
 get the context. It saves you the huge burden of passing the context
-from `run` to every function until it reaches the location of `io.read()`.
+from `run` to every function until it reaches the location of `io.read`.
 
 
 ## `contra_map_read` : transforming the shared context.
 
 As I said, the context behaves as a local global variable.
-With `io.read()` you have seen its global behaviour.
+With `io.read` you have seen its global behaviour.
 The method `contra_map_read` transforms the context, but only
 for the `IO` it is being called on.
 Note that the context is transformed before the `IO` is executed.
@@ -64,7 +64,7 @@ for dependency injection.
 
 
 ```python
->>> main : IO[str,None,int] = io.read().contra_map_read(lambda s: len(s))
+>>> main : IO[str,None,int] = io.read.contra_map_read(lambda s: len(s))
 >>> main.run("Hello")
 Ok(success=5)
 ```
@@ -83,7 +83,7 @@ The last point is important because it means the function can raise
 errors while `io.defer` can only raise panics.
 
 ```python
->>> def f(context:int) -> Result[str,int]:
+>>> def f(context:int, i: int) -> Result[str,int]:
 ...   if context > 0:
 ...     return Ok(context + i)
 ...   else:
@@ -121,8 +121,7 @@ As a demonstration of how dependency injection works in *Raffiot*,
 create and fill the file `dependency_injection.py` as below:
 
 ```python
-from raffiot import io
-from raffiot.io import IO
+from raffiot import *
 
 import sys
 from dataclasses import dataclass
@@ -166,7 +165,7 @@ class LocalFileSytemService(Service):
 
 
 main : IO[Service,NotFound,List[str]] = (
-  io.read()
+  io.read
   .flat_map(lambda service:
     service.get("index.html")
     .flat_map(lambda x:

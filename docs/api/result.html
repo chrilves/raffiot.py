@@ -32,11 +32,14 @@ Data structure to represent the result of computation.
 &#34;&#34;&#34;
 
 from __future__ import annotations
-from typing import TypeVar, Generic, Callable, Any, List, Iterable
-from typing_extensions import final
-from dataclasses import dataclass
-from raffiot import MatchError
+
 from collections import abc
+from dataclasses import dataclass
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
+
+from typing_extensions import final
+
+from raffiot.utils import MatchError
 
 __all__ = [
     &#34;safe&#34;,
@@ -458,6 +461,8 @@ class Ok(Result[E, A]):
     The result of a successful computation.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;success&#34;]
+
     success: A
 
 
@@ -469,6 +474,8 @@ class Error(Result[E, A]):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;error&#34;]
+
     error: E
 
 
@@ -479,6 +486,8 @@ class Panic(Result[E, A]):
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
+
+    __slots__ = [&#34;exception&#34;]
 
     exception: Exception
 
@@ -750,6 +759,8 @@ class Error(Result[E, A]):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;error&#34;]
+
     error: E</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -757,11 +768,11 @@ class Error(Result[E, A]):
 <li><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a></li>
 <li>typing.Generic</li>
 </ul>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
 <dt id="raffiot.result.Error.error"><code class="name">var <span class="ident">error</span> : ~E</code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -805,6 +816,8 @@ class Ok(Result[E, A]):
     The result of a successful computation.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;success&#34;]
+
     success: A</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -812,11 +825,11 @@ class Ok(Result[E, A]):
 <li><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a></li>
 <li>typing.Generic</li>
 </ul>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
 <dt id="raffiot.result.Ok.success"><code class="name">var <span class="ident">success</span> : ~A</code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -862,6 +875,8 @@ class Panic(Result[E, A]):
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
+    __slots__ = [&#34;exception&#34;]
+
     exception: Exception</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -869,11 +884,11 @@ class Panic(Result[E, A]):
 <li><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a></li>
 <li>typing.Generic</li>
 </ul>
-<h3>Class variables</h3>
+<h3>Instance variables</h3>
 <dl>
 <dt id="raffiot.result.Panic.exception"><code class="name">var <span class="ident">exception</span> : Exception</code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 <h3>Inherited members</h3>

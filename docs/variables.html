@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Robust and Fast Functional IO Toolkit - RAFFIOT Guide</title>
+        <title>Variables - RAFFIOT Guide</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html" class="active"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li><li class="chapter-item expanded "><a href="variables.html"><strong aria-hidden="true">8.</strong> Variables</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="raffiot.html"><strong aria-hidden="true">1.</strong> Robust and Fast Functional IO Toolkit</a></li><li class="chapter-item expanded "><a href="first_steps.html"><strong aria-hidden="true">2.</strong> First Steps with IO</a></li><li class="chapter-item expanded "><a href="failures.html"><strong aria-hidden="true">3.</strong> Failures</a></li><li class="chapter-item expanded "><a href="context.html"><strong aria-hidden="true">4.</strong> Context</a></li><li class="chapter-item expanded "><a href="lists.html"><strong aria-hidden="true">5.</strong> Combining a list of IOs</a></li><li class="chapter-item expanded "><a href="async.html"><strong aria-hidden="true">6.</strong> Concurrent Programming</a></li><li class="chapter-item expanded "><a href="resource.html"><strong aria-hidden="true">7.</strong> Resource Management</a></li><li class="chapter-item expanded "><a href="variables.html" class="active"><strong aria-hidden="true">8.</strong> Variables</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -163,79 +163,125 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="robust-and-fast-functional-io-toolkit"><a class="header" href="#robust-and-fast-functional-io-toolkit">Robust and Fast Functional IO Toolkit</a></h1>
-<p><em>Raffiot</em> is small (almost) dependency-free python library providing some
-usual functional tools. It currently provides</p>
-<ul>
-<li>an easy-to-use <code>IO</code> monad which is <strong>stack-safe</strong>, <strong>fast</strong>, support
-<strong>asynchronous</strong>, <strong>concurrent</strong>, <strong>parallel</strong> programming, has many other features.</li>
-<li>a <code>Resource</code> data type for easy but reliable <strong>resource management</strong>.</li>
-<li>a <code>Result</code> data structure to represent errors</li>
-</ul>
-<h2 id="demo"><a class="header" href="#demo">Demo</a></h2>
-<p>For a demo, just type this in a terminal:</p>
-<pre><code class="language-shellscript">curl https://raw.githubusercontent.com/chrilves/raffiot.py/main/demos/raffiot_demo.sh | /bin/sh
+                        <h1 id="variables"><a class="header" href="#variables">Variables</a></h1>
+<p><code>IO</code> is heavily expression based but <em>Python</em> does not allow to define local
+variables in expressions. <em>Raffiot</em> provides two types to work around this
+limitation: <code>Val</code> and <code>Var</code>. A <code>Val</code> is an immutable variable while a <code>Var</code> is
+a mutable variable.</p>
+<h2 id="immutable-variables"><a class="header" href="#immutable-variables">Immutable Variables</a></h2>
+<p>Immutable variables can be created very easily by using the class <code>Val</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
+&gt;&gt;&gt; Val(5)
+Val(value=5)
 </code></pre>
-<p>This demo runs 4 computations in parallel. It demonstrates how simple concurrent
-and parallel programing is in <em>raffiot</em>.</p>
-<p><strong>Note that this command will install raffiot in your current Python environment</strong></p>
-<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
-<h3 id="this-a-hrefindexhtmlguidea"><a class="header" href="#this-a-hrefindexhtmlguidea">This <a href="./index.html">Guide</a></a></h3>
-<p>This guide will teach you how to use <em>Raffiot</em> through examples.
-Just use the <strong>left panel</strong> or the <strong>right arrow</strong> on this page to jump to the next section.</p>
-<h3 id="a-hrefapiindexhtmlapia"><a class="header" href="#a-hrefapiindexhtmlapia"><a href="./api/index.html">API</a></a></h3>
-<p>The <a href="./api/index.html">API</a> is online at
-<a href="./api/index.html">https://chrilves.github.io/raffiot.py/api/index.html</a>.</p>
-<h2 id="features"><a class="header" href="#features">Features</a></h2>
-<ul>
-<li><strong>pure python</strong>: <em>Raffiot</em> is written entirely in Python 3.7+.</li>
-<li><strong>small</strong>: it is just a few small files.</li>
-<li><strong>(almost) dependency-free</strong>: it only depends on <code>typing-extensions</code> (for the
-<code>@final</code> annotation).</li>
-<li><strong>crystal clear code</strong> </li>
-</ul>
-<h3 id="io"><a class="header" href="#io">IO</a></h3>
-<ul>
-<li><strong>stack safe</strong>: you just won't run into stack overflows anymore.</li>
-<li><strong>fast</strong>: you won't notice the overhead.</li>
-<li><strong>dependency injection</strong> <em>made easy</em>: make some context visible from anywhere.</li>
-<li><em>simple</em> <strong>asynchronous</strong> <em>and</em> <strong>concurrent programming</strong>: full support of synchronous,
-asynchronous and concurrent programming <em>with the same simple API</em>.</li>
-<li><strong>railway-oriented programming</strong>: clean and simple failure management.</li>
-<li><strong>distinction</strong> <em>between</em> <strong>expected and unexpected failures</strong>: some failures are part
-of your program's normal behaviour (errors) while others are show something
-terribly wrong happened (panics). Yes, that's heavily inspired by <em>Rust</em>.</li>
-</ul>
-<h3 id="resource"><a class="header" href="#resource">Resource</a></h3>
-<p>Python has the <code>with</code> construction, but <code>Resource</code> goes a step further.</p>
-<ul>
-<li><strong>easy user-defined resource creation</strong>: just provide some open and close
-function.</li>
-<li><strong>composability</strong>: the resource you want to create depends on another resource?
-Not a problem, you can compose resources the way you want. It scales.</li>
-<li><strong>failures handling in resources</strong>: <code>Resource</code> has everything <code>IO</code> has, including
-its wonderful failure management.</li>
-</ul>
-<h3 id="result"><a class="header" href="#result">Result</a></h3>
-<p>Did I mention <strong>Railway-Oriented Programming</strong>? <code>Result</code> is represent the 3 possible
-result of a computation:</p>
-<ul>
-<li><code>Ok(value)</code>: the computation successfully computed the this <code>value</code>.</li>
-<li><code>Error(error)</code>: the computation failed on some expected failure <code>error</code>, probably
-from the business domain.</li>
-<li><code>Panic(exception)</code>: the computation failed on some unexpected failure <code>exception</code>.</li>
-</ul>
+<p><code>Val</code> has most of the usual operations like <code>map</code>, <code>flat_map</code>, <code>zip</code>, etc.
+Please have a look the the <a href="./api/index.html">API</a> for a complete list of
+methods.</p>
+<p>For example, Python's forbids this syntax:</p>
+<pre><code class="language-python">&gt;&gt;&gt; lambda x:
+&gt;&gt;&gt;   y = x + 5
+&gt;&gt;&gt;   print(f&quot;y={y}&quot;)
+</code></pre>
+<p>because it only allows lambdas to contain one single expression.
+To simulate this behaviour, you can use:</p>
+<pre><code class="language-python">&gt;&gt;&gt; lambda x: Val(x+5).map(lambda y: print(f&quot;y={y}&quot;))
+</code></pre>
+<p>We totally agree that the first syntax is far superior, but until Python allows
+lambda to declare local variables, this is probably the best we can get.</p>
+<h2 id="mutable-variables"><a class="header" href="#mutable-variables">Mutable Variables</a></h2>
+<p><em>Raffiot</em>'s mutable variable are not only mutable variables. They are designed
+to play nicely with concurrency. <strong>Every access to the a <code>Var</code> is exclusive</strong>,
+which means only one fiber is allowed to read or modify the variable at any
+time.</p>
+<h3 id="varcreate-varcreate_rs-the-only-ways-to-create-a-mutable-variable"><a class="header" href="#varcreate-varcreate_rs-the-only-ways-to-create-a-mutable-variable"><code>Var.create</code>, <code>Var.create_rs</code>: the only ways to create a mutable variable</a></h3>
+<p>Because a <code>Var</code> is not just a value, it can only be created either by the <em>IO</em>
+<code>Var.create(a:A)</code> of type <code>IO[Any,None,Var[A]]</code> or the <em>Resource</em>
+<code>Var.create(a:A)</code> of type <code>Resource[Any,None,Var[A]]</code>:</p>
+<pre><code class="language-python">&gt;&gt;&gt; from typing import Any
+&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(5).flat_map(lambda var1: var1.set(7).then(var1.get()))
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=7)
+&gt;&gt;&gt; main_rs: Resource[Any,None,None] = (
+...   Var.create_rs(5).flat_map(lambda var1: var1.set_rs(7).then(var1.get_rs()))
+... )
+&gt;&gt;&gt; main_rs.use(io.pure).run(None)
+Ok(success=7)
+</code></pre>
+<p>As you can see, you can use the methods <code>get</code>/<code>set</code> to get/set the current value
+as an <code>IO</code> or <code>get_rs</code>/<code>set_rs</code> to get/set the current value as a <code>Resource</code>.</p>
+<p>Alternatively, you can use the method <code>get_and_set</code> and <code>get_and_set_rs</code> to
+assign a new value to the variable and get the previous value at the same time.</p>
+<h3 id="update-modifying-the-current-value"><a class="header" href="#update-modifying-the-current-value"><code>update</code>: modifying the current value</a></h3>
+<p>When you need to update the current value of a variable <code>var:Var[A]</code>, use the
+<code>update</code> method.
+It takes as input a function <code>f: Callable[[A], Tuple[A,B]]</code>. This function will
+receive the current value of the variable and must return a pair
+<code>(new_value, returned)</code>. The <code>new_value</code> will become the new value of the
+variable. The value <code>returned</code> serves to output some value if you want to.</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(5).flat_map(lambda v: v.update(lambda x: (x+1, 2*x)))
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=UpdateResult(old_value=5, new_value=6, returned=10))
+</code></pre>
+<p>The functions <code>update_io</code> and <code>update_rs</code> are respectively for <em>IO</em> and
+<em>Resource</em> functions.</p>
+<h3 id="traverse-creating-a-new-variable-from-another-one"><a class="header" href="#traverse-creating-a-new-variable-from-another-one"><code>traverse</code>: creating a new variable from another one.</a></h3>
+<p>The <code>traverse</code> methods create a new variable using an existing one:</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(5)
+...      .flat_map(lambda var1: var1.traverse(lambda x: io.defer(print, x)
+...                                                       .then(io.pure(x+1))
+...                                          )
+...                                  .flat_map(lambda var2: var2.get())
+...       )
+... )
+5
+Ok(success=6)
+</code></pre>
+<h3 id="zip-getting-the-values-of-a-group-of-variables"><a class="header" href="#zip-getting-the-values-of-a-group-of-variables"><code>zip</code>: Getting the values of a group of variables</a></h3>
+<p>The <code>zip</code> class method regroup the values a list of variable. All concurrent
+access to the variables are forbidden during the zip to ensure consistent
+reading of the variables values:*</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   io.zip(Var.create(0), Var.create(1))
+...     .flat_map(lambda vars:
+...       Var.zip(vars[0], vars[1])
+...     )
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=[0, 1])
+</code></pre>
+<p>Note: the <code>zip_with</code> instance method is equivalent.</p>
+<h3 id="ap-combining-the-values-of-a-group-of-variables"><a class="header" href="#ap-combining-the-values-of-a-group-of-variables"><code>ap</code>: Combining the values of a group of variables</a></h3>
+<p>The <code>zip</code> class method regroup the values a list of variable. All concurrent
+access to the variables are forbidden during the zip to ensure consistent
+reading of the variables values:*</p>
+<pre><code class="language-python">&gt;&gt;&gt; main: IO[Any,None,None] = (
+...   Var.create(lambda x, y: x + y)
+...      .flat_map(lambda var_fun:
+...         io.zip(Var.create(2), Var.create(3))
+...           .flat_map(lambda vars:
+...             var_fun.ap(vars[0], vars[1])
+...           )
+...     )
+... )
+&gt;&gt;&gt; main.run(None)
+Ok(success=5)
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-
-                        
-                            <a rel="next" href="first_steps.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
+                            <a rel="prev" href="resource.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
                             </a>
+                        
+
                         
 
                         <div style="clear: both"></div>
@@ -245,11 +291,11 @@ from the business domain.</li>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-
-                
-                    <a rel="next" href="first_steps.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
+                    <a rel="prev" href="resource.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
                     </a>
+                
+
                 
             </nav>
 

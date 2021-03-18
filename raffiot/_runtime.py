@@ -11,7 +11,6 @@ import threading
 import time
 import uuid
 from collections import deque
-from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
 from queue import Queue
@@ -21,10 +20,10 @@ from typing import Any, List, TypeVar, Generic, Callable
 
 from typing_extensions import final
 
-from raffiot import MatchError
 from raffiot._internal import ContTag, FiberState, IOTag, ResultTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Error, Panic
+from raffiot.utils import MatchError
 
 __all__ = [
     "SharedState",

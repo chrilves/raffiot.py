@@ -7,11 +7,11 @@ from unittest import TestCase
 import hypothesis.strategies as st
 from hypothesis import given
 
-from raffiot import MatchError
 from raffiot import io
 from raffiot.io import IO
 from raffiot.resource import *
 from raffiot.result import Result, Ok, Error, Panic
+from raffiot.utils import MatchError
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)

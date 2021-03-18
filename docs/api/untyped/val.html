@@ -33,110 +33,132 @@ Local Variables to work around Python annoying limitations about lambdas.
 
 Python forbids local variables and
 &#34;&#34;&#34;
-
 from __future__ import annotations
 
+from collections import abc
 from dataclasses import dataclass
+
+
 from raffiot.untyped import io, resource
 from raffiot.untyped.io import IO
 from raffiot.untyped.resource import Resource
-from collections import abc
-from abc import ABC
-
 
 __all__ = [
     &#34;Val&#34;,
-    &#34;Var&#34;,
-    &#34;sequence&#34;,
 ]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Val:
+    &#34;&#34;&#34;
+    Immutable Value.
+
+    Used to create local &#34;variables&#34; in lambdas.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;value&#34;]
+
     value: None
 
     def get(self):
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
         return self.value
 
     def get_io(self):
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
         return io.defer(self.get)
 
     def get_rs(self):
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
         return resource.defer(self.get)
 
     @classmethod
     def pure(cls, a):
+        &#34;&#34;&#34;
+        Create a new Val with value `a`
+
+        :param a: the value of this val.
+        :return:
+        &#34;&#34;&#34;
         return Val(a)
 
     def map(self, f):
+        &#34;&#34;&#34;
+        Create a new Val from this one by applying this **pure** function.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
         return Val(f(self.value))
 
+    def traverse(self, f):
+        &#34;&#34;&#34;
+        Create a new Val from this one by applying this `IO` function.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        return io.defer_io(f, self.value).map(Val)
+
     def flat_map(self, f):
+        &#34;&#34;&#34;
+        Create a new Val from this one.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
         return f(self.value)
+
+    def flatten(self):  # A = Val
+        &#34;&#34;&#34; &#34;
+        Flatten this `Val]` into a `Val`
+        &#34;&#34;&#34;
+
+        return Val(self.value.value)
 
     @classmethod
     def zip(cls, *vals):
+        &#34;&#34;&#34; &#34;
+        Group these list of Val into a Val of List
+        &#34;&#34;&#34;
+
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
         return Val([x.value for x in vals])
 
     def zip_with(self, *vals):
+        &#34;&#34;&#34;
+        Group this Val with other Val into a list of Val.
+
+        :param vals: other Val to combine with self.
+        :return:
+        &#34;&#34;&#34;
+
         return Val.zip(self, *vals)
 
     def ap(self, *arg):
+        &#34;&#34;&#34;
+        Apply the function contained in this Val to `args` Vals.
+
+        :param arg:
+        :return:
+        &#34;&#34;&#34;
+
         if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
-        return Val(self.value(*l))
-
-
-@dataclass
-class Var(Val):
-    value: None
-
-    def set(self, v):
-        old = self.value
-        self.value = v
-        return old
-
-    def set_io(self, v):
-        return io.defer(self.set, v)
-
-    def set_rs(self, v):
-        return resource.defer(self.set, v)
-
-    @classmethod
-    def pure(cls, a):
-        return Var(a)
-
-    def map(self, f):
-        return Var(f(self.value))
-
-    def flat_map(self, f):
-        return f(self.value)
-
-    @classmethod
-    def zip(cls, *vars):
-        if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
-            return Var([x.value for x in vars[0]])
-        return Var([x.value for x in vars])
-
-    def zip_with(self, *vars):
-        return Var.zip(self, *vars)
-
-    def ap(self, *arg):
-        if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
-            l = [x.value for x in arg[0]]
-        else:
-            l = [x.value for x in arg]
-        return Var(self.value(*l))
-
-
-def sequence(*a):
-    if len(a) == 1 and isinstance(a[0], abc.Iterable):
-        return a[0][-1]
-    return a[-1]</code></pre>
+        return Val(self.value(*l))</code></pre>
 </details>
 </section>
 <section>
@@ -144,24 +166,6 @@ def sequence(*a):
 <section>
 </section>
 <section>
-<h2 class="section-title" id="header-functions">Functions</h2>
-<dl>
-<dt id="raffiot.untyped.val.sequence"><code class="name flex">
-<span>def <span class="ident">sequence</span></span>(<span>*a)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def sequence(*a):
-    if len(a) == 1 and isinstance(a[0], abc.Iterable):
-        return a[0][-1]
-    return a[-1]</code></pre>
-</details>
-</dd>
-</dl>
 </section>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
@@ -171,74 +175,145 @@ def sequence(*a):
 <span>(</span><span>value: None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Val(value: 'None')</p></div>
+<div class="desc"><p>Immutable Value.</p>
+<p>Used to create local "variables" in lambdas.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class Val:
+    &#34;&#34;&#34;
+    Immutable Value.
+
+    Used to create local &#34;variables&#34; in lambdas.
+    &#34;&#34;&#34;
+
+    __slots__ = [&#34;value&#34;]
+
     value: None
 
     def get(self):
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
         return self.value
 
     def get_io(self):
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
         return io.defer(self.get)
 
     def get_rs(self):
+        &#34;&#34;&#34;
+        Get this Val value.
+        :return:
+        &#34;&#34;&#34;
         return resource.defer(self.get)
 
     @classmethod
     def pure(cls, a):
+        &#34;&#34;&#34;
+        Create a new Val with value `a`
+
+        :param a: the value of this val.
+        :return:
+        &#34;&#34;&#34;
         return Val(a)
 
     def map(self, f):
+        &#34;&#34;&#34;
+        Create a new Val from this one by applying this **pure** function.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
         return Val(f(self.value))
 
+    def traverse(self, f):
+        &#34;&#34;&#34;
+        Create a new Val from this one by applying this `IO` function.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
+
+        return io.defer_io(f, self.value).map(Val)
+
     def flat_map(self, f):
+        &#34;&#34;&#34;
+        Create a new Val from this one.
+
+        :param f:
+        :return:
+        &#34;&#34;&#34;
         return f(self.value)
+
+    def flatten(self):  # A = Val
+        &#34;&#34;&#34; &#34;
+        Flatten this `Val]` into a `Val`
+        &#34;&#34;&#34;
+
+        return Val(self.value.value)
 
     @classmethod
     def zip(cls, *vals):
+        &#34;&#34;&#34; &#34;
+        Group these list of Val into a Val of List
+        &#34;&#34;&#34;
+
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
         return Val([x.value for x in vals])
 
     def zip_with(self, *vals):
+        &#34;&#34;&#34;
+        Group this Val with other Val into a list of Val.
+
+        :param vals: other Val to combine with self.
+        :return:
+        &#34;&#34;&#34;
+
         return Val.zip(self, *vals)
 
     def ap(self, *arg):
+        &#34;&#34;&#34;
+        Apply the function contained in this Val to `args` Vals.
+
+        :param arg:
+        :return:
+        &#34;&#34;&#34;
+
         if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
         return Val(self.value(*l))</code></pre>
 </details>
-<h3>Subclasses</h3>
-<ul class="hlist">
-<li><a title="raffiot.untyped.val.Var" href="#raffiot.untyped.val.Var">Var</a></li>
-</ul>
-<h3>Class variables</h3>
-<dl>
-<dt id="raffiot.untyped.val.Val.value"><code class="name">var <span class="ident">value</span> : NoneType</code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-</dl>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.untyped.val.Val.pure"><code class="name flex">
 <span>def <span class="ident">pure</span></span>(<span>a)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Create a new Val with value <code>a</code></p>
+<p>:param a: the value of this val.
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
 def pure(cls, a):
+    &#34;&#34;&#34;
+    Create a new Val with value `a`
+
+    :param a: the value of this val.
+    :return:
+    &#34;&#34;&#34;
     return Val(a)</code></pre>
 </details>
 </dd>
@@ -246,17 +321,29 @@ def pure(cls, a):
 <span>def <span class="ident">zip</span></span>(<span>*vals)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>"
+Group these list of Val into a Val of List</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
 def zip(cls, *vals):
+    &#34;&#34;&#34; &#34;
+    Group these list of Val into a Val of List
+    &#34;&#34;&#34;
+
     if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
         return Val([x.value for x in vals[0]])
     return Val([x.value for x in vals])</code></pre>
 </details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.untyped.val.Val.value"><code class="name">var <span class="ident">value</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 <h3>Methods</h3>
@@ -265,12 +352,21 @@ def zip(cls, *vals):
 <span>def <span class="ident">ap</span></span>(<span>self, *arg)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Apply the function contained in this Val to <code>args</code> Vals.</p>
+<p>:param arg:
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def ap(self, *arg):
+    &#34;&#34;&#34;
+    Apply the function contained in this Val to `args` Vals.
+
+    :param arg:
+    :return:
+    &#34;&#34;&#34;
+
     if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
         l = [x.value for x in arg[0]]
     else:
@@ -282,25 +378,56 @@ def zip(cls, *vals):
 <span>def <span class="ident">flat_map</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Create a new Val from this one.</p>
+<p>:param f:
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def flat_map(self, f):
+    &#34;&#34;&#34;
+    Create a new Val from this one.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
     return f(self.value)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.val.Val.flatten"><code class="name flex">
+<span>def <span class="ident">flatten</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>"
+Flatten this <code><a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a>]</code> into a <code><a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a></code></p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def flatten(self):  # A = Val
+    &#34;&#34;&#34; &#34;
+    Flatten this `Val]` into a `Val`
+    &#34;&#34;&#34;
+
+    return Val(self.value.value)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.get"><code class="name flex">
 <span>def <span class="ident">get</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Get this Val value.
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get(self):
+    &#34;&#34;&#34;
+    Get this Val value.
+    :return:
+    &#34;&#34;&#34;
     return self.value</code></pre>
 </details>
 </dd>
@@ -308,12 +435,17 @@ def zip(cls, *vals):
 <span>def <span class="ident">get_io</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Get this Val value.
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_io(self):
+    &#34;&#34;&#34;
+    Get this Val value.
+    :return:
+    &#34;&#34;&#34;
     return io.defer(self.get)</code></pre>
 </details>
 </dd>
@@ -321,12 +453,17 @@ def zip(cls, *vals):
 <span>def <span class="ident">get_rs</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Get this Val value.
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_rs(self):
+    &#34;&#34;&#34;
+    Get this Val value.
+    :return:
+    &#34;&#34;&#34;
     return resource.defer(self.get)</code></pre>
 </details>
 </dd>
@@ -334,222 +471,65 @@ def zip(cls, *vals):
 <span>def <span class="ident">map</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Create a new Val from this one by applying this <strong>pure</strong> function.</p>
+<p>:param f:
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def map(self, f):
+    &#34;&#34;&#34;
+    Create a new Val from this one by applying this **pure** function.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
     return Val(f(self.value))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.val.Val.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>self, f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a new Val from this one by applying this <code>IO</code> function.</p>
+<p>:param f:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(self, f):
+    &#34;&#34;&#34;
+    Create a new Val from this one by applying this `IO` function.
+
+    :param f:
+    :return:
+    &#34;&#34;&#34;
+
+    return io.defer_io(f, self.value).map(Val)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.zip_with"><code class="name flex">
 <span>def <span class="ident">zip_with</span></span>(<span>self, *vals)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Group this Val with other Val into a list of Val.</p>
+<p>:param vals: other Val to combine with self.
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def zip_with(self, *vals):
+    &#34;&#34;&#34;
+    Group this Val with other Val into a list of Val.
+
+    :param vals: other Val to combine with self.
+    :return:
+    &#34;&#34;&#34;
+
     return Val.zip(self, *vals)</code></pre>
-</details>
-</dd>
-</dl>
-</dd>
-<dt id="raffiot.untyped.val.Var"><code class="flex name class">
-<span>class <span class="ident">Var</span></span>
-<span>(</span><span>value: None)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Var(value: 'None')</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@dataclass
-class Var(Val):
-    value: None
-
-    def set(self, v):
-        old = self.value
-        self.value = v
-        return old
-
-    def set_io(self, v):
-        return io.defer(self.set, v)
-
-    def set_rs(self, v):
-        return resource.defer(self.set, v)
-
-    @classmethod
-    def pure(cls, a):
-        return Var(a)
-
-    def map(self, f):
-        return Var(f(self.value))
-
-    def flat_map(self, f):
-        return f(self.value)
-
-    @classmethod
-    def zip(cls, *vars):
-        if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
-            return Var([x.value for x in vars[0]])
-        return Var([x.value for x in vars])
-
-    def zip_with(self, *vars):
-        return Var.zip(self, *vars)
-
-    def ap(self, *arg):
-        if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
-            l = [x.value for x in arg[0]]
-        else:
-            l = [x.value for x in arg]
-        return Var(self.value(*l))</code></pre>
-</details>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li><a title="raffiot.untyped.val.Val" href="#raffiot.untyped.val.Val">Val</a></li>
-</ul>
-<h3>Class variables</h3>
-<dl>
-<dt id="raffiot.untyped.val.Var.value"><code class="name">var <span class="ident">value</span> : NoneType</code></dt>
-<dd>
-<div class="desc"></div>
-</dd>
-</dl>
-<h3>Static methods</h3>
-<dl>
-<dt id="raffiot.untyped.val.Var.pure"><code class="name flex">
-<span>def <span class="ident">pure</span></span>(<span>a)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@classmethod
-def pure(cls, a):
-    return Var(a)</code></pre>
-</details>
-</dd>
-<dt id="raffiot.untyped.val.Var.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*vars)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">@classmethod
-def zip(cls, *vars):
-    if len(vars) == 1 and isinstance(vars[0], abc.Iterable):
-        return Var([x.value for x in vars[0]])
-    return Var([x.value for x in vars])</code></pre>
-</details>
-</dd>
-</dl>
-<h3>Methods</h3>
-<dl>
-<dt id="raffiot.untyped.val.Var.ap"><code class="name flex">
-<span>def <span class="ident">ap</span></span>(<span>self, *arg)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def ap(self, *arg):
-    if len(arg) == 1 and isinstance(arg[0], abc.Iterable):
-        l = [x.value for x in arg[0]]
-    else:
-        l = [x.value for x in arg]
-    return Var(self.value(*l))</code></pre>
-</details>
-</dd>
-<dt id="raffiot.untyped.val.Var.flat_map"><code class="name flex">
-<span>def <span class="ident">flat_map</span></span>(<span>self, f)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def flat_map(self, f):
-    return f(self.value)</code></pre>
-</details>
-</dd>
-<dt id="raffiot.untyped.val.Var.map"><code class="name flex">
-<span>def <span class="ident">map</span></span>(<span>self, f)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def map(self, f):
-    return Var(f(self.value))</code></pre>
-</details>
-</dd>
-<dt id="raffiot.untyped.val.Var.set"><code class="name flex">
-<span>def <span class="ident">set</span></span>(<span>self, v)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def set(self, v):
-    old = self.value
-    self.value = v
-    return old</code></pre>
-</details>
-</dd>
-<dt id="raffiot.untyped.val.Var.set_io"><code class="name flex">
-<span>def <span class="ident">set_io</span></span>(<span>self, v)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def set_io(self, v):
-    return io.defer(self.set, v)</code></pre>
-</details>
-</dd>
-<dt id="raffiot.untyped.val.Var.set_rs"><code class="name flex">
-<span>def <span class="ident">set_rs</span></span>(<span>self, v)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def set_rs(self, v):
-    return resource.defer(self.set, v)</code></pre>
-</details>
-</dd>
-<dt id="raffiot.untyped.val.Var.zip_with"><code class="name flex">
-<span>def <span class="ident">zip_with</span></span>(<span>self, *vars)</span>
-</code></dt>
-<dd>
-<div class="desc"></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def zip_with(self, *vars):
-    return Var.zip(self, *vars)</code></pre>
 </details>
 </dd>
 </dl>
@@ -568,11 +548,6 @@ def zip(cls, *vars):
 <li><code><a title="raffiot.untyped" href="index.html">raffiot.untyped</a></code></li>
 </ul>
 </li>
-<li><h3><a href="#header-functions">Functions</a></h3>
-<ul class="">
-<li><code><a title="raffiot.untyped.val.sequence" href="#raffiot.untyped.val.sequence">sequence</a></code></li>
-</ul>
-</li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
@@ -580,29 +555,16 @@ def zip(cls, *vars):
 <ul class="two-column">
 <li><code><a title="raffiot.untyped.val.Val.ap" href="#raffiot.untyped.val.Val.ap">ap</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.flat_map" href="#raffiot.untyped.val.Val.flat_map">flat_map</a></code></li>
+<li><code><a title="raffiot.untyped.val.Val.flatten" href="#raffiot.untyped.val.Val.flatten">flatten</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.get" href="#raffiot.untyped.val.Val.get">get</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.get_io" href="#raffiot.untyped.val.Val.get_io">get_io</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.get_rs" href="#raffiot.untyped.val.Val.get_rs">get_rs</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.map" href="#raffiot.untyped.val.Val.map">map</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.pure" href="#raffiot.untyped.val.Val.pure">pure</a></code></li>
+<li><code><a title="raffiot.untyped.val.Val.traverse" href="#raffiot.untyped.val.Val.traverse">traverse</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.value" href="#raffiot.untyped.val.Val.value">value</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.zip" href="#raffiot.untyped.val.Val.zip">zip</a></code></li>
 <li><code><a title="raffiot.untyped.val.Val.zip_with" href="#raffiot.untyped.val.Val.zip_with">zip_with</a></code></li>
-</ul>
-</li>
-<li>
-<h4><code><a title="raffiot.untyped.val.Var" href="#raffiot.untyped.val.Var">Var</a></code></h4>
-<ul class="two-column">
-<li><code><a title="raffiot.untyped.val.Var.ap" href="#raffiot.untyped.val.Var.ap">ap</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.flat_map" href="#raffiot.untyped.val.Var.flat_map">flat_map</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.map" href="#raffiot.untyped.val.Var.map">map</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.pure" href="#raffiot.untyped.val.Var.pure">pure</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.set" href="#raffiot.untyped.val.Var.set">set</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.set_io" href="#raffiot.untyped.val.Var.set_io">set_io</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.set_rs" href="#raffiot.untyped.val.Var.set_rs">set_rs</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.value" href="#raffiot.untyped.val.Var.value">value</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.zip" href="#raffiot.untyped.val.Var.zip">zip</a></code></li>
-<li><code><a title="raffiot.untyped.val.Var.zip_with" href="#raffiot.untyped.val.Var.zip_with">zip_with</a></code></li>
 </ul>
 </li>
 </ul>
