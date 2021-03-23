@@ -35,6 +35,6 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Operating System :: OS Independent",
     ],
-    install_requires=["typing-extensions"],
+    install_requires=["typing-extensions", "cloudpickle"],
     python_requires=">=3.7",
 )
