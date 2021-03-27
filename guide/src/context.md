@@ -85,9 +85,9 @@ errors while `io.defer` can only raise panics.
 ```python
 >>> def f(context:int, i: int) -> Result[str,int]:
 ...   if context > 0:
-...     return Ok(context + i)
+...     return result.ok(context + i)
 ...   else:
-...     return Error("Ooups!")
+...     return result.error("Ooups!")
 >>> main : IO[int,None,int] = io.defer_read(f, 5)
 >>> main.run(10)
 Ok(success=15)
@@ -112,7 +112,7 @@ to execute later returns an `IO`.
 >>> main.run(10)
 Ok(success=15)
 >>> main.run(-1)
-Error(error='Ooups!')
+Errors(errors=['Ooups!'])
 ```
 
 ## Use Case: Dependency Injection

@@ -42,9 +42,11 @@ from dataclasses import dataclass
 
 from raffiot.untyped import _runtime
 from raffiot.untyped import io
+from raffiot.untyped import result
 from raffiot.untyped._internal import IOTag
 from raffiot.untyped.io import IO
-from raffiot.untyped.result import Result, Ok, Error, Panic
+from raffiot.untyped.result import Result, Ok, Errors, Panic
+from raffiot.untyped.utils import ComputationStatus, MatchError, MultipleExceptions
 
 __all__ = [
     &#34;Resource&#34;,
@@ -56,6 +58,7 @@ __all__ = [
     &#34;defer_read_resource&#34;,
     &#34;read&#34;,
     &#34;error&#34;,
+    &#34;errors&#34;,
     &#34;panic&#34;,
     &#34;from_result&#34;,
     &#34;from_io_resource&#34;,
@@ -63,6 +66,7 @@ __all__ = [
     &#34;from_open_close&#34;,
     &#34;from_with&#34;,
     &#34;zip&#34;,
+    &#34;zip_par&#34;,
     &#34;traverse&#34;,
     &#34;yield_&#34;,
     &#34;async_&#34;,
@@ -70,10 +74,26 @@ __all__ = [
     &#34;sleep&#34;,
     &#34;reentrant_lock&#34;,
     &#34;semaphore&#34;,
+    &#34;noop_close&#34;,
 ]
 
 
-@dataclass
+def close_and_merge_failure(close, r):
+    &#34;&#34;&#34;
+    Helper to close
+
+    :param close:
+    :param r:
+    :return:
+    &#34;&#34;&#34;
+    return (
+        io.defer_io(close, ComputationStatus.FAILED)
+        .attempt()
+        .flat_map(lambda r2: io.from_result(result.sequence(r2, r)))
+    )
+
+
+@dataclass(frozen=True)
 class Resource:
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
@@ -88,13 +108,15 @@ class Resource:
     
     On success, this IO must produce a `Tuple[A, IO[R,Any,Any]`:
         - The first value of the tuple, of type `A`, is the created resource.
-        - The second value of the tuple, of type `IO[R,Any,Any]`, is the IO that
-            release the first value.
+        - The second value of the tuple, of type `Callable[[ComputationStatus], IO[R,E,Any]]`,
+          is the function that releases the resource. 
+          It receives the `Result` (with the value set to None) to indicate
+          whether the computation succeeded, failed or panicked.
     
     For example:
         
         &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(
-        &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+        &gt;&gt;&gt;     lambda a: (a, lambda _:io.defer(a.close))))
     &#34;&#34;&#34;
 
     def use(self, fun):
@@ -109,10 +131,8 @@ class Resource:
 
         def safe_use(x):
             a, close = x
-            return (
-                io.defer_io(fun, a)
-                .attempt()
-                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            return io.defer_io(fun, a).finally_(
+                lambda r: close(r.to_computation_status())
             )
 
         return self.create.flat_map(safe_use)
@@ -139,7 +159,9 @@ class Resource:
             try:
                 return io.pure((f(a), close))
             except Exception as exception:
-                return close.attempt().then(io.panic(exception))
+                return close_and_merge_failure(
+                    close, Panic(exceptions=[exception], errors=[])
+                )
 
         return Resource(self.create.flat_map(safe_map))
 
@@ -154,16 +176,23 @@ class Resource:
 
             def safe_flat_map_a2(xa2):
                 a2, close_a2 = xa2
-                return io.pure((a2, close_a.attempt().then(close_a2)))
+
+                def close_all(cs):
+                    return io.zip(
+                        io.defer_io(close_a2, cs).attempt(),
+                        io.defer_io(close_a, cs).attempt(),
+                    ).flat_map(lambda rs: io.from_result(result.zip(rs)))
+
+                return io.pure((a2, close_all))
 
             return (
-                f(a)
-                .create.attempt()
+                io.defer_io(lambda x: f(x).create, a)
+                .attempt()
                 .flat_map(
-                    lambda r: r.fold(
+                    lambda r: r.unsafe_fold(
                         safe_flat_map_a2,
-                        lambda e: close_a.attempt().then(io.error(e)),
-                        lambda p: close_a.attempt().then(io.panic(p)),
+                        lambda e: close_and_merge_failure(close_a, Errors(e)),
+                        lambda p, e: close_and_merge_failure(close_a, Panic(p, e)),
                     )
                 )
             )
@@ -185,7 +214,17 @@ class Resource:
         If one resource creation fails, the whole creation fails (opened resources
         are released then).
         &#34;&#34;&#34;
-        return zip((self, *rs))
+        return zip(self, *rs)
+
+    def zip_par(self, *rs):
+        &#34;&#34;&#34;
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
+
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
+        &#34;&#34;&#34;
+        return zip_par(self, *rs)
 
     def ap(self, *arg):
         &#34;&#34;&#34;
@@ -212,23 +251,23 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(
             self.create.contra_map_read(f).map(
-                lambda x: (x[0], x[1].contra_map_read(f))
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).contra_map_read(f))
             )
         )
 
-    # Error API
+    # Errors API
 
     def catch(self, handler):
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        On error, call the handler with the error.
+        On errors, call the handler with the errors.
         &#34;&#34;&#34;
         return Resource(self.create.catch(lambda e: handler(e).create))
 
     def map_error(self, f):
         &#34;&#34;&#34;
-        Transform the stored error if the resource creation fails on an error.
+        Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(self.create.map_error(f))
@@ -239,13 +278,13 @@ class Resource:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        On panic, call the handler with the exception.
+        On panic, call the handler with the exceptions.
         &#34;&#34;&#34;
-        return Resource(self.create.recover(lambda p: handler(p).create))
+        return Resource(self.create.recover(lambda p, e: handler(p, e).create))
 
     def map_panic(self, f):
         &#34;&#34;&#34;
-        Transform the exception stored if the computation fails on a panic.
+        Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
@@ -258,7 +297,7 @@ class Resource:
         that never fails but creates a Result.
 
         - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-        - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If self fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
         - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the resource creation, unless a catch or
@@ -269,15 +308,15 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(
             self.create.attempt().map(
-                lambda x: x.fold(
+                lambda x: x.unsafe_fold(
                     lambda v: (Ok(v[0]), v[1]),
-                    lambda e: (Error(e), io.pure(None)),
-                    lambda p: (Panic(p), io.pure(None)),
+                    lambda e: (Errors(e), noop_close),
+                    lambda p, e: (Panic(p, e), noop_close),
                 )
             )
         )
 
-    def finally_(self, rs):
+    def finally_(self, after):
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -286,7 +325,11 @@ class Resource:
         unconditionally, at the end of a resource creation, without changing
         its result, like executing a lifted IO.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
+        return self.attempt().flat_map(
+            lambda r1: after(r1)
+            .attempt()
+            .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+        )
 
     def on_failure(self, handler):
         &#34;&#34;&#34;
@@ -294,17 +337,17 @@ class Resource:
         React to any failure of the resource creation.
         Do nothing if the resource creation is successful.
 
-        - The handler will be called on `Error(e)` if the resource creation fails with error e.
+        - The handler will be called on `Errors(e)` if the resource creation fails with errors e.
         - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(
-            lambda r: r.fold(
-                pure,
-                lambda e: handler(Error(e)),
-                lambda p: handler(Panic(p)),
-            )
-        )
+
+        def g(r):
+            if isinstance(r, Ok):
+                return pure(r.success)
+            return handler(r)
+
+        return self.attempt().flat_map(g)
 
 
 def lift_io(mio):
@@ -312,14 +355,14 @@ def lift_io(mio):
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
     &#34;&#34;&#34;
-    return Resource(mio.map(lambda a: (a, io.pure(None))))
+    return Resource(mio.map(lambda a: (a, noop_close)))
 
 
 def pure(a):
     &#34;&#34;&#34;
     A Resource that always returns the same constant.
     &#34;&#34;&#34;
-    return Resource(io.pure((a, io.pure(None))))
+    return Resource(io.pure((a, noop_close)))
 
 
 def defer(deferred, *args, **kwargs):
@@ -338,7 +381,7 @@ def defer_resource(deferred, *args, **kwargs):
     Make a function that returns an `Resource`, a `Resource` itself.
 
     This is extremely useful with recursive function that would normally blow
-    the stack (raise a stack overflow exception). Deferring recursive calls
+    the stack (raise a stack overflow exceptions). Deferring recursive calls
     eliminates stack overflow.
 
     For more information see `io.defer_io`
@@ -387,21 +430,46 @@ def error(err):
     return Resource(io.error(err))
 
 
-def panic(exception):
+def errors(*errs):
     &#34;&#34;&#34;
-    Resource creation that always fails with the panic exception.
+    Resource creation that always fails on the errors err.
     &#34;&#34;&#34;
-    return Resource(io.panic(exception))
+    if (
+        len(errs) == 1
+        and isinstance(errs[0], abc.Iterable)
+        and not isinstance(errs[0], str)
+    ):
+        return Resource(io.errors(errs[0]))
+    return Resource(io.errors(errs))
+
+
+def panic(*exceptions, errors=None):
+    &#34;&#34;&#34;
+    Resource creation that always fails with the panic exceptions.
+    &#34;&#34;&#34;
+    if (
+        len(exceptions) == 1
+        and isinstance(exceptions[0], abc.Iterable)
+        and not isinstance(exceptions[0], str)
+    ):
+        return Resource(io.panic(exceptions[0], errors=errors))
+    return Resource(io.panic(exceptions, errors=errors))
 
 
 def from_result(r):
     &#34;&#34;&#34;
     Resource creation that:
     - success if r is an `Ok`
-    - fails with error e if r is `Error(e)`
+    - fails with errors e if r is `Errors(e)`
     - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
-    return r.fold(pure, error, panic)
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Errors):
+        return errors(r.errors)
+    if isinstance(r, Panic):
+        return panic(r.exceptions, errors=r.errors)
+    return panic(MatchError(f&#34;{r} should be a Result&#34;))
 
 
 def from_io_resource(mio):
@@ -415,14 +483,16 @@ def from_open_close_io(open, close):
     &#34;&#34;&#34;
     Construct a `Resource` from an IO to open a resource and one to close it.
     &#34;&#34;&#34;
-    return Resource(open.map(lambda a: (a, close(a))))
+    return Resource(open.map(lambda a: (a, lambda cs: io.defer_io(close, a, cs))))
 
 
 def from_open_close(open, close):
     &#34;&#34;&#34;
     Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
-    return Resource(io.defer(open).map(lambda a: (a, io.defer(close, a))))
+    return Resource(
+        io.defer(open).map(lambda a: (a, lambda cs: io.defer(close, a, cs)))
+    )
 
 
 def from_with(the_io):
@@ -440,7 +510,10 @@ def from_with(the_io):
     def manager_handler(manager):
         enter = type(manager).__enter__
         exit = type(manager).__exit__
-        return (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
+        return (
+            enter(manager),
+            lambda _, cs: io.defer(lambda: exit(manager, None, None, None)),
+        )
 
     return Resource(the_io.map(manager_handler))
 
@@ -456,36 +529,76 @@ def zip(*rs):
     :return:
     &#34;&#34;&#34;
     if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
+        args = iter(rs[0])
+    else:
+        args = iter(rs)
+
+    def append(l, a):
+        l.append(a)
+        return l
+
+    def reverse(l):
+        l.reverse()
+        return l
+
+    def aux():
+        try:
+            return next(args).flat_map(
+                lambda a: defer_resource(aux).map(lambda l: append(l, a))
+            )
+        except StopIteration:
+            return pure([])
+
+    return aux().map(reverse)
+
+
+def zip_par(*rs):
+    &#34;&#34;&#34;
+    Transform a list of Resource into a Resource creating a list
+    of all resources.
+
+    If once resource creation fails, the whole creation fails.
+    The resources opened are then released.
+    :param rs: the list of resources to pack.
+    :return:
+    &#34;&#34;&#34;
+    if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
         args = rs[0]
     else:
         args = rs
 
     def process(l):
-        close = []
-        args = []
-        level = 0
-        error = None
+        values = []
+        closes = []
+        errors = []
+        panics = []
 
         for arg in l:
-            if arg.is_ok():
-                args.append(arg.success[0])
-                close.append(arg.success[1].attempt())
-            elif arg.is_error() and level &lt; 1:
-                error = arg
-                level = 1
-            elif arg.is_panic() and level &lt; 2:
-                error = arg
-                level = 2
+            if isinstance(arg, Ok):
+                values.append(arg.success[0])
+                closes.append(arg.success[1])
+            elif isinstance(arg, Errors):
+                errors.extend(arg.errors)
+            elif isinstance(arg, Panic):
+                panics.extend(arg.exceptions)
+                errors.extend(arg.errors)
             else:
-                level = 2
-                error = Panic(MatchError(f&#34;{arg} should be a Result &#34;))
+                panics.append(MatchError(f&#34;{arg} should be a Result &#34;))
 
-        if level == 0:
-            return io.pure((args, io.sequence(close)))
-        else:
-            return io.sequence(close).attempt().then(io.from_result(error))
+        def close_all(cs):
+            return io.zip([io.defer_io(f, cs).attempt() for f in closes]).flat_map(
+                lambda rs: io.from_result(result.zip(rs))
+            )
 
-    return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))
+        if panics:
+            return close_and_merge_failure(close_all, Panic(panics, errors=errors))
+        if errors:
+            return close_and_merge_failure(close_all, Errors(errors))
+        return io.pure((values, close_all))
+
+    return Resource(
+        io.parallel([x.create for x in args]).flat_map(io.wait).flat_map(process)
+    )
 
 
 def traverse(l, f):
@@ -534,8 +647,8 @@ def async_(f, *args, **kwargs):
        The value passed to `callback` must be the result of the asynchonous call:
 
         - `Ok(value)` if the call was successful and returned `value`.
-        - `Error(error)` if the call failed on error `error`.
-        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+        - `Errors(errors)` if the call failed on errors `errors`.
+        - `Panic(exceptions)` if the failed unexpectedly on exceptions `exceptions`.
 
     For example:
 
@@ -575,7 +688,9 @@ def sleep(seconds):
 
 reentrant_lock = io.defer(_runtime.Lock).map(
     lambda new_lock: Resource(
-        IO(IOTag.ACQUIRE, new_lock).then(io.pure((None, IO(IOTag.RELEASE, new_lock))))
+        IO(IOTag.ACQUIRE, new_lock).then(
+            io.pure((None, lambda _: IO(IOTag.RELEASE, new_lock)))
+        )
     )
 )
 &#34;&#34;&#34;
@@ -602,11 +717,15 @@ def semaphore(tokens):
         new_semaphore = _runtime.Semaphore(tokens)
         return Resource(
             IO(IOTag.ACQUIRE, new_semaphore).then(
-                io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+                io.pure((None, lambda _: IO(IOTag.RELEASE, new_semaphore)))
             )
         )
 
-    return io.defer(h)</code></pre>
+    return io.defer(h)
+
+
+def noop_close(cs):
+    return io.pure(None)</code></pre>
 </details>
 </section>
 <section>
@@ -665,8 +784,8 @@ When <code>callback</code> is called, the Resource is resumed.
 The value passed to <code>callback</code> must be the result of the asynchonous call:</p>
 <ul>
 <li><code>Ok(value)</code> if the call was successful and returned <code>value</code>.</li>
-<li><code>Error(<a title="raffiot.untyped.resource.error" href="#raffiot.untyped.resource.error">error()</a>)</code> if the call failed on error <code><a title="raffiot.untyped.resource.error" href="#raffiot.untyped.resource.error">error()</a></code>.</li>
-<li><code>Panic(exception)</code> if the failed unexpectedly on exception <code>exception</code>.</li>
+<li><code>Errors(<a title="raffiot.untyped.resource.errors" href="#raffiot.untyped.resource.errors">errors()</a>)</code> if the call failed on errors <code><a title="raffiot.untyped.resource.errors" href="#raffiot.untyped.resource.errors">errors()</a></code>.</li>
+<li><code>Panic(exceptions)</code> if the failed unexpectedly on exceptions <code>exceptions</code>.</li>
 </ul>
 </li>
 </ul>
@@ -701,8 +820,8 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
        The value passed to `callback` must be the result of the asynchonous call:
 
         - `Ok(value)` if the call was successful and returned `value`.
-        - `Error(error)` if the call failed on error `error`.
-        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+        - `Errors(errors)` if the call failed on errors `errors`.
+        - `Panic(exceptions)` if the failed unexpectedly on exceptions `exceptions`.
 
     For example:
 
@@ -780,7 +899,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <dd>
 <div class="desc"><p>Make a function that returns an <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code>, a <code><a title="raffiot.untyped.resource.Resource" href="#raffiot.untyped.resource.Resource">Resource</a></code> itself.</p>
 <p>This is extremely useful with recursive function that would normally blow
-the stack (raise a stack overflow exception). Deferring recursive calls
+the stack (raise a stack overflow exceptions). Deferring recursive calls
 eliminates stack overflow.</p>
 <p>For more information see <code>io.defer_io</code></p></div>
 <details class="source">
@@ -792,7 +911,7 @@ eliminates stack overflow.</p>
     Make a function that returns an `Resource`, a `Resource` itself.
 
     This is extremely useful with recursive function that would normally blow
-    the stack (raise a stack overflow exception). Deferring recursive calls
+    the stack (raise a stack overflow exceptions). Deferring recursive calls
     eliminates stack overflow.
 
     For more information see `io.defer_io`
@@ -818,6 +937,28 @@ eliminates stack overflow.</p>
     Resource creation that always fails on the error err.
     &#34;&#34;&#34;
     return Resource(io.error(err))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.errors"><code class="name flex">
+<span>def <span class="ident">errors</span></span>(<span>*errs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Resource creation that always fails on the errors err.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def errors(*errs):
+    &#34;&#34;&#34;
+    Resource creation that always fails on the errors err.
+    &#34;&#34;&#34;
+    if (
+        len(errs) == 1
+        and isinstance(errs[0], abc.Iterable)
+        and not isinstance(errs[0], str)
+    ):
+        return Resource(io.errors(errs[0]))
+    return Resource(io.errors(errs))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_io_resource"><code class="name flex">
@@ -849,7 +990,9 @@ eliminates stack overflow.</p>
     &#34;&#34;&#34;
     Construct a `Resource` from a function to open a resource and one to close it.
     &#34;&#34;&#34;
-    return Resource(io.defer(open).map(lambda a: (a, io.defer(close, a))))</code></pre>
+    return Resource(
+        io.defer(open).map(lambda a: (a, lambda cs: io.defer(close, a, cs)))
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_open_close_io"><code class="name flex">
@@ -865,7 +1008,7 @@ eliminates stack overflow.</p>
     &#34;&#34;&#34;
     Construct a `Resource` from an IO to open a resource and one to close it.
     &#34;&#34;&#34;
-    return Resource(open.map(lambda a: (a, close(a))))</code></pre>
+    return Resource(open.map(lambda a: (a, lambda cs: io.defer_io(close, a, cs))))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_result"><code class="name flex">
@@ -874,7 +1017,7 @@ eliminates stack overflow.</p>
 <dd>
 <div class="desc"><p>Resource creation that:
 - success if r is an <code>Ok</code>
-- fails with error e if r is <code>Error(e)</code>
+- fails with errors e if r is <code>Errors(e)</code>
 - fails with panic p if r is <code>Panic(p)</code></p></div>
 <details class="source">
 <summary>
@@ -884,10 +1027,16 @@ eliminates stack overflow.</p>
     &#34;&#34;&#34;
     Resource creation that:
     - success if r is an `Ok`
-    - fails with error e if r is `Error(e)`
+    - fails with errors e if r is `Errors(e)`
     - fails with panic p if r is `Panic(p)`
     &#34;&#34;&#34;
-    return r.fold(pure, error, panic)</code></pre>
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Errors):
+        return errors(r.errors)
+    if isinstance(r, Panic):
+        return panic(r.exceptions, errors=r.errors)
+    return panic(MatchError(f&#34;{r} should be a Result&#34;))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_with"><code class="name flex">
@@ -926,7 +1075,10 @@ body</p>
     def manager_handler(manager):
         enter = type(manager).__enter__
         exit = type(manager).__exit__
-        return (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
+        return (
+            enter(manager),
+            lambda _, cs: io.defer(lambda: exit(manager, None, None, None)),
+        )
 
     return Resource(the_io.map(manager_handler))</code></pre>
 </details>
@@ -946,23 +1098,42 @@ The releasing IO does nothing.</p></div>
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
     &#34;&#34;&#34;
-    return Resource(mio.map(lambda a: (a, io.pure(None))))</code></pre>
+    return Resource(mio.map(lambda a: (a, noop_close)))</code></pre>
 </details>
 </dd>
-<dt id="raffiot.untyped.resource.panic"><code class="name flex">
-<span>def <span class="ident">panic</span></span>(<span>exception)</span>
+<dt id="raffiot.untyped.resource.noop_close"><code class="name flex">
+<span>def <span class="ident">noop_close</span></span>(<span>cs)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Resource creation that always fails with the panic exception.</p></div>
+<div class="desc"></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def panic(exception):
+<pre><code class="python">def noop_close(cs):
+    return io.pure(None)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.panic"><code class="name flex">
+<span>def <span class="ident">panic</span></span>(<span>*exceptions, errors=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Resource creation that always fails with the panic exceptions.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def panic(*exceptions, errors=None):
     &#34;&#34;&#34;
-    Resource creation that always fails with the panic exception.
+    Resource creation that always fails with the panic exceptions.
     &#34;&#34;&#34;
-    return Resource(io.panic(exception))</code></pre>
+    if (
+        len(exceptions) == 1
+        and isinstance(exceptions[0], abc.Iterable)
+        and not isinstance(exceptions[0], str)
+    ):
+        return Resource(io.panic(exceptions[0], errors=errors))
+    return Resource(io.panic(exceptions, errors=errors))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.pure"><code class="name flex">
@@ -978,7 +1149,7 @@ The releasing IO does nothing.</p></div>
     &#34;&#34;&#34;
     A Resource that always returns the same constant.
     &#34;&#34;&#34;
-    return Resource(io.pure((a, io.pure(None))))</code></pre>
+    return Resource(io.pure((a, noop_close)))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.semaphore"><code class="name flex">
@@ -1011,7 +1182,7 @@ left, then the fiber is blocked until one token is available again.</p>
         new_semaphore = _runtime.Semaphore(tokens)
         return Resource(
             IO(IOTag.ACQUIRE, new_semaphore).then(
-                io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+                io.pure((None, lambda _: IO(IOTag.RELEASE, new_semaphore)))
             )
         )
 
@@ -1122,36 +1293,90 @@ The resources opened are then released.
     :return:
     &#34;&#34;&#34;
     if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
+        args = iter(rs[0])
+    else:
+        args = iter(rs)
+
+    def append(l, a):
+        l.append(a)
+        return l
+
+    def reverse(l):
+        l.reverse()
+        return l
+
+    def aux():
+        try:
+            return next(args).flat_map(
+                lambda a: defer_resource(aux).map(lambda l: append(l, a))
+            )
+        except StopIteration:
+            return pure([])
+
+    return aux().map(reverse)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.zip_par"><code class="name flex">
+<span>def <span class="ident">zip_par</span></span>(<span>*rs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform a list of Resource into a Resource creating a list
+of all resources.</p>
+<p>If once resource creation fails, the whole creation fails.
+The resources opened are then released.
+:param rs: the list of resources to pack.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip_par(*rs):
+    &#34;&#34;&#34;
+    Transform a list of Resource into a Resource creating a list
+    of all resources.
+
+    If once resource creation fails, the whole creation fails.
+    The resources opened are then released.
+    :param rs: the list of resources to pack.
+    :return:
+    &#34;&#34;&#34;
+    if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
         args = rs[0]
     else:
         args = rs
 
     def process(l):
-        close = []
-        args = []
-        level = 0
-        error = None
+        values = []
+        closes = []
+        errors = []
+        panics = []
 
         for arg in l:
-            if arg.is_ok():
-                args.append(arg.success[0])
-                close.append(arg.success[1].attempt())
-            elif arg.is_error() and level &lt; 1:
-                error = arg
-                level = 1
-            elif arg.is_panic() and level &lt; 2:
-                error = arg
-                level = 2
+            if isinstance(arg, Ok):
+                values.append(arg.success[0])
+                closes.append(arg.success[1])
+            elif isinstance(arg, Errors):
+                errors.extend(arg.errors)
+            elif isinstance(arg, Panic):
+                panics.extend(arg.exceptions)
+                errors.extend(arg.errors)
             else:
-                level = 2
-                error = Panic(MatchError(f&#34;{arg} should be a Result &#34;))
+                panics.append(MatchError(f&#34;{arg} should be a Result &#34;))
 
-        if level == 0:
-            return io.pure((args, io.sequence(close)))
-        else:
-            return io.sequence(close).attempt().then(io.from_result(error))
+        def close_all(cs):
+            return io.zip([io.defer_io(f, cs).attempt() for f in closes]).flat_map(
+                lambda rs: io.from_result(result.zip(rs))
+            )
 
-    return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))</code></pre>
+        if panics:
+            return close_and_merge_failure(close_all, Panic(panics, errors=errors))
+        if errors:
+            return close_and_merge_failure(close_all, Errors(errors))
+        return io.pure((values, close_all))
+
+    return Resource(
+        io.parallel([x.create for x in args]).flat_map(io.wait).flat_map(process)
+    )</code></pre>
 </details>
 </dd>
 </dl>
@@ -1170,7 +1395,7 @@ can fail with errors of type E and read a context of type R.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class Resource:
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
@@ -1185,13 +1410,15 @@ class Resource:
     
     On success, this IO must produce a `Tuple[A, IO[R,Any,Any]`:
         - The first value of the tuple, of type `A`, is the created resource.
-        - The second value of the tuple, of type `IO[R,Any,Any]`, is the IO that
-            release the first value.
+        - The second value of the tuple, of type `Callable[[ComputationStatus], IO[R,E,Any]]`,
+          is the function that releases the resource. 
+          It receives the `Result` (with the value set to None) to indicate
+          whether the computation succeeded, failed or panicked.
     
     For example:
         
         &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(
-        &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+        &gt;&gt;&gt;     lambda a: (a, lambda _:io.defer(a.close))))
     &#34;&#34;&#34;
 
     def use(self, fun):
@@ -1206,10 +1433,8 @@ class Resource:
 
         def safe_use(x):
             a, close = x
-            return (
-                io.defer_io(fun, a)
-                .attempt()
-                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            return io.defer_io(fun, a).finally_(
+                lambda r: close(r.to_computation_status())
             )
 
         return self.create.flat_map(safe_use)
@@ -1236,7 +1461,9 @@ class Resource:
             try:
                 return io.pure((f(a), close))
             except Exception as exception:
-                return close.attempt().then(io.panic(exception))
+                return close_and_merge_failure(
+                    close, Panic(exceptions=[exception], errors=[])
+                )
 
         return Resource(self.create.flat_map(safe_map))
 
@@ -1251,16 +1478,23 @@ class Resource:
 
             def safe_flat_map_a2(xa2):
                 a2, close_a2 = xa2
-                return io.pure((a2, close_a.attempt().then(close_a2)))
+
+                def close_all(cs):
+                    return io.zip(
+                        io.defer_io(close_a2, cs).attempt(),
+                        io.defer_io(close_a, cs).attempt(),
+                    ).flat_map(lambda rs: io.from_result(result.zip(rs)))
+
+                return io.pure((a2, close_all))
 
             return (
-                f(a)
-                .create.attempt()
+                io.defer_io(lambda x: f(x).create, a)
+                .attempt()
                 .flat_map(
-                    lambda r: r.fold(
+                    lambda r: r.unsafe_fold(
                         safe_flat_map_a2,
-                        lambda e: close_a.attempt().then(io.error(e)),
-                        lambda p: close_a.attempt().then(io.panic(p)),
+                        lambda e: close_and_merge_failure(close_a, Errors(e)),
+                        lambda p, e: close_and_merge_failure(close_a, Panic(p, e)),
                     )
                 )
             )
@@ -1282,7 +1516,17 @@ class Resource:
         If one resource creation fails, the whole creation fails (opened resources
         are released then).
         &#34;&#34;&#34;
-        return zip((self, *rs))
+        return zip(self, *rs)
+
+    def zip_par(self, *rs):
+        &#34;&#34;&#34;
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
+
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
+        &#34;&#34;&#34;
+        return zip_par(self, *rs)
 
     def ap(self, *arg):
         &#34;&#34;&#34;
@@ -1309,23 +1553,23 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(
             self.create.contra_map_read(f).map(
-                lambda x: (x[0], x[1].contra_map_read(f))
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).contra_map_read(f))
             )
         )
 
-    # Error API
+    # Errors API
 
     def catch(self, handler):
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        On error, call the handler with the error.
+        On errors, call the handler with the errors.
         &#34;&#34;&#34;
         return Resource(self.create.catch(lambda e: handler(e).create))
 
     def map_error(self, f):
         &#34;&#34;&#34;
-        Transform the stored error if the resource creation fails on an error.
+        Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(self.create.map_error(f))
@@ -1336,13 +1580,13 @@ class Resource:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        On panic, call the handler with the exception.
+        On panic, call the handler with the exceptions.
         &#34;&#34;&#34;
-        return Resource(self.create.recover(lambda p: handler(p).create))
+        return Resource(self.create.recover(lambda p, e: handler(p, e).create))
 
     def map_panic(self, f):
         &#34;&#34;&#34;
-        Transform the exception stored if the computation fails on a panic.
+        Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
@@ -1355,7 +1599,7 @@ class Resource:
         that never fails but creates a Result.
 
         - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-        - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If self fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
         - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the resource creation, unless a catch or
@@ -1366,15 +1610,15 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(
             self.create.attempt().map(
-                lambda x: x.fold(
+                lambda x: x.unsafe_fold(
                     lambda v: (Ok(v[0]), v[1]),
-                    lambda e: (Error(e), io.pure(None)),
-                    lambda p: (Panic(p), io.pure(None)),
+                    lambda e: (Errors(e), noop_close),
+                    lambda p, e: (Panic(p, e), noop_close),
                 )
             )
         )
 
-    def finally_(self, rs):
+    def finally_(self, after):
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -1383,7 +1627,11 @@ class Resource:
         unconditionally, at the end of a resource creation, without changing
         its result, like executing a lifted IO.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
+        return self.attempt().flat_map(
+            lambda r1: after(r1)
+            .attempt()
+            .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+        )
 
     def on_failure(self, handler):
         &#34;&#34;&#34;
@@ -1391,17 +1639,17 @@ class Resource:
         React to any failure of the resource creation.
         Do nothing if the resource creation is successful.
 
-        - The handler will be called on `Error(e)` if the resource creation fails with error e.
+        - The handler will be called on `Errors(e)` if the resource creation fails with errors e.
         - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(
-            lambda r: r.fold(
-                pure,
-                lambda e: handler(Error(e)),
-                lambda p: handler(Panic(p)),
-            )
-        )</code></pre>
+
+        def g(r):
+            if isinstance(r, Ok):
+                return pure(r.success)
+            return handler(r)
+
+        return self.attempt().flat_map(g)</code></pre>
 </details>
 <h3>Instance variables</h3>
 <dl>
@@ -1410,11 +1658,13 @@ class Resource:
 <div class="desc"><p>IO to create one resource along with the IO for releasing it.</p>
 <p>On success, this IO must produce a <code>Tuple[A, IO[R,Any,Any]</code>:
 - The first value of the tuple, of type <code>A</code>, is the created resource.
-- The second value of the tuple, of type <code>IO[R,Any,Any]</code>, is the IO that
-release the first value.</p>
+- The second value of the tuple, of type <code>Callable[[ComputationStatus], IO[R,E,Any]]</code>,
+is the function that releases the resource.
+It receives the <code>Result</code> (with the value set to None) to indicate
+whether the computation succeeded, failed or panicked.</p>
 <p>For example:</p>
 <pre><code>&gt;&gt;&gt; Resource(io.defer(lambda: open("file")).map(
-&gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+&gt;&gt;&gt;     lambda a: (a, lambda _:io.defer(a.close))))
 </code></pre></div>
 </dd>
 </dl>
@@ -1451,7 +1701,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
 that never fails but creates a Result.</p>
 <ul>
 <li>If self successfully computes a, then <code>self.attempt()</code> successfully computes <code>Ok(a)</code>.</li>
-<li>If self fails on error e, then <code>self.attempt()</code> successfully computes <code>Error(e)</code>.</li>
+<li>If self fails on errors e, then <code>self.attempt()</code> successfully computes <code>Errors(e)</code>.</li>
 <li>If self fails on panic p, then <code>self.attempt()</code> successfully computes <code>Panic(p)</code>.</li>
 </ul>
 <p>Note that errors and panics stop the resource creation, unless a catch or
@@ -1469,7 +1719,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     that never fails but creates a Result.
 
     - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-    - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+    - If self fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
     - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
     Note that errors and panics stop the resource creation, unless a catch or
@@ -1480,10 +1730,10 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     &#34;&#34;&#34;
     return Resource(
         self.create.attempt().map(
-            lambda x: x.fold(
+            lambda x: x.unsafe_fold(
                 lambda v: (Ok(v[0]), v[1]),
-                lambda e: (Error(e), io.pure(None)),
-                lambda p: (Panic(p), io.pure(None)),
+                lambda e: (Errors(e), noop_close),
+                lambda p, e: (Panic(p, e), noop_close),
             )
         )
     )</code></pre>
@@ -1494,7 +1744,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>React to errors (the except part of a try-except).</p>
-<p>On error, call the handler with the error.</p></div>
+<p>On errors, call the handler with the errors.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1503,7 +1753,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
-    On error, call the handler with the error.
+    On errors, call the handler with the errors.
     &#34;&#34;&#34;
     return Resource(self.create.catch(lambda e: handler(e).create))</code></pre>
 </details>
@@ -1525,13 +1775,13 @@ Note that f is not from R to R2 but from R2 to R!</p></div>
     &#34;&#34;&#34;
     return Resource(
         self.create.contra_map_read(f).map(
-            lambda x: (x[0], x[1].contra_map_read(f))
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).contra_map_read(f))
         )
     )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.finally_"><code class="name flex">
-<span>def <span class="ident">finally_</span></span>(<span>self, rs)</span>
+<span>def <span class="ident">finally_</span></span>(<span>self, after)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>After having computed self, but before returning its result,
@@ -1543,7 +1793,7 @@ its result, like executing a lifted IO.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def finally_(self, rs):
+<pre><code class="python">def finally_(self, after):
     &#34;&#34;&#34;
     After having computed self, but before returning its result,
     execute the rs Resource creation.
@@ -1552,7 +1802,11 @@ its result, like executing a lifted IO.</p></div>
     unconditionally, at the end of a resource creation, without changing
     its result, like executing a lifted IO.
     &#34;&#34;&#34;
-    return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))</code></pre>
+    return self.attempt().flat_map(
+        lambda r1: after(r1)
+        .attempt()
+        .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.flat_map"><code class="name flex">
@@ -1576,16 +1830,23 @@ The resource created by the first one (self) can be used to create the second (f
 
         def safe_flat_map_a2(xa2):
             a2, close_a2 = xa2
-            return io.pure((a2, close_a.attempt().then(close_a2)))
+
+            def close_all(cs):
+                return io.zip(
+                    io.defer_io(close_a2, cs).attempt(),
+                    io.defer_io(close_a, cs).attempt(),
+                ).flat_map(lambda rs: io.from_result(result.zip(rs)))
+
+            return io.pure((a2, close_all))
 
         return (
-            f(a)
-            .create.attempt()
+            io.defer_io(lambda x: f(x).create, a)
+            .attempt()
             .flat_map(
-                lambda r: r.fold(
+                lambda r: r.unsafe_fold(
                     safe_flat_map_a2,
-                    lambda e: close_a.attempt().then(io.error(e)),
-                    lambda p: close_a.attempt().then(io.panic(p)),
+                    lambda e: close_and_merge_failure(close_a, Errors(e)),
+                    lambda p, e: close_and_merge_failure(close_a, Panic(p, e)),
                 )
             )
         )
@@ -1630,7 +1891,9 @@ Do nothing otherwise.</p></div>
         try:
             return io.pure((f(a), close))
         except Exception as exception:
-            return close.attempt().then(io.panic(exception))
+            return close_and_merge_failure(
+                close, Panic(exceptions=[exception], errors=[])
+            )
 
     return Resource(self.create.flat_map(safe_map))</code></pre>
 </details>
@@ -1639,7 +1902,7 @@ Do nothing otherwise.</p></div>
 <span>def <span class="ident">map_error</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the stored error if the resource creation fails on an error.
+<div class="desc"><p>Transform the stored errors if the resource creation fails on an errors.
 Do nothing otherwise.</p></div>
 <details class="source">
 <summary>
@@ -1647,7 +1910,7 @@ Do nothing otherwise.</p></div>
 </summary>
 <pre><code class="python">def map_error(self, f):
     &#34;&#34;&#34;
-    Transform the stored error if the resource creation fails on an error.
+    Transform the stored errors if the resource creation fails on an errors.
     Do nothing otherwise.
     &#34;&#34;&#34;
     return Resource(self.create.map_error(f))</code></pre>
@@ -1657,7 +1920,7 @@ Do nothing otherwise.</p></div>
 <span>def <span class="ident">map_panic</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the exception stored if the computation fails on a panic.
+<div class="desc"><p>Transform the exceptions stored if the computation fails on a panic.
 Do nothing otherwise.</p></div>
 <details class="source">
 <summary>
@@ -1665,7 +1928,7 @@ Do nothing otherwise.</p></div>
 </summary>
 <pre><code class="python">def map_panic(self, f):
     &#34;&#34;&#34;
-    Transform the exception stored if the computation fails on a panic.
+    Transform the exceptions stored if the computation fails on a panic.
     Do nothing otherwise.
     &#34;&#34;&#34;
     return Resource(
@@ -1681,7 +1944,7 @@ Do nothing otherwise.</p></div>
 React to any failure of the resource creation.
 Do nothing if the resource creation is successful.</p>
 <ul>
-<li>The handler will be called on <code>Error(e)</code> if the resource creation fails with error e.</li>
+<li>The handler will be called on <code>Errors(e)</code> if the resource creation fails with errors e.</li>
 <li>The handler will be called on <code>Panic(p)</code> if the resource creation fails with panic p.</li>
 <li>The handler will never be called on <code>Ok(a)</code>.</li>
 </ul></div>
@@ -1695,17 +1958,17 @@ Do nothing if the resource creation is successful.</p>
     React to any failure of the resource creation.
     Do nothing if the resource creation is successful.
 
-    - The handler will be called on `Error(e)` if the resource creation fails with error e.
+    - The handler will be called on `Errors(e)` if the resource creation fails with errors e.
     - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
     - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
-    return self.attempt().flat_map(
-        lambda r: r.fold(
-            pure,
-            lambda e: handler(Error(e)),
-            lambda p: handler(Panic(p)),
-        )
-    )</code></pre>
+
+    def g(r):
+        if isinstance(r, Ok):
+            return pure(r.success)
+        return handler(r)
+
+    return self.attempt().flat_map(g)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.recover"><code class="name flex">
@@ -1713,7 +1976,7 @@ Do nothing if the resource creation is successful.</p>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
-<p>On panic, call the handler with the exception.</p></div>
+<p>On panic, call the handler with the exceptions.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1722,9 +1985,9 @@ Do nothing if the resource creation is successful.</p>
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).
 
-    On panic, call the handler with the exception.
+    On panic, call the handler with the exceptions.
     &#34;&#34;&#34;
-    return Resource(self.create.recover(lambda p: handler(p).create))</code></pre>
+    return Resource(self.create.recover(lambda p, e: handler(p, e).create))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.then"><code class="name flex">
@@ -1769,10 +2032,8 @@ its releasing IO). The return value if the result of fun(a).</p>
 
     def safe_use(x):
         a, close = x
-        return (
-            io.defer_io(fun, a)
-            .attempt()
-            .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+        return io.defer_io(fun, a).finally_(
+            lambda r: close(r.to_computation_status())
         )
 
     return self.create.flat_map(safe_use)</code></pre>
@@ -1822,7 +2083,30 @@ are released then).</p></div>
     If one resource creation fails, the whole creation fails (opened resources
     are released then).
     &#34;&#34;&#34;
-    return zip((self, *rs))</code></pre>
+    return zip(self, *rs)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.resource.Resource.zip_par"><code class="name flex">
+<span>def <span class="ident">zip_par</span></span>(<span>self, *rs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pack a list of resources (including self) into a Resource creating the
+list of all resources.</p>
+<p>If one resource creation fails, the whole creation fails (opened resources
+are released then).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip_par(self, *rs):
+    &#34;&#34;&#34;
+    Pack a list of resources (including self) into a Resource creating the
+    list of all resources.
+
+    If one resource creation fails, the whole creation fails (opened resources
+    are released then).
+    &#34;&#34;&#34;
+    return zip_par(self, *rs)</code></pre>
 </details>
 </dd>
 </dl>
@@ -1856,12 +2140,14 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.defer_read_resource" href="#raffiot.untyped.resource.defer_read_resource">defer_read_resource</a></code></li>
 <li><code><a title="raffiot.untyped.resource.defer_resource" href="#raffiot.untyped.resource.defer_resource">defer_resource</a></code></li>
 <li><code><a title="raffiot.untyped.resource.error" href="#raffiot.untyped.resource.error">error</a></code></li>
+<li><code><a title="raffiot.untyped.resource.errors" href="#raffiot.untyped.resource.errors">errors</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_io_resource" href="#raffiot.untyped.resource.from_io_resource">from_io_resource</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_open_close" href="#raffiot.untyped.resource.from_open_close">from_open_close</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_open_close_io" href="#raffiot.untyped.resource.from_open_close_io">from_open_close_io</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_result" href="#raffiot.untyped.resource.from_result">from_result</a></code></li>
 <li><code><a title="raffiot.untyped.resource.from_with" href="#raffiot.untyped.resource.from_with">from_with</a></code></li>
 <li><code><a title="raffiot.untyped.resource.lift_io" href="#raffiot.untyped.resource.lift_io">lift_io</a></code></li>
+<li><code><a title="raffiot.untyped.resource.noop_close" href="#raffiot.untyped.resource.noop_close">noop_close</a></code></li>
 <li><code><a title="raffiot.untyped.resource.panic" href="#raffiot.untyped.resource.panic">panic</a></code></li>
 <li><code><a title="raffiot.untyped.resource.pure" href="#raffiot.untyped.resource.pure">pure</a></code></li>
 <li><code><a title="raffiot.untyped.resource.semaphore" href="#raffiot.untyped.resource.semaphore">semaphore</a></code></li>
@@ -1869,6 +2155,7 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.sleep_until" href="#raffiot.untyped.resource.sleep_until">sleep_until</a></code></li>
 <li><code><a title="raffiot.untyped.resource.traverse" href="#raffiot.untyped.resource.traverse">traverse</a></code></li>
 <li><code><a title="raffiot.untyped.resource.zip" href="#raffiot.untyped.resource.zip">zip</a></code></li>
+<li><code><a title="raffiot.untyped.resource.zip_par" href="#raffiot.untyped.resource.zip_par">zip_par</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
@@ -1893,6 +2180,7 @@ are released then).</p></div>
 <li><code><a title="raffiot.untyped.resource.Resource.use" href="#raffiot.untyped.resource.Resource.use">use</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.with_" href="#raffiot.untyped.resource.Resource.with_">with_</a></code></li>
 <li><code><a title="raffiot.untyped.resource.Resource.zip" href="#raffiot.untyped.resource.Resource.zip">zip</a></code></li>
+<li><code><a title="raffiot.untyped.resource.Resource.zip_par" href="#raffiot.untyped.resource.Resource.zip_par">zip_par</a></code></li>
 </ul>
 </li>
 </ul>

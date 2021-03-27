@@ -7,8 +7,9 @@ import hypothesis.strategies as st
 from hypothesis import given
 
 from raffiot.io import *
-from raffiot.result import Result, Ok, Error, Panic
+from raffiot.result import Result, ok
 from raffiot.utils import MatchError
+from raffiot import result
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)
@@ -18,37 +19,43 @@ A = TypeVar("A", covariant=True)
 class TestIO(TestCase):
     @given(st.integers())
     def test_pure(self, i: int) -> None:
-        assert pure(i).run(None) == Ok(i)
+        assert pure(i).run(None) == result.ok(i)
 
     @given(st.integers())
     def test_flatten(self, i: int) -> None:
-        assert pure(pure(i)).flatten().run(None) == Ok(i)
+        assert pure(pure(i)).flatten().run(None) == result.ok(i)
 
     @given(st.text(), st.text())
     def test_ap(self, u: str, v: str) -> None:
-        assert pure(lambda x, y: x + y).ap(pure(u), pure(v)).run(None) == Ok(u + v)
+        assert pure(lambda x, y: x + y).ap(pure(u), pure(v)).run(None) == result.ok(
+            u + v
+        )
 
     @given(st.text(), st.text())
     def test_ap_error(self, u: str, v: str) -> None:
-        assert pure(lambda x, y: x + y).ap(error(u), pure(v)).run(None) == Error(u)
+        assert pure(lambda x, y: x + y).ap(errors(u), pure(v)).run(
+            None
+        ) == result.errors(u)
 
     @given(st.text(), st.text())
     def test_ap_panic(self, u: str, v: str) -> None:
         assert pure(lambda x, y: x + y).ap(pure(u), panic(MatchError(v))).run(
             None
-        ) == Panic(MatchError(v))
+        ) == result.panic(MatchError(v))
 
     @given(st.lists(st.text()))
     def test_zip(self, l: List[str]) -> None:
-        assert zip([pure(s) for s in l]).run(None) == Ok(l)
+        assert zip([pure(s) for s in l]).run(None) == result.ok(l)
 
     @given(st.text(), st.text())
     def test_zip_error(self, u: str, v: str) -> None:
-        assert zip(error(u), pure(v)).run(None) == Error(u)
+        assert zip(errors(u), pure(v)).run(None) == result.errors(u)
 
     @given(st.text(), st.text())
     def test_zip_panic(self, u: str, v: str) -> None:
-        assert zip(pure(u), panic(MatchError(v))).run(None) == Panic(MatchError(v))
+        assert zip(pure(u), panic(MatchError(v))).run(None) == result.panic(
+            MatchError(v)
+        )
 
     @given(st.integers(), st.integers(), st.integers(), st.lists(st.text()))
     def test_sequence(self, x: int, y: int, z: int, l: List[str]) -> None:
@@ -60,7 +67,7 @@ class TestIO(TestCase):
 
         assert sequence(
             [defer(f, 0), defer(f, 1), defer(f, 2)] + [pure(s) for s in l]
-        ).run(None) == Ok(None if not l else l[-1])
+        ).run(None) == result.ok(None if not l else l[-1])
         assert state == expected
 
     @given(st.text(), st.text(), st.text())
@@ -71,7 +78,9 @@ class TestIO(TestCase):
         def f(i):
             state[i] = arr[i]
 
-        assert sequence(defer(f, 0), error(w), defer(f, 1)).run(None) == Error(w)
+        assert sequence(defer(f, 0), errors(w), defer(f, 1)).run(None) == result.error(
+            w
+        )
         assert state == [u, None]
 
     @given(st.text(), st.text(), st.text())
@@ -84,34 +93,34 @@ class TestIO(TestCase):
 
         assert sequence(defer(f, 0), panic(MatchError(w)), defer(f, 1)).run(
             None
-        ) == Panic(MatchError(w))
+        ) == result.panic(MatchError(w))
         assert state == [u, None]
 
     @given(st.text())
     def test_error(self, err: str) -> None:
-        assert error(err).run(None) == Error(err)
+        assert errors(err).run(None) == result.error(err)
 
     @given(st.text(), st.text())
     def test_map_error(self, u: str, v: str) -> None:
-        assert error(u).map_error(lambda x: x + v).run(None) == Error(u + v)
+        assert errors(u).map_error(lambda x: x + v).run(None) == result.error(u + v)
 
     @given(st.text(), st.text())
     def test_catch_error(self, u: str, v: str) -> None:
-        assert error(u).catch(lambda x: pure(x + v)).run(None) == Ok(u + v)
+        assert errors(u).catch(lambda x: pure(x[0] + v)).run(None) == result.ok(u + v)
 
     @given(st.text(), st.text())
     def test_not_catch_ok(self, u: str, v: str) -> None:
-        assert pure(u).catch(lambda x: pure(x + v)).run(None) == Ok(u)
+        assert pure(u).catch(lambda x: pure(x + v)).run(None) == result.ok(u)
 
     @given(st.text(), st.text())
     def test_not_catch_panic(self, u: str, v: str) -> None:
         pan = MatchError(u)
-        assert panic(pan).catch(lambda x: pure(x + v)).run(None) == Panic(pan)
+        assert panic(pan).catch(lambda x: pure(x + v)).run(None) == result.panic(pan)
 
     @given(st.text())
     def test_panic(self, err: str) -> None:
         pan = MatchError(err)
-        assert panic(pan).run(None) == Panic(pan)
+        assert panic(pan).run(None) == result.panic(pan)
 
     @given(st.text(), st.text())
     def test_map_panic(self, u: str, v: str) -> None:
@@ -119,72 +128,78 @@ class TestIO(TestCase):
         puv = MatchError(u + v)
         assert panic(pu).map_panic(lambda x: MatchError(x.message + v)).run(
             None
-        ) == Panic(puv)
+        ) == result.panic(puv)
 
     @given(st.text(), st.text())
     def test_recover_panic(self, u: str, v: str) -> None:
         pu = MatchError(u)
-        assert panic(pu).recover(lambda x: pure(x.message + v)).run(None) == Ok(u + v)
+        assert panic(pu).recover(lambda x, e: pure(x[0].message + v)).run(
+            None
+        ) == result.ok(u + v)
 
     @given(st.text(), st.text())
     def test_not_recover_ok(self, u: str, v: str) -> None:
-        assert pure(u).recover(lambda x: pure(v)).run(None) == Ok(u)
+        assert pure(u).recover(lambda x: pure(v)).run(None) == result.ok(u)
 
     @given(st.text(), st.text())
     def test_not_catch_error(self, u: str, v: str) -> None:
-        assert error(u).catch(lambda x: pure(v)).run(None) == Ok(v)
+        assert error(u).catch(lambda x: pure(v)).run(None) == result.ok(v)
 
     @given(st.text())
     def test_panic(self, pan: str) -> None:
-        assert panic(MatchError(pan)).run(None) == Panic(MatchError(pan))
+        assert panic(MatchError(pan)).run(None) == result.panic(MatchError(pan))
 
     @given(st.text(), st.text())
     def test_on_failure_ok(self, u: str, v: str) -> None:
-        assert pure(u).on_failure(lambda x: pure(v)).run(None) == Ok(u)
+        assert pure(u).on_failure(lambda x: pure(v)).run(None) == result.ok(u)
 
     @given(st.text(), st.text())
     def test_on_failure_error(self, u: str, v: str) -> None:
-        assert error(u).map(lambda _: v).on_failure(pure).run(None) == Ok(Error(u))
+        assert errors(u).map(lambda _: v).on_failure(pure).run(None) == result.ok(
+            result.error(u)
+        )
 
     @given(st.text(), st.text())
     def test_on_failure_panic(self, u: str, v: str) -> None:
         pu = MatchError(u)
-        assert panic(pu).map(lambda _: v).on_failure(pure).run(None) == Ok(Panic(pu))
+        assert panic(pu).map(lambda _: v).on_failure(pure).run(None) == result.ok(
+            result.panic(pu)
+        )
 
     @given(st.text())
     def test_read(self, i: st.integers()) -> None:
-        assert read.run(i) == Ok(i)
+        assert read.run(i) == result.ok(i)
 
     @given(st.text(), st.text())
     def test_map_read(self, u: str, v: str) -> None:
-        assert read.contra_map_read(lambda x: x + v).run(u) == Ok(u + v)
+        assert read.contra_map_read(lambda x: x + v).run(u) == result.ok(u + v)
 
     @given(st.text())
     def test_attempt_ok(self, u: str) -> None:
-        assert pure(u).attempt().run(None) == Ok(Ok(u))
+        assert pure(u).attempt().run(None) == result.ok(result.ok(u))
 
     @given(st.text())
     def test_attempt_error(self, u: str) -> None:
-        assert error(u).attempt().run(None) == Ok(Error(u))
+        assert errors(u).attempt().run(None) == result.ok(result.error(u))
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:
         pu = MatchError(u)
-        assert panic(pu).attempt().run(None) == Ok(Panic(pu))
+        assert panic(pu).attempt().run(None) == result.ok(result.panic(pu))
 
     @given(st.text())
     def test_from_ok(self, u: str) -> None:
-        x = Ok(u)
+        x = result.ok(u)
         assert from_result(x).run(None) == x
 
     @given(st.text())
     def test_from_error(self, u: str) -> None:
-        x = Error(u)
+        x = result.error(u)
         assert from_result(x).run(None) == x
 
     @given(st.text())
     def test_from_panic(self, u: str) -> None:
-        x = Panic(MatchError(u))
+        x = result.panic(MatchError(u))
         assert from_result(x).run(None) == x
 
     @given(st.integers(min_value=1000, max_value=2000))
@@ -195,16 +210,16 @@ class TestIO(TestCase):
             else:
                 return defer_io(f, j - 1).map(lambda x: x + 2)
 
-        assert f(i).run(None) == Ok(2 * i)
+        assert f(i).run(None) == result.ok(2 * i)
 
     @given(st.integers(), st.integers())
     def test_defer_read(self, i: int, k: int) -> None:
         def g(j: int) -> Result[E, A]:
             if j % 3 == 0:
-                return Ok(j)
+                return result.ok(j)
             if j % 3 == 1:
-                return Error(j)
-            return Panic(MatchError(j))
+                return result.error(j)
+            return result.panic(MatchError(j))
 
         def f(context: R, j: int) -> Result[E, A]:
             return g(j + k)
@@ -219,7 +234,7 @@ class TestIO(TestCase):
             else:
                 return defer_read_io(f, j - 1).map(lambda x: x + 2)
 
-        assert defer_read_io(f, i).run(None) == Ok(2 * i)
+        assert defer_read_io(f, i).run(None) == result.ok(2 * i)
 
     @given(st.integers(min_value=0, max_value=10))
     def test_recursion(self, i: int) -> None:
@@ -229,7 +244,7 @@ class TestIO(TestCase):
             else:
                 return pure(j).flat_map(lambda x: f(j - 1).map(lambda y: x + y))
 
-        assert f(i).run(None) == Ok(i * (i + 1) / 2) if i >= 0 else 0
+        assert f(i).run(None) == result.ok(i * (i + 1) / 2) if i >= 0 else 0
 
     @given(st.lists(st.integers()))
     def test_traverse(self, l: List[int]) -> None:
@@ -238,7 +253,7 @@ class TestIO(TestCase):
         def f(x: int) -> IO[None, None, int]:
             return defer(lambda: var.append(x)).then(pure(x * 2))
 
-        assert traverse(l, f).run(None).map(list) == Ok([x * 2 for x in l])
+        assert traverse(l, f).run(None).map(list) == result.ok([x * 2 for x in l])
         assert var == l
 
     @given(st.lists(st.integers()), st.integers())
@@ -250,7 +265,7 @@ class TestIO(TestCase):
 
         ios = [select_io(i) for i in l] + [pure(x)]
 
-        assert sequence(ios).run(None) == Ok(x)
+        assert sequence(ios).run(None) == result.ok(x)
 
     @given(st.text(), st.lists(st.text()))
     def test_async(self, s: str, l: List[str]) -> None:
@@ -265,7 +280,7 @@ class TestIO(TestCase):
                 def f(r, k):
                     def h():
                         time.sleep(0.01)
-                        k(Ok(v + u))
+                        k(result.ok(v + u))
 
                     pool.submit(h)
 
@@ -275,7 +290,7 @@ class TestIO(TestCase):
             for u in l:
                 ret = (lambda ret, u: ret.flat_map(lambda v: get_async(v, u)))(ret, u)
 
-            assert ret.run(None) == Ok(expected)
+            assert ret.run(None) == result.ok(expected)
 
     @given(st.lists(st.integers()))
     def test_parallel(self, l: List[str]) -> None:
@@ -296,21 +311,25 @@ class TestIO(TestCase):
 
         def g(j: int) -> Result[E, A]:
             if j % 5 == 0:
-                return Ok(j)
+                return result.ok(j)
             if j % 5 == 1:
-                return Error(j)
+                return result.error(j)
             if j % 5 == 2:
-                return Panic(MatchError(j))
+                return result.panic(MatchError(j))
             if j % 5 == 3:
-                return Ok(None)
-            return Panic(MatchError(j))
+                return result.ok(None)
+            return result.panic(MatchError(j))
 
-        assert parallel([f(s) for s in l]).flat_map(wait).run(None) == Ok(
+        assert parallel([f(s) for s in l]).flat_map(wait).run(None) == result.ok(
             [g(s) for s in l]
         )
 
+    @given(st.lists(st.integers()))
+    def test_parallel_wait_zip_ok(self, l: List[int]):
+        assert zip_par([pure(i) for i in l]).run(None) == result.ok(l)
+
     def test_then_keep(self):
-        assert pure(5).then_keep(pure(7)).run(None) == Ok(5)
+        assert pure(5).then_keep(pure(7)).run(None) == result.ok(5)
 
     def test_sleep(self):
         sleep_time = 2

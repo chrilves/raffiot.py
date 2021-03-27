@@ -8,8 +8,8 @@ But before, I need to present you the `Result[E,A]` type.
 
 `Result[E,A]` represent the result of a computation.
 A computation can either be successful, returning a value of type `A`,
-or failed with an expected error of type `E`, or failed with an
-unexpected exception.
+or have failed on some expected errors of type `E`, or failed one some
+unexpected exceptions.
 `IO` and `Result` make a distinction between expected failures,
 called *errors*, and unexpected failures, called *panics*.
 
@@ -28,6 +28,11 @@ Panics should never happen, but sometimes even the most improbable events
 do occur. When panics happen, consider your computation lost. Terminate
 it doing as little damage as possible.
 
+*Raffiot* is designed to **report all encountered failures**. Failures are
+never silently ignored but exposed via the `Result` type. This is why the
+`Result` type works with lists of domain failures (*errors*) and unexpected
+failures (*panics*).
+
 For the rest of this section, you will need these imports.
 
 ```python
@@ -36,80 +41,111 @@ For the rest of this section, you will need these imports.
 
 ### `Ok(success:A)` : A Success
 
-
 When a computation successfully return some value `a` of type `A`,
 it actually returns the value `Ok(a)` of type `Result[E,A]`. The
 value `a` can be obtained by `Ok(a).success`:
 
 ```python
->>> result : Result[Any,int] = Ok(5)
->>> result
+>>> from typing import Any
+>>> r : Result[Any,int] = Ok(5)
+>>> r
 Ok(success=5)
->>> result.success
+>>> r.success
 5
 ```
 
-### `Error(error:E)` : An Expected Failure
+### `Errors(errors:List[E])` : Some Expected Failures
 
 When a computation fail because of an error `e` of type `E`,
-it actually return a value `Error(e)` of type `Result[E,Any]`.
+it actually return a value `Errors(errors=[e])` of type `Result[E,Any]`.
 The type `E` can be any type you want. Choose as type `E` a type
 that fit your business domain errors the best.
-The error `e` can be obtained by `Error(e).error`:
+The list of all errors encountered can be obtained by `Errors([e]).errors`:
 
 ```python
->>> result : Result[int,Any] = Error(5)
->>> result
-Error(error=5)
->>> result.error
+>>> r : Result[int,Any] = Errors([5])
+>>> r
+Errors(errors=[5])
+>>> r.errors
 5
 ```
 
-### `Panic(exception:Exception)` : An Unexpected Failure
+Note that you must **ALWAYS** provide a **list** to `Errors! So, to avoid bugs,
+please use the method `result.error(e: E) -> Result[E,Any]` when you want to
+raise a single error or `result.errors(e1:E, e2:E, ...) -> Result[E,Any]` when
+you want to raise several errors:
+
+```python
+>>> result.error(5)
+Errors(errors=[5])
+>>> result.errors(5, 2)
+Errors(errors=[5, 2])
+```
+
+### `Panic(exceptions: List[Exception], errors: List[E])` : Some Unexpected Failures
 
 When a computation fail because of an unexpected failure,
-it actually return a value `Panic(p)` of type `Result[Any,Any]`
+it actually return a value `Panic(exceptions=[p],errors=[])` of type `Result[Any,Any]`
 where `p` is the exception encountered.
 The exception type is always the Python exception type `Exception`.
-The exception `p` can be obtained by `Panic(p).exception`:
+The exceptions encountered can be obtained by `Panic([p],[]).exceptions`.
 
 
 ```python
->>> result : Result[Any,Any] = Panic(Exception("BOOM!"))
->>> result
-Panic(exception=Exception('BOOM!'))
->>> result.exception
-Exception('BOOM!')
+>>> r : Result[Any,Any] = Panic(exceptions=[Exception("BOOM!")], errors=[])
+>>> r
+Panic(exceptions=[Exception('BOOM!')], errors=[])
+>>> r.exceptions
+[Exception('BOOM!')]
+>>> r.errors
+[]
+```
+
+When an unexpected failures happen, there may have already been some expected
+failures. This is why the `Panic` case have a list of errors slot. The list
+of exceptions should never be empty (otherwise it shouldn't be a `Panic`).
+Using the `Panic` constructor is error-prone as you **must always provide lists**
+for the `exceptions`and `errors`field. Instead you can use the helper function
+`result.panic`:
+
+
+``` python
+>>> result.panic(Exception("BOOM"))
+Panic(exceptions=[Exception('BOOM')], errors=[])
+>>> result.panic(Exception("BOOM 1"), Exception("BOOM 2"))
+Panic(exceptions=[Exception('BOOM 1'), Exception('BOOM 2')], errors=[])
+>>> result.panic(Exception("BOOM 1"), Exception("BOOM 2"), errors=[5,2])
+Panic(exceptions=[Exception('BOOM 1'), Exception('BOOM 2')], errors=[5, 2])
 ```
 
 ### `fold` : transforming a `Result[E,A]`
 
 To transform a `Result[E,A]`, use the method `fold`. It takes
 as argument three functions. The first one is called when the
-result is an `Ok`. The second is called when it is an `Error`.
-The third is called when it is a `Panic`. When called, each of
-these function receive as argument the value/error/exception
-(depending on the case) stored in the result:
+result is an `Ok`. The second is called when it are some `Errors`.
+The third is called on `Panic`. When called, each of
+these function receive as argument the value/list of errors/list exceptions and
+errors (depending on the case) stored in the result:
 
 ```python
 >>> Ok(5).fold(
 ...   lambda s: f"success: {s}",
-...   lambda e: f"error: {e}",
-...   lambda p: f"exeption: {p}"
+...   lambda e: f"errors: {e}",
+...   lambda p,e: f"exeptions: {p}, errors: {e}"
 ... )
 'success: 5'
->>> Error(7).fold(
+>>> result.errors(7,5).fold(
 ...   lambda s: f"success: {s}",
-...   lambda e: f"error: {e}",
-...   lambda p: f"exeption: {p}"
+...   lambda e: f"errors: {e}",
+...   lambda p,e: f"exeptions: {p}, errors: {e}"
 ... )
-'error: 7'
->>> Panic(Exception("BOOM!")).fold(
+'error: [7,5]'
+>>> result.panic(Exception("BOOM 1"), Exception("BOOM 2"), errors=[5,2]).fold(
 ...   lambda s: f"success: {s}",
-...   lambda e: f"error: {e}",
-...   lambda p: f"exeption: {p}"
-... 
-'exeption: BOOM!'
+...   lambda e: f"errors: {e}",
+...   lambda p,e: f"exeptions: {p}, errors: {e}"
+... )
+"exeptions: [Exception('BOOM 1'), Exception('BOOM 2')], errors: [5, 2]"
 ```
 
 ### `raise_on_panic` : reporting panics as exceptions
@@ -122,29 +158,29 @@ on the result:
 ```python
 >>> Ok(5).raise_on_panic()
 Ok(success=5)
->>> Error(7).raise_on_panic()
-Error(error=7)
->>> Panic(Exception("BOOM!")).raise_on_panic()
+>>> result.error(7).raise_on_panic()
+Errors(errors=[7])
+>>> result.panic(Exception("BOOM!")).raise_on_panic()
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
-  File "/home/tof/dev/raffiot.py/raffiot/result.py", line 406, in raise_on_panic
-    raise self.exception
+  File "/home/tof/dev/raffiot.py/raffiot/result.py", line 434, in raise_on_panic
+    raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
 Exception: BOOM!
 ```
 
 `raise_on_panic` is **the only function/method raising exceptions**.
 Never expect other functions to raise exception on failures, they
-will return an `Error` or `Panic` instead:
+will return an `Errors` or `Panic` instead:
 
 ```python
 >>> main : IO[None,None,None] = io.panic(Exception("BOOM!"))
 >>> main.run(None)
-Panic(exception=Exception('BOOM!'))
+Panic(exceptions=[Exception('BOOM!')], errors=[])
 >>> main.run(None).raise_on_panic()
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
-  File "/home/tof/dev/raffiot.py/raffiot/result.py", line 406, in raise_on_panic
-    raise self.exception
+  File "/home/tof/dev/raffiot.py/raffiot/result.py", line 434, in raise_on_panic
+    raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
 Exception: BOOM!
 ```
 
@@ -164,15 +200,42 @@ To raise an error, simply call `io.error`:
 
 >>> main_str : IO[None,str,Any] = io.error("Oops")
 >>> main_str.run(None)
-Error(error='Oops')
+Errors(errors=['Oops'])
 
 >>> main_int : IO[None,int,Any] = io.error(5)
 >>> main_int.run(None)
-Error(error=5)
+Errors(errors=[5])
 
 >>> main_list : IO[None,List[int],Any] = io.error([1,2,3])
 >>> main_list.run(None)
-Error(error=[1, 2, 3])
+Error(error=[[1, 2, 3]])
+```
+
+### `errors` : raising several errors at once.
+
+To raise several errors, simply call `io.errors`:
+
+```python
+>>> from typing import Any, List
+
+>>> main_str : IO[None,str,Any] = io.errors("Oops1", "Oops2")
+>>> main_str.run(None)
+Errors(errors=['Oops1', 'Oops2'])
+
+>>> main_int : IO[None,int,Any] = io.errors(5,7)
+>>> main_int.run(None)
+Errors(errors=[5, 7])
+```
+
+**But beware**: the iterable arguments will be treated as collections of errors
+and not a single error. For example the error `[1,2,3]` will be treated by
+`io.errors` as three errors `1`, `2` and `3`. So when you want to raise iterable
+errors, use `io.error` instead:
+
+```python
+>>> main_list : IO[None,List[int],Any] = io.errors([1,2,3])
+>>> main_list.run(None)
+Errors(errors=[1, 2, 3])
 ```
 
 ### `catch` : reacting to expected failures to continue.
@@ -180,8 +243,8 @@ Error(error=[1, 2, 3])
 To react to errors, just call the method `catch`.
 It is very similar to a `try-exept` block.
 It takes as argument a function called the *error handler*.
-When the computation fails because of an error `e`,
-the error handler is called with `e` as argument.
+When the computation fails because of some errors `le: List[E]`,
+the error handler is called with `le` as argument.
 The result is then the error handler's result.
 
 ```python
@@ -189,12 +252,12 @@ The result is then the error handler's result.
 ...   return (
 ...   io.error(i)
 ...   .catch(lambda x:
-...     io.pure(2*x)
-...     if x % 2 == 0
+...     io.pure(2*x[0])
+...     if x[0] % 2 == 0
 ...     else io.error("Oops"))
 ... )
 >>> main(5).run(None)
-Error(error='Oops')
+Errors(errors=['Oops'])
 >>> main(6).run(None)
 Ok(success=12)
 ```
@@ -216,7 +279,7 @@ but on errors:
 ```python
 >>> main : IO[None,int,Any] = io.error([1,2]).map_error(lambda l: l[0] + l[1])
 >>> main.run(None)
-Error(error=3)
+Errors(errors=[3])
 ```
 
 If the computation is successful or if it fails on a panic,
@@ -229,7 +292,7 @@ Panics can be raise either manually, by calling `io.panic`, or
 when `run` encounters an exception.
 **The method `run` on `IO` never raises exceptions!**
 Every exception `p` raised during the execution of `run` are caught and
-transformed into panics `Panic(p)`.
+transformed into panics `result.panic(p)`.
 
 ### **ALL** exceptions are caught
 
@@ -240,7 +303,7 @@ All exception caught this way are transformed into panics:
 ```python
 >>> main : IO[None,None,float] = io.pure(0).map(lambda x: 1/x)
 >>> main.run(None)
-Panic(exception=ZeroDivisionError('division by zero'))
+Panic(exceptions=[ZeroDivisionError('division by zero')], errors=[])
 ```
 
 Remember that panics are unexpected failures and unexpected failures
@@ -260,8 +323,11 @@ situation, you should raise a panic.
 ```python
 >>> main : IO[None,None,Any] = io.panic(Exception("BOOM!"))
 >>> main.run(None)
-Panic(exception=Exception('BOOM!'))
+Panic(exceptions=[Exception('BOOM!')], errors=[])
 ```
+
+The function `io.panic` accepts several exceptions as arguments and even
+domain errors with the `errors` keyword argument.
 
 ### `recover` : **stopping** the computation safely after an unexpected failure.
 
@@ -270,28 +336,29 @@ actions to recover. For example, you may want to restart the computation
 on panics. To react to panics, just call `recover`.
 It is very similar to a `try-exept` block.
 It takes as argument a function, called the *panic handler*.
-If the computation fails because of a panic `p`, then the panic handler
-is called with `p` as argument.
+If the computation fails because of a panic with exceptions `lexn: List[Exception]`,
+and errors `lerr: List[E]`, then the panic handler is called with `lexn` as
+first argument and `lerr`as its second argument.
 The result is then the the handler's result.
 
 ```python
 >>> main : IO[None,None,Any] = (
 ...   io.panic(Exception("BOOM!"))
-...   .recover(lambda p: io.pure("Recovered from " + str(p)))
+...   .recover(lambda lexn, lerr: io.pure(f"Recovered from exceptions: {lexn} and errors {lerr}"))
 ... )
 >>> main.run(None)
-Ok(success='Recovered from BOOM!')
+Ok(success="Recovered from exceptions: [Exception('BOOM!')] and errors []")
 ```
 
-### `map_panic` : transforming an unexpected failure.
+### `map_panic` : transforming exceptions.
 
 It is often useful to transform a panic. For example you may
 want to add some useful information about the context: what
 was the request that led to this error, what were the arguments
 of the operation that failed, etc.
 
-To transform an error, call `map_panic`. It behaves like `map`,
-but on panics:
+To transform all the exceptions of a `Panic`, call `map_panic`.
+It behaves like `map`, but on exceptions contained in `Panic`:
 
 ```python
 >>> main : IO[None, None, None] = (
@@ -300,7 +367,7 @@ but on panics:
 ...   .map_panic(lambda exception: Exception("BOOM"))
 ... )
 >>> main.run(None)
-Panic(exception=Exception('BOOM'))
+Panic(exceptions=[Exception('BOOM')], errors=[])
 ```
 
 ### More tools
@@ -312,9 +379,9 @@ functions and methods seen above but they deserve being seeing in details:
 
 The method `attemp` transform an `IO[R,E,A]` into
 `IO[R,None,Result[E,A]]`. If the original computation is successful,
-the transformed one returns an `Ok`. If the original computation fails
-on an error `e`, the transformed one returns `Error(e)`. If the original
-computation fails on a panic `p`, the transformed one returns `Panic(p)`:
+the transformed one returns an `Ok(Ok(...))`. If the original computation fails
+on some errors, the transformed one returns `Ok(Errors(...))`.
+If the original computation fails on a panic, the transformed one returns `Ok(Panic(...))`:
 
 
 ```python
@@ -323,10 +390,10 @@ computation fails on a panic `p`, the transformed one returns `Panic(p)`:
 Ok(success=Ok(success=5))
 >>> io_error : IO[None,None,Result[int,None]] = io.error(7).attempt()
 >>> io_error.run(None)
-Ok(success=Error(error=7))
+Ok(success=Errors(errors=[7]))
 >>> io_panic : IO[None,None,Result[None,None]] = io.panic(Exception("BOOM!")).attempt()
 >>> io_panic.run(None)
-Ok(success=Panic(exception=Exception('BOOM!')))
+Ok(success=Panic(exceptions=[Exception('BOOM!')], errors=[]))
 ```
 
 It is hugely useful when you want to do different actions depending
@@ -341,12 +408,12 @@ It transform a `Result[E,A]` into the corresponding `IO[None,E,A]`:
 ```python
 >>> io_ok : IO[None,None,int] = io.from_result(Ok(5))
 >>> io_ok.run(None)
->>> io_error : IO[None,int,None] = io.from_result(Error(5))
+>>> io_error : IO[None,int,None] = io.from_result(result.error(5))
 >>> io_error.run(None)
-Error(error=5)
->>> io_panic : IO[None,None,None] = io.from_result(Panic(Exception("BOOM!")))
+Errors(errors=[5])
+>>> io_panic : IO[None,None,None] = io.from_result(result.panic(Exception("BOOM!")))
 >>> io_panic.run(None)
-Panic(exception=Exception('BOOM!'))
+Panic(exceptions=[Exception('BOOM!')], errors=[])
 ```
 
 `from_result` is often useful after an `attempt` to restore the state
@@ -355,19 +422,23 @@ of the computation.
 ### `finally_` : doing something unconditionally.
 
 The method `finally_` is the *finally* clause of a *try-except-finally*.
-It executed an `IO` after the current one, discard its result and
-restore the result of the current one:
+It executed a `IO` after the current one, discard its result and
+restore the result of the current one. The `IO` executed after is actually
+a function taking as argument a `Result[R,E]` from the preceding `IO`.
+It enables to perform different actions depending on the result of the first
+computation:
+
 
 ```python
->>> pure(5).finally_(io.defer(print, "Hello")).run(None)
-Hello
+>>> io.pure(5).finally_(lambda r: io.defer(print, f"Hello, result is {r}")).run(None)
+Hello, result is Ok(success=5)
 Ok(success=5)
->>> error(7).finally_(io.defer(print, "Hello")).run(None)
-Hello
-Error(error=7)
->>> panic(Exception("BOOM!")).finally_(io.defer(print, "Hello")).run(None)
-Hello
-Panic(exception=Exception('BOOM!'))
+>>> io.error(7).finally_(lambda r: io.defer(print, f"Hello, result is {r}")).run(None)
+Hello, result is Errors(errors=[7])
+Errors(errors=[7])
+>>> io.panic(Exception("BOOM!")).finally_(lambda r: io.defer(print, f"Hello, result is {r}")).run(None)
+Hello, result is Panic(exceptions=[Exception('BOOM!')], errors=[])
+Panic(exceptions=[Exception('BOOM!')], errors=[])
 ```
 
 ### `on_failure` : reaction to both errors and panics.
@@ -382,10 +453,10 @@ This `Result[E,None]` is never `Ok` because `on_failure` call the handler
 only on failures.
 
 ```python
->>> pure(5).on_failure(lambda x: pure(12)).run(None)
+>>> io.pure(5).on_failure(lambda x: io.pure(12)).run(None)
 Ok(success=5)
->>> error(7).on_failure(lambda x: pure(12)).run(None)
+>>> io.error(7).on_failure(lambda x: io.pure(12)).run(None)
 Ok(success=12)
->>> panic(Exception("BOOM!")).on_failure(lambda x: pure(12)).run(None)
+>>> io.panic(Exception("BOOM!")).on_failure(lambda x: io.pure(12)).run(None)
 Ok(success=12)
 ```

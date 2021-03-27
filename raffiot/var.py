@@ -27,7 +27,7 @@ B = TypeVar("B")
 
 
 @final
-@dataclass
+@dataclass(frozen=True)
 class UpdateResult(Generic[A, B]):
     """
     The result of the `update` methods of `Var`.

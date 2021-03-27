@@ -246,9 +246,12 @@ A <code>Resource</code> is essentially two computations:</p>
 ... )
 </code></pre>
 <p>Now the function releasing the string (i.e. printing it):</p>
-<pre><code class="language-python">&gt;&gt;&gt; def rs_close(s: str) -&gt; IO[None, None, None]:
+<pre><code class="language-python">&gt;&gt;&gt; def rs_close(s: str, cs: ComputationStatus) -&gt; IO[None, None, None]:
 ...   return io.defer(print, f&quot;Closing {s}&quot;)
 </code></pre>
+<p>The first function argument is the created resource. The second one indicates
+whether the computation was successful. It can be either
+<code>ComputationStatus.SUCCEEDED</code> or <code>ComputationStatus.FAILED</code>.</p>
 <p>From there, creating a <code>Resource</code> is as simple as a single call
 to <code>resource.from_open_close_io</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_open_close_io(rs_open, rs_close)
@@ -308,10 +311,13 @@ use the function <code>resource.from_open_close</code>:</p>
 ...   )
 ...   print(f&quot;Opening {s}&quot;)
 ...   return s
-&gt;&gt;&gt; def rs_close(s: str) -&gt; None:
+&gt;&gt;&gt; def rs_close(s: str, cs: ComputationStatus) -&gt; None:
 ...   print(f&quot;Closing {s}&quot;)
 &gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_open_close(rs_open, rs_close)
 </code></pre>
+<p>Once again, the he first argument of <code>rs_close</code> is the created resource and
+the second one indicates whether the computation was successful:
+<code>ComputationStatus.SUCCEEDED</code> or <code>ComputationStatus.FAILED</code>.</p>
 <h2 id="from_with--resource-from-with"><a class="header" href="#from_with--resource-from-with"><code>from_with</code> : Resource from <code>with</code></a></h2>
 <p>If the resource you want to create already support Python's
 <code>with</code>-statement, then you're lucky: you just have to make
@@ -319,16 +325,20 @@ one single call to <code>resource.from_with</code></p>
 <pre><code class="language-python">&gt;&gt;&gt; rs : Resource[None,None,str] = resource.from_with(io.defer(open, &quot;hello.txt&quot;, &quot;w&quot;))
 </code></pre>
 <h2 id="creating-a-resource-directly"><a class="header" href="#creating-a-resource-directly">Creating a Resource directly</a></h2>
-<p>A <code>Resource[R,E,A]</code> is essentially an <code>IO[R,E,Tuple[A, IO[R,Any,Any]]]</code>.
-When the <code>IO</code> runs, it returns a pair <code>Tuple[A, IO[R,Any,Any]]</code>.
+<p>A <code>Resource[R,E,A]</code> is essentially an
+<code>IO[R,E,Tuple[A, Callable[[ComputationStatus], IO[R,E,Any]]]]</code>.
+When the <code>IO</code> runs, it returns a pair
+<code>Tuple[A, Callable[[ComputationStatus], IO[R,Any,Any]]]</code>.
 The fist member of the pair is the created resource of type <code>A</code>.
-The second member of the pair is the <code>IO</code> to run to release the
-resource.
-Note that the result and failures of the releasing <code>IO</code> are ignored.</p>
+The second member of the pair is the release function. Its argument is a
+<code>ComputationStatus</code> indicating whether the computation was successful.
+It must return an <code>IO</code> that perform the release of the resource.</p>
+<p>Note that any failure encountered when releasing the resource makes the <code>IO</code>
+to fail too.</p>
 <pre><code class="language-python">&gt;&gt;&gt; create : IO[None,None,Tuple[str, IO[None,Any,Any]]] = (
 ...   rnd_str.flat_map(lambda filename:
 ...     io.defer(print, f&quot;Opening {filename}&quot;).map(lambda file:
-...       (file, io.defer(print, f&quot;Closing {filename}&quot;))
+...       (file, lambda computationStatus: io.defer(print, f&quot;Closing {filename}&quot;))
 ...     )
 ...   )
 ... )
@@ -344,8 +354,8 @@ Note that the result and failures of the releasing <code>IO</code> are ignored.<
 ...     .then(io.defer(open, filename, &quot;w&quot;))
 ...     .map(lambda file:
 ...       ( file,
-...         io.defer(print, f&quot;Closing {filename}&quot;)
-...         .then(io.defer(f.close))
+...         lambda computationStatus: io.defer(print, f&quot;Closing {filename}&quot;)
+...         .then(io.defer(file.close))
 ...       )
 ...     )
 ...    )
@@ -357,6 +367,9 @@ Note that the result and failures of the releasing <code>IO</code> are ignored.<
 ...   )
 ... )
 &gt;&gt;&gt; io_ok.run(None)
+Opening 6E21M413
+Closing 6E21M413
+Ok(success=12)
 &gt;&gt;&gt; io_error : IO[None,None,None] = (
 ...   rs.use(lambda file:
 ...     io.defer(file.write, &quot;Hello World!&quot;)
@@ -366,7 +379,7 @@ Note that the result and failures of the releasing <code>IO</code> are ignored.<
 &gt;&gt;&gt; io_error.run(None)
 Opening R9A1YSJ3
 Closing R9A1YSJ3
-Error(error='Oups!')
+Errors(errors=['Oups!'])
 &gt;&gt;&gt; io_panic : IO[None,None,None] = (
 ...   rs.use(lambda file:
 ...     io.defer(file.write, &quot;Hello World!&quot;)
@@ -374,9 +387,9 @@ Error(error='Oups!')
 ...   )
 ... )
 &gt;&gt;&gt; io_panic.run(None)
-Opening PSUNW6M5
-Closing PSUNW6M5
-Panic(exception=Exception('BOOM!'))
+Opening R1V3A0SO
+Closing R1V3A0SO
+Panic(exceptions=[Exception('BOOM!')], errors=[])
 </code></pre>
 
                     </main>

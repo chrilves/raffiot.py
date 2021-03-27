@@ -21,7 +21,7 @@ The whole computation fails on the first failure encountered.
 Ok(success=[8, 'Hello'])
 >>> main : IO[None,str,List] = io.zip(io.pure(8), io.error("Oups"))
 >>> main.run(None)
-Error(error='Oups')
+Errors(errors=['Oups'])
 ```
 
 ## `sequence` : running IOs in sequence

@@ -35,23 +35,31 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, List, Iterable
+from typing import TypeVar, Generic, Callable, Any, List, Iterable, Tuple
 
 from typing_extensions import final
 
-from raffiot.utils import MatchError
+from raffiot.utils import (
+    ComputationStatus,
+    MatchError,
+    MultipleExceptions,
+    DomainErrors,
+)
 
 __all__ = [
     &#34;safe&#34;,
     &#34;Result&#34;,
     &#34;Ok&#34;,
-    &#34;Error&#34;,
+    &#34;Errors&#34;,
     &#34;Panic&#34;,
     &#34;pure&#34;,
+    &#34;ok&#34;,
     &#34;error&#34;,
+    &#34;errors&#34;,
     &#34;panic&#34;,
     &#34;traverse&#34;,
     &#34;zip&#34;,
+    &#34;sequence&#34;,
     &#34;returns_result&#34;,
 ]
 
@@ -65,10 +73,10 @@ X = TypeVar(&#34;X&#34;)
 
 def safe(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E, A]]:
     &#34;&#34;&#34;
-    Simple decorator to ensure all exception are caught and transformed into
+    Simple decorator to ensure all exceptions are caught and transformed into
     panics.
 
-    A function that returns a Result[E,A] should never raise an exception but
+    A function that returns a Result[E,A] should never raise an exceptions but
     instead return a panic. This decorator make sure of it.
 
     :param f:
@@ -79,7 +87,7 @@ def safe(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E, A]]:
         try:
             return f(*args, **kwargs)
         except Exception as exception:
-            return Panic(exception)
+            return Panic(exceptions=[exception], errors=[])
 
     return wrapper
 
@@ -92,17 +100,17 @@ class Result(Generic[E, A]):
     - *Ok(some_value: A)*
             The computation succeeded.
             The value some_value, of type A, is the result of the computation
-    - *Error(some_error: E)*
-            The computation failed with an expected error.
-            The error some_error, of type E, is the expected error encountered.
-    - *Panic(some_exception: Exception)*
-            The computation failed on an unexpected error.
-            The exception some_exception is the unexpected error encountered.
+    - *Errors(some_errors: List[E])*
+            The computation failed with an expected errors.
+            The errors some_errors, of type List[E], is the expected errors encountered.
+    - *Panic(some_exceptions: List[Exception], errors: List[E])*
+            The computation failed on an unexpected errors.
+            The exceptions some_exceptions is the unexpected errors encountered.
 
     The distinction between errors (expected failures) and panics (unexpected
     failures) is essential.
 
-    Errors are failures your program is prepared to deal with safely. An error
+    Errors are failures your program is prepared to deal with safely. An errors
     simply means some operation was not successful, but your program is still
     behaving nicely. Nothing terribly wrong happened. Generally errors belong to
     your business domain. You can take any type as E.
@@ -113,7 +121,7 @@ class Result(Generic[E, A]):
     is always Exception.
 
     As an example, if your program is an HTTP server. Errors are bad requests
-    (error code 400) while panics are internal server errors (error code 500).
+    (errors code 400) while panics are internal server errors (errors code 500).
     Receiving bad request is part of the normal life of any HTTP server, it must
     know how to reply nicely. But internal server errors are bugs.
     &#34;&#34;&#34;
@@ -122,36 +130,36 @@ class Result(Generic[E, A]):
     def unsafe_fold(
         self,
         on_success: Callable[[A], X],
-        on_error: Callable[[E], X],
-        on_panic: Callable[[Exception], X],
+        on_error: Callable[[List[E]], X],
+        on_panic: Callable[[List[Exception], List[E]], X],
     ) -&gt; X:
         &#34;&#34;&#34;
         Transform this Result[E,A] into X.
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :param on_panic: is called if this result is a `Panic`.
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return on_success(self.success)
-        if isinstance(self, Error):
-            return on_error(self.error)
+        if isinstance(self, Errors):
+            return on_error(self.errors)
         if isinstance(self, Panic):
-            return on_panic(self.exception)
-        raise MatchError(f&#34;{self} should be a Result&#34;)
+            return on_panic(self.exceptions, self.errors)
+        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])
 
     @final
     @safe
     def fold(
         self,
         on_success: Callable[[A], X],
-        on_error: Callable[[E], X],
-        on_panic: Callable[[Exception], X],
+        on_error: Callable[[List[E]], X],
+        on_panic: Callable[[List[Exception], List[E]], X],
     ) -&gt; X:
         &#34;&#34;&#34;
         Transform this Result[E,A] into X.
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :param on_panic: is called if this result is a `Panic`.
         :return:
         &#34;&#34;&#34;
@@ -159,37 +167,39 @@ class Result(Generic[E, A]):
 
     @final
     def unsafe_fold_raise(
-        self, on_success: Callable[[A], X], on_error: Callable[[E], X]
+        self, on_success: Callable[[A], X], on_error: Callable[[List[E]], X]
     ) -&gt; X:
         &#34;&#34;&#34;
-        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
-        But raise the stored exception is this is a panic.
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Errors`.
+        But raise the stored exceptions is this is a panic.
 
-        It is useful to raise an exception on panics.
+        It is useful to raise an exceptions on panics.
 
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return on_success(self.success)
-        if isinstance(self, Error):
-            return on_error(self.error)
+        if isinstance(self, Errors):
+            return on_error(self.errors)
         if isinstance(self, Panic):
-            raise self.exception
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
         raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @final
     @safe
-    def fold_raise(self, on_success: Callable[[A], X], on_error: Callable[[E], X]) -&gt; X:
+    def fold_raise(
+        self, on_success: Callable[[A], X], on_error: Callable[[List[E]], X]
+    ) -&gt; X:
         &#34;&#34;&#34;
-        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
-        But raise the stored exception is this is a panic.
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Errors`.
+        But raise the stored exceptions is this is a panic.
 
-        It is useful to raise an exception on panics.
+        It is useful to raise an exceptions on panics.
 
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :return:
         &#34;&#34;&#34;
         return self.unsafe_fold_raise(on_success, on_error)
@@ -237,16 +247,16 @@ class Result(Generic[E, A]):
         h: Callable[[Exception], Exception],
     ) -&gt; Result[E2, A2]:
         &#34;&#34;&#34;
-        Transform the value/error/exception stored in this result.
+        Transform the value/errors/exceptions stored in this result.
         :param f: how to transform the value a if this result is `Ok(a)`
-        :param g: how to transform the error e if this result is `Error(e)`
-        :param h: how to transform the exception p if this result is `Panic(p)`
+        :param g: how to transform the errors e if this result is `Errors(e)`
+        :param h: how to transform the exceptions p if this result is `Panic(p)`
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.unsafe_fold(
             lambda x: Ok(f(x)),
-            lambda x: Error(g(x)),
-            lambda x: Panic(h(x)),
+            lambda x: Errors(list(map(g, x))),
+            lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
         )
 
     @final
@@ -258,10 +268,10 @@ class Result(Generic[E, A]):
         h: Callable[[Exception], Exception],
     ) -&gt; Result[E2, A2]:
         &#34;&#34;&#34;
-        Transform the value/error/exception stored in this result.
+        Transform the value/errors/exceptions stored in this result.
         :param f: how to transform the value a if this result is `Ok(a)`
-        :param g: how to transform the error e if this result is `Error(e)`
-        :param h: how to transform the exception p if this result is `Panic(p)`
+        :param g: how to transform the errors e if this result is `Errors(e)`
+        :param h: how to transform the exceptions p if this result is `Panic(p)`
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.unsafe_tri_map(f, g, h)
@@ -276,9 +286,9 @@ class Result(Generic[E, A]):
     @final
     def is_error(self) -&gt; bool:
         &#34;&#34;&#34;
-        :return: True if this result is an `Error`
+        :return: True if this result is an `Errors`
         &#34;&#34;&#34;
-        return isinstance(self, Error)
+        return isinstance(self, Errors)
 
     @final
     def is_panic(self) -&gt; bool:
@@ -309,14 +319,12 @@ class Result(Generic[E, A]):
         return self.unsafe_map(f)
 
     @final
-    def zip(
-        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
-    ) -&gt; Result[E, List[A]]:
+    def zip(self: Result[E, A], *arg: Result[E, X]) -&gt; Result[E, List[A]]:
         &#34;&#34;&#34;
         Transform a list of Result (including self) into a Result of list.
 
         Is Ok is all results are Ok.
-        Is Error some are Ok, but at least one is an error but no panics.
+        Is Errors some are Ok, but at least one is an errors but no panics.
         Is Panic is there is at least one panic.
         &#34;&#34;&#34;
         return zip((self, *arg))
@@ -358,43 +366,43 @@ class Result(Generic[E, A]):
     @final
     def unsafe_map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
         &#34;&#34;&#34;
-        Transform the error stored if this result is an `Error`.
+        Transform the errors stored if this result is an `Errors`.
         :param f: the transformation function
         :return:
         &#34;&#34;&#34;
-        if isinstance(self, Error):
-            return Error(f(self.error))
+        if isinstance(self, Errors):
+            return Errors(list(map(f, self.errors)))
         return self  # type: ignore
 
     @final
     @safe
     def map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
         &#34;&#34;&#34;
-        Transform the error stored if this result is an `Error`.
+        Transform the errors stored if this result is an `Errors`.
         :param f: the transformation function
         :return:
         &#34;&#34;&#34;
         return self.unsafe_map_error(f)
 
     @final
-    def unsafe_catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+    def unsafe_catch(self, handler: Callable[[List[E]], Result[E, A]]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
         Otherwise, do nothing.
         &#34;&#34;&#34;
-        if isinstance(self, Error):
-            return handler(self.error)
+        if isinstance(self, Errors):
+            return handler(self.errors)
         return self
 
     @final
     @safe
-    def catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+    def catch(self, handler: Callable[[E], Result[List[E], A]]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
         Otherwise, do nothing.
         &#34;&#34;&#34;
         return self.unsafe_catch(handler)
@@ -402,41 +410,43 @@ class Result(Generic[E, A]):
     @final
     def unsafe_map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        Transform the exception stored if this result is a `Panic(some_exception)`.
+        Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return Panic(f(self.exception))
+            return Panic(list(map(f, self.exceptions)), self.errors)
         return self
 
     @final
     @safe
     def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        Transform the exception stored if this result is a `Panic(some_exception)`.
+        Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         return self.unsafe_map_panic(f)
 
     @final
     def unsafe_recover(
-        self, handler: Callable[[Exception], Result[E, A]]
+        self, handler: Callable[[List[Exception], List[E]], Result[E, A]]
     ) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
         Otherwise do nothing.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return handler(self.exception)
+            return handler(self.exceptions, self.errors)
         return self
 
     @final
     @safe
-    def recover(self, handler: Callable[[Exception], Result[E, A]]) -&gt; Result[E, A]:
+    def recover(
+        self, handler: Callable[[List[Exception], List[E]], Result[E, A]]
+    ) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
         Otherwise do nothing.
         &#34;&#34;&#34;
         return self.unsafe_recover(handler)
@@ -444,18 +454,44 @@ class Result(Generic[E, A]):
     @final
     def raise_on_panic(self) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        If this result is an `Ok` or `Error`, do nothing.
-        If it is a `Panic(some_exception)`, raise the exception.
+        If this result is an `Ok` or `Errors`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exceptions.
 
-        Use with extreme care since it raise exception.
+        Use with extreme care since it raise exceptions.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            raise self.exception
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
         return self
+
+    @final
+    def unsafe_get(self) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        If this result is an `Ok`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exceptions.
+
+        Use with extreme care since it raise exceptions.
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return self.success
+        if isinstance(self, Errors):
+            raise DomainErrors(self.errors)
+        if isinstance(self, Panic):
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
+        raise MatchError(f&#34;{self} should be a result.&#34;)
+
+    @final
+    def to_computation_status(self) -&gt; ComputationStatus:
+        &#34;&#34;&#34;
+        Transform this Result into a Computation Status
+        :return:
+        &#34;&#34;&#34;
+        if self.is_ok():
+            return ComputationStatus.SUCCEEDED
+        return ComputationStatus.FAILED
 
 
 @final
-@dataclass
+@dataclass(frozen=True)
 class Ok(Result[E, A]):
     &#34;&#34;&#34;
     The result of a successful computation.
@@ -467,29 +503,31 @@ class Ok(Result[E, A]):
 
 
 @final
-@dataclass
-class Error(Result[E, A]):
+@dataclass(frozen=True)
+class Errors(Result[E, A]):
     &#34;&#34;&#34;
-    The result of a computation that failed on an excepted normal error case.
+    The result of a computation that failed on an excepted normal errors case.
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;error&#34;]
+    __slots__ = [&#34;errors&#34;]
 
-    error: E
+    errors: List[E]
 
 
 @final
-@dataclass
+@dataclass(frozen=True)
 class Panic(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exception&#34;]
+    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
 
-    exception: Exception
+    exceptions: List[Exception]
+
+    errors: List[E]
 
 
 def pure(a: A) -&gt; Result[Any, A]:
@@ -499,22 +537,126 @@ def pure(a: A) -&gt; Result[Any, A]:
     return Ok(a)
 
 
-def error(error: E) -&gt; Result[E, Any]:
+def ok(a: A) -&gt; Result[Any, A]:
     &#34;&#34;&#34;
-    Alias for `Error(error)`.
+    Alias for `Ok(a)`.
     &#34;&#34;&#34;
-    return Error(error)
+    return Ok(a)
 
 
-def panic(exception: Exception) -&gt; Result[Any, Any]:
+def error(err: E) -&gt; Result[E, Any]:
     &#34;&#34;&#34;
-    Alias for `Panic(exception)`.
+    Alias for `Errors(err)`.
     &#34;&#34;&#34;
-    return Panic(exception)
+    return Errors([err])
 
 
-@safe
-def traverse(l: Iterable[A], f: Callable[[A], Result[E, A2]]) -&gt; Result[E, List[A2]]:
+def errors(*errs: E) -&gt; Result[E, Any]:
+    &#34;&#34;&#34;
+    Alias for `Errors(errs)`.
+    &#34;&#34;&#34;
+    if (
+        len(errs) == 1
+        and isinstance(errs[0], abc.Iterable)
+        and not isinstance(errs[0], str)
+    ):
+        return Errors(list(errs[0]))
+    return Errors(list(errs))
+
+
+def panic(*exceptions: Exception, errors=None) -&gt; Result[Any, Any]:
+    &#34;&#34;&#34;
+    Alias for `Panic(exceptions)`.
+    &#34;&#34;&#34;
+    if (
+        len(exceptions) == 1
+        and isinstance(exceptions[0], abc.Iterable)
+        and not isinstance(exceptions[0], str)
+    ):
+        return Panic(
+            exceptions=list(exceptions[0]), errors=list(errors) if errors else []
+        )
+    return Panic(exceptions=list(exceptions), errors=list(errors) if errors else [])
+
+
+def zip(*l: Iterable[Result[E, A]]) -&gt; Result[E, List[A]]:
+    &#34;&#34;&#34;
+    Combine a list of `Result`.
+
+    If everyone is `Ok(x)`, then return `Ok([...x...])`.
+    If there are some errors but no panics, return `Errors(&lt;the list of errors&gt;)`.
+    If there are some panics, return the Panic with all exceptions and errors
+    encountered.
+
+    :param l:
+    :return:
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        args = l[0]
+    else:
+        args = l
+
+    values = []
+    errs = []
+    exceptions = []
+
+    for arg in args:
+        if isinstance(arg, Ok):
+            values.append(arg.success)
+        elif isinstance(arg, Errors):
+            errs.extend(arg.errors)
+        elif isinstance(arg, Panic):
+            exceptions.extend(arg.exceptions)
+            errs.extend(arg.errors)
+        else:
+            exceptions.append(MatchError(f&#34;{arg} should be a Result&#34;))
+
+    if exceptions:
+        return Panic(exceptions=exceptions, errors=errs)
+    if errs:
+        return Errors(errs)
+    return Ok(values)
+
+
+def sequence(*l: Iterable[Result[E, A]]) -&gt; Result[List[E], A]:
+    &#34;&#34;&#34;
+    Combine a list of `Result`.
+
+    If everyone is `Ok(x)`, then return `Ok(&lt;the value of the last result&gt;)`.
+    If there are some errs but no exceptions, return `Errors(&lt;the list of errs&gt;)`.
+    If there are some exceptions, return the Panic with all exceptions and errs
+    encountered.
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        args = l[0]
+    else:
+        args = l
+
+    value = None
+    errs = []
+    exceptions = []
+
+    for arg in args:
+        if isinstance(arg, Ok):
+            value = arg.success
+        elif isinstance(arg, Errors):
+            errs.extend(arg.errors)
+        elif isinstance(arg, Panic):
+            exceptions.extend(arg.exceptions)
+            errs.extend(arg.errors)
+        else:
+            exceptions.append(MatchError(f&#34;{arg} should be a Result&#34;))
+
+    if exceptions:
+        return Panic(exceptions=exceptions, errors=errs)
+    if errs:
+        return Errors(errs)
+    return Ok(value)
+
+
+def traverse(
+    l: Iterable[A], f: Callable[[A], Result[E, A2]]
+) -&gt; Result[List[E], List[A2]]:
     &#34;&#34;&#34;
     Apply the function `f` to every element of the iterable.
     The resulting Result is Ok if all results are Ok.
@@ -526,30 +668,13 @@ def traverse(l: Iterable[A], f: Callable[[A], Result[E, A2]]) -&gt; Result[E, Li
     :return:
     &#34;&#34;&#34;
 
-    return zip([f(i) for i in l])
+    def g(i):
+        try:
+            return f(i)
+        except Exception as exception:
+            return Panic([exception], [])
 
-
-def zip(*l: Iterable[Result[E, A]]) -&gt; Result[E, List[A]]:
-    if len(l) == 1 and isinstance(l[0], abc.Iterable):
-        args = l[0]
-    else:
-        args = l
-
-    values = []
-    error = None
-
-    for arg in args:
-        if arg.is_ok():
-            values.append(arg.success)
-        elif arg.is_error() and error is None:
-            error = arg
-        elif arg.is_panic():
-            return arg
-
-    if error is None:
-        return Ok(values)
-    else:
-        return error
+    return zip([g(i) for i in l])
 
 
 def returns_result(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E, A]]:
@@ -564,7 +689,7 @@ def returns_result(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E,
         try:
             return Ok(f(*args, **kwargs))
         except Exception as exception:
-            return Panic(exception)
+            return panic(exception)
 
     return wrapper</code></pre>
 </details>
@@ -577,35 +702,81 @@ def returns_result(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E,
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="raffiot.result.error"><code class="name flex">
-<span>def <span class="ident">error</span></span>(<span>error: E) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.Any]</span>
+<span>def <span class="ident">error</span></span>(<span>err: E) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.Any]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Alias for <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a>(<a title="raffiot.result.error" href="#raffiot.result.error">error()</a>)</code>.</p></div>
+<div class="desc"><p>Alias for <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a>(err)</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def error(error: E) -&gt; Result[E, Any]:
+<pre><code class="python">def error(err: E) -&gt; Result[E, Any]:
     &#34;&#34;&#34;
-    Alias for `Error(error)`.
+    Alias for `Errors(err)`.
     &#34;&#34;&#34;
-    return Error(error)</code></pre>
+    return Errors([err])</code></pre>
+</details>
+</dd>
+<dt id="raffiot.result.errors"><code class="name flex">
+<span>def <span class="ident">errors</span></span>(<span>*errs: E) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.Any]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Alias for <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a>(errs)</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def errors(*errs: E) -&gt; Result[E, Any]:
+    &#34;&#34;&#34;
+    Alias for `Errors(errs)`.
+    &#34;&#34;&#34;
+    if (
+        len(errs) == 1
+        and isinstance(errs[0], abc.Iterable)
+        and not isinstance(errs[0], str)
+    ):
+        return Errors(list(errs[0]))
+    return Errors(list(errs))</code></pre>
+</details>
+</dd>
+<dt id="raffiot.result.ok"><code class="name flex">
+<span>def <span class="ident">ok</span></span>(<span>a: A) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[typing.Any, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Alias for <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a>(a)</code>.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ok(a: A) -&gt; Result[Any, A]:
+    &#34;&#34;&#34;
+    Alias for `Ok(a)`.
+    &#34;&#34;&#34;
+    return Ok(a)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.panic"><code class="name flex">
-<span>def <span class="ident">panic</span></span>(<span>exception: Exception) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[typing.Any, typing.Any]</span>
+<span>def <span class="ident">panic</span></span>(<span>*exceptions: Exception, errors=None) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[typing.Any, typing.Any]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Alias for <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(exception)</code>.</p></div>
+<div class="desc"><p>Alias for <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(exceptions)</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def panic(exception: Exception) -&gt; Result[Any, Any]:
+<pre><code class="python">def panic(*exceptions: Exception, errors=None) -&gt; Result[Any, Any]:
     &#34;&#34;&#34;
-    Alias for `Panic(exception)`.
+    Alias for `Panic(exceptions)`.
     &#34;&#34;&#34;
-    return Panic(exception)</code></pre>
+    if (
+        len(exceptions) == 1
+        and isinstance(exceptions[0], abc.Iterable)
+        and not isinstance(exceptions[0], str)
+    ):
+        return Panic(
+            exceptions=list(exceptions[0]), errors=list(errors) if errors else []
+        )
+    return Panic(exceptions=list(exceptions), errors=list(errors) if errors else [])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.pure"><code class="name flex">
@@ -647,7 +818,7 @@ into a function f returning <code><a title="raffiot.result.Result" href="#raffio
         try:
             return Ok(f(*args, **kwargs))
         except Exception as exception:
-            return Panic(exception)
+            return panic(exception)
 
     return wrapper</code></pre>
 </details>
@@ -656,9 +827,9 @@ into a function f returning <code><a title="raffiot.result.Result" href="#raffio
 <span>def <span class="ident">safe</span></span>(<span>f: Callable[..., <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> Callable[..., <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Simple decorator to ensure all exception are caught and transformed into
+<div class="desc"><p>Simple decorator to ensure all exceptions are caught and transformed into
 panics.</p>
-<p>A function that returns a Result[E,A] should never raise an exception but
+<p>A function that returns a Result[E,A] should never raise an exceptions but
 instead return a panic. This decorator make sure of it.</p>
 <p>:param f:
 :return:</p></div>
@@ -668,10 +839,10 @@ instead return a panic. This decorator make sure of it.</p>
 </summary>
 <pre><code class="python">def safe(f: Callable[..., Result[E, A]]) -&gt; Callable[..., Result[E, A]]:
     &#34;&#34;&#34;
-    Simple decorator to ensure all exception are caught and transformed into
+    Simple decorator to ensure all exceptions are caught and transformed into
     panics.
 
-    A function that returns a Result[E,A] should never raise an exception but
+    A function that returns a Result[E,A] should never raise an exceptions but
     instead return a panic. This decorator make sure of it.
 
     :param f:
@@ -682,57 +853,149 @@ instead return a panic. This decorator make sure of it.</p>
         try:
             return f(*args, **kwargs)
         except Exception as exception:
-            return Panic(exception)
+            return Panic(exceptions=[exception], errors=[])
 
     return wrapper</code></pre>
 </details>
 </dd>
-<dt id="raffiot.result.traverse"><code class="name flex">
-<span>def <span class="ident">traverse</span></span>(<span>*args: Any, **kwargs: Any) ‑> Any</span>
+<dt id="raffiot.result.sequence"><code class="name flex">
+<span>def <span class="ident">sequence</span></span>(<span>*l: Iterable[<a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[typing.List[~E], ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Combine a list of <code><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a></code>.</p>
+<p>If everyone is <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a>(x)</code>, then return <code>Ok(&lt;the value of the last result&gt;)</code>.
+If there are some errs but no exceptions, return <code>Errors(&lt;the list of errs&gt;)</code>.
+If there are some exceptions, return the Panic with all exceptions and errs
+encountered.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def wrapper(*args: Any, **kwargs: Any) -&gt; Any:
-    try:
-        return f(*args, **kwargs)
-    except Exception as exception:
-        return Panic(exception)</code></pre>
+<pre><code class="python">def sequence(*l: Iterable[Result[E, A]]) -&gt; Result[List[E], A]:
+    &#34;&#34;&#34;
+    Combine a list of `Result`.
+
+    If everyone is `Ok(x)`, then return `Ok(&lt;the value of the last result&gt;)`.
+    If there are some errs but no exceptions, return `Errors(&lt;the list of errs&gt;)`.
+    If there are some exceptions, return the Panic with all exceptions and errs
+    encountered.
+    &#34;&#34;&#34;
+    if len(l) == 1 and isinstance(l[0], abc.Iterable):
+        args = l[0]
+    else:
+        args = l
+
+    value = None
+    errs = []
+    exceptions = []
+
+    for arg in args:
+        if isinstance(arg, Ok):
+            value = arg.success
+        elif isinstance(arg, Errors):
+            errs.extend(arg.errors)
+        elif isinstance(arg, Panic):
+            exceptions.extend(arg.exceptions)
+            errs.extend(arg.errors)
+        else:
+            exceptions.append(MatchError(f&#34;{arg} should be a Result&#34;))
+
+    if exceptions:
+        return Panic(exceptions=exceptions, errors=errs)
+    if errs:
+        return Errors(errs)
+    return Ok(value)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.result.traverse"><code class="name flex">
+<span>def <span class="ident">traverse</span></span>(<span>l: Iterable[A], f: Callable[[A], <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A2]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[typing.List[~E], typing.List[~A2]]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply the function <code>f</code> to every element of the iterable.
+The resulting Result is Ok if all results are Ok.</p>
+<p>This function is essentially like map, but f returns Result[E,A2] instead of A2.</p>
+<p>:param l: the elements to apply to f
+:param f: the function for each element.
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def traverse(
+    l: Iterable[A], f: Callable[[A], Result[E, A2]]
+) -&gt; Result[List[E], List[A2]]:
+    &#34;&#34;&#34;
+    Apply the function `f` to every element of the iterable.
+    The resulting Result is Ok if all results are Ok.
+
+    This function is essentially like map, but f returns Result[E,A2] instead of A2.
+
+    :param l: the elements to apply to f
+    :param f: the function for each element.
+    :return:
+    &#34;&#34;&#34;
+
+    def g(i):
+        try:
+            return f(i)
+        except Exception as exception:
+            return Panic([exception], [])
+
+    return zip([g(i) for i in l])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.zip"><code class="name flex">
 <span>def <span class="ident">zip</span></span>(<span>*l: Iterable[<a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.List[~A]]</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Combine a list of <code><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a></code>.</p>
+<p>If everyone is <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a>(x)</code>, then return <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a>([&hellip;x&hellip;])</code>.
+If there are some errors but no panics, return <code>Errors(&lt;the list of errors&gt;)</code>.
+If there are some panics, return the Panic with all exceptions and errors
+encountered.</p>
+<p>:param l:
+:return:</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def zip(*l: Iterable[Result[E, A]]) -&gt; Result[E, List[A]]:
+    &#34;&#34;&#34;
+    Combine a list of `Result`.
+
+    If everyone is `Ok(x)`, then return `Ok([...x...])`.
+    If there are some errors but no panics, return `Errors(&lt;the list of errors&gt;)`.
+    If there are some panics, return the Panic with all exceptions and errors
+    encountered.
+
+    :param l:
+    :return:
+    &#34;&#34;&#34;
     if len(l) == 1 and isinstance(l[0], abc.Iterable):
         args = l[0]
     else:
         args = l
 
     values = []
-    error = None
+    errs = []
+    exceptions = []
 
     for arg in args:
-        if arg.is_ok():
+        if isinstance(arg, Ok):
             values.append(arg.success)
-        elif arg.is_error() and error is None:
-            error = arg
-        elif arg.is_panic():
-            return arg
+        elif isinstance(arg, Errors):
+            errs.extend(arg.errors)
+        elif isinstance(arg, Panic):
+            exceptions.extend(arg.exceptions)
+            errs.extend(arg.errors)
+        else:
+            exceptions.append(MatchError(f&#34;{arg} should be a Result&#34;))
 
-    if error is None:
-        return Ok(values)
-    else:
-        return error</code></pre>
+    if exceptions:
+        return Panic(exceptions=exceptions, errors=errs)
+    if errs:
+        return Errors(errs)
+    return Ok(values)</code></pre>
 </details>
 </dd>
 </dl>
@@ -740,28 +1003,28 @@ instead return a panic. This decorator make sure of it.</p>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="raffiot.result.Error"><code class="flex name class">
-<span>class <span class="ident">Error</span></span>
-<span>(</span><span>error: E)</span>
+<dt id="raffiot.result.Errors"><code class="flex name class">
+<span>class <span class="ident">Errors</span></span>
+<span>(</span><span>errors: List[E])</span>
 </code></dt>
 <dd>
-<div class="desc"><p>The result of a computation that failed on an excepted normal error case.
+<div class="desc"><p>The result of a computation that failed on an excepted normal errors case.
 The program is still in a valid state and can progress safely.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass
-class Error(Result[E, A]):
+@dataclass(frozen=True)
+class Errors(Result[E, A]):
     &#34;&#34;&#34;
-    The result of a computation that failed on an excepted normal error case.
+    The result of a computation that failed on an excepted normal errors case.
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;error&#34;]
+    __slots__ = [&#34;errors&#34;]
 
-    error: E</code></pre>
+    errors: List[E]</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -770,7 +1033,7 @@ class Error(Result[E, A]):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="raffiot.result.Error.error"><code class="name">var <span class="ident">error</span> : ~E</code></dt>
+<dt id="raffiot.result.Errors.errors"><code class="name">var <span class="ident">errors</span> : List[~E]</code></dt>
 <dd>
 <div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
@@ -784,11 +1047,13 @@ class Error(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.to_computation_status" href="#raffiot.result.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_ap" href="#raffiot.result.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_catch" href="#raffiot.result.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_flat_map" href="#raffiot.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold" href="#raffiot.result.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold_raise" href="#raffiot.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_get" href="#raffiot.result.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map" href="#raffiot.result.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_error" href="#raffiot.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
@@ -810,7 +1075,7 @@ class Error(Result[E, A]):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass
+@dataclass(frozen=True)
 class Ok(Result[E, A]):
     &#34;&#34;&#34;
     The result of a successful computation.
@@ -841,11 +1106,13 @@ class Ok(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.to_computation_status" href="#raffiot.result.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_ap" href="#raffiot.result.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_catch" href="#raffiot.result.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_flat_map" href="#raffiot.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold" href="#raffiot.result.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold_raise" href="#raffiot.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_get" href="#raffiot.result.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map" href="#raffiot.result.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_error" href="#raffiot.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
@@ -858,7 +1125,7 @@ class Ok(Result[E, A]):
 </dd>
 <dt id="raffiot.result.Panic"><code class="flex name class">
 <span>class <span class="ident">Panic</span></span>
-<span>(</span><span>exception: Exception)</span>
+<span>(</span><span>exceptions: List[Exception], errors: List[E])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>The result of a computation that failed unexpectedly.
@@ -868,16 +1135,18 @@ The program is not in a valid state and must terminate safely.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass
+@dataclass(frozen=True)
 class Panic(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exception&#34;]
+    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
 
-    exception: Exception</code></pre>
+    exceptions: List[Exception]
+
+    errors: List[E]</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -886,7 +1155,11 @@ class Panic(Result[E, A]):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="raffiot.result.Panic.exception"><code class="name">var <span class="ident">exception</span> : Exception</code></dt>
+<dt id="raffiot.result.Panic.errors"><code class="name">var <span class="ident">errors</span> : List[~E]</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+<dt id="raffiot.result.Panic.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[Exception]</code></dt>
 <dd>
 <div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
@@ -900,11 +1173,13 @@ class Panic(Result[E, A]):
 <li><code><a title="raffiot.result.Result.is_ok" href="#raffiot.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.result.Result.is_panic" href="#raffiot.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.result.Result.to_computation_status" href="#raffiot.result.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_ap" href="#raffiot.result.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_catch" href="#raffiot.result.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_flat_map" href="#raffiot.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold" href="#raffiot.result.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold_raise" href="#raffiot.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_get" href="#raffiot.result.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map" href="#raffiot.result.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_error" href="#raffiot.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
@@ -925,16 +1200,16 @@ class Panic(Result[E, A]):
 <li><em>Ok(some_value: A)</em>
 The computation succeeded.
 The value some_value, of type A, is the result of the computation</li>
-<li><em>Error(some_error: E)</em>
-The computation failed with an expected error.
-The error some_error, of type E, is the expected error encountered.</li>
-<li><em>Panic(some_exception: Exception)</em>
-The computation failed on an unexpected error.
-The exception some_exception is the unexpected error encountered.</li>
+<li><em>Errors(some_errors: List[E])</em>
+The computation failed with an expected errors.
+The errors some_errors, of type List[E], is the expected errors encountered.</li>
+<li><em>Panic(some_exceptions: List[Exception], errors: List[E])</em>
+The computation failed on an unexpected errors.
+The exceptions some_exceptions is the unexpected errors encountered.</li>
 </ul>
 <p>The distinction between errors (expected failures) and panics (unexpected
 failures) is essential.</p>
-<p>Errors are failures your program is prepared to deal with safely. An error
+<p>Errors are failures your program is prepared to deal with safely. An errors
 simply means some operation was not successful, but your program is still
 behaving nicely. Nothing terribly wrong happened. Generally errors belong to
 your business domain. You can take any type as E.</p>
@@ -943,7 +1218,7 @@ can not progress further. All you can do when panics occur, is stopping your
 computation gracefully (like releasing resources before dying). The panic type
 is always Exception.</p>
 <p>As an example, if your program is an HTTP server. Errors are bad requests
-(error code 400) while panics are internal server errors (error code 500).
+(errors code 400) while panics are internal server errors (errors code 500).
 Receiving bad request is part of the normal life of any HTTP server, it must
 know how to reply nicely. But internal server errors are bugs.</p></div>
 <details class="source">
@@ -958,17 +1233,17 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     - *Ok(some_value: A)*
             The computation succeeded.
             The value some_value, of type A, is the result of the computation
-    - *Error(some_error: E)*
-            The computation failed with an expected error.
-            The error some_error, of type E, is the expected error encountered.
-    - *Panic(some_exception: Exception)*
-            The computation failed on an unexpected error.
-            The exception some_exception is the unexpected error encountered.
+    - *Errors(some_errors: List[E])*
+            The computation failed with an expected errors.
+            The errors some_errors, of type List[E], is the expected errors encountered.
+    - *Panic(some_exceptions: List[Exception], errors: List[E])*
+            The computation failed on an unexpected errors.
+            The exceptions some_exceptions is the unexpected errors encountered.
 
     The distinction between errors (expected failures) and panics (unexpected
     failures) is essential.
 
-    Errors are failures your program is prepared to deal with safely. An error
+    Errors are failures your program is prepared to deal with safely. An errors
     simply means some operation was not successful, but your program is still
     behaving nicely. Nothing terribly wrong happened. Generally errors belong to
     your business domain. You can take any type as E.
@@ -979,7 +1254,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     is always Exception.
 
     As an example, if your program is an HTTP server. Errors are bad requests
-    (error code 400) while panics are internal server errors (error code 500).
+    (errors code 400) while panics are internal server errors (errors code 500).
     Receiving bad request is part of the normal life of any HTTP server, it must
     know how to reply nicely. But internal server errors are bugs.
     &#34;&#34;&#34;
@@ -988,36 +1263,36 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     def unsafe_fold(
         self,
         on_success: Callable[[A], X],
-        on_error: Callable[[E], X],
-        on_panic: Callable[[Exception], X],
+        on_error: Callable[[List[E]], X],
+        on_panic: Callable[[List[Exception], List[E]], X],
     ) -&gt; X:
         &#34;&#34;&#34;
         Transform this Result[E,A] into X.
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :param on_panic: is called if this result is a `Panic`.
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return on_success(self.success)
-        if isinstance(self, Error):
-            return on_error(self.error)
+        if isinstance(self, Errors):
+            return on_error(self.errors)
         if isinstance(self, Panic):
-            return on_panic(self.exception)
-        raise MatchError(f&#34;{self} should be a Result&#34;)
+            return on_panic(self.exceptions, self.errors)
+        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])
 
     @final
     @safe
     def fold(
         self,
         on_success: Callable[[A], X],
-        on_error: Callable[[E], X],
-        on_panic: Callable[[Exception], X],
+        on_error: Callable[[List[E]], X],
+        on_panic: Callable[[List[Exception], List[E]], X],
     ) -&gt; X:
         &#34;&#34;&#34;
         Transform this Result[E,A] into X.
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :param on_panic: is called if this result is a `Panic`.
         :return:
         &#34;&#34;&#34;
@@ -1025,37 +1300,39 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
 
     @final
     def unsafe_fold_raise(
-        self, on_success: Callable[[A], X], on_error: Callable[[E], X]
+        self, on_success: Callable[[A], X], on_error: Callable[[List[E]], X]
     ) -&gt; X:
         &#34;&#34;&#34;
-        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
-        But raise the stored exception is this is a panic.
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Errors`.
+        But raise the stored exceptions is this is a panic.
 
-        It is useful to raise an exception on panics.
+        It is useful to raise an exceptions on panics.
 
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return on_success(self.success)
-        if isinstance(self, Error):
-            return on_error(self.error)
+        if isinstance(self, Errors):
+            return on_error(self.errors)
         if isinstance(self, Panic):
-            raise self.exception
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
         raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @final
     @safe
-    def fold_raise(self, on_success: Callable[[A], X], on_error: Callable[[E], X]) -&gt; X:
+    def fold_raise(
+        self, on_success: Callable[[A], X], on_error: Callable[[List[E]], X]
+    ) -&gt; X:
         &#34;&#34;&#34;
-        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
-        But raise the stored exception is this is a panic.
+        Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Errors`.
+        But raise the stored exceptions is this is a panic.
 
-        It is useful to raise an exception on panics.
+        It is useful to raise an exceptions on panics.
 
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :return:
         &#34;&#34;&#34;
         return self.unsafe_fold_raise(on_success, on_error)
@@ -1103,16 +1380,16 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         h: Callable[[Exception], Exception],
     ) -&gt; Result[E2, A2]:
         &#34;&#34;&#34;
-        Transform the value/error/exception stored in this result.
+        Transform the value/errors/exceptions stored in this result.
         :param f: how to transform the value a if this result is `Ok(a)`
-        :param g: how to transform the error e if this result is `Error(e)`
-        :param h: how to transform the exception p if this result is `Panic(p)`
+        :param g: how to transform the errors e if this result is `Errors(e)`
+        :param h: how to transform the exceptions p if this result is `Panic(p)`
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.unsafe_fold(
             lambda x: Ok(f(x)),
-            lambda x: Error(g(x)),
-            lambda x: Panic(h(x)),
+            lambda x: Errors(list(map(g, x))),
+            lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
         )
 
     @final
@@ -1124,10 +1401,10 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         h: Callable[[Exception], Exception],
     ) -&gt; Result[E2, A2]:
         &#34;&#34;&#34;
-        Transform the value/error/exception stored in this result.
+        Transform the value/errors/exceptions stored in this result.
         :param f: how to transform the value a if this result is `Ok(a)`
-        :param g: how to transform the error e if this result is `Error(e)`
-        :param h: how to transform the exception p if this result is `Panic(p)`
+        :param g: how to transform the errors e if this result is `Errors(e)`
+        :param h: how to transform the exceptions p if this result is `Panic(p)`
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.unsafe_tri_map(f, g, h)
@@ -1142,9 +1419,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     @final
     def is_error(self) -&gt; bool:
         &#34;&#34;&#34;
-        :return: True if this result is an `Error`
+        :return: True if this result is an `Errors`
         &#34;&#34;&#34;
-        return isinstance(self, Error)
+        return isinstance(self, Errors)
 
     @final
     def is_panic(self) -&gt; bool:
@@ -1175,14 +1452,12 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         return self.unsafe_map(f)
 
     @final
-    def zip(
-        self: Result[E, Callable[[X], A]], *arg: Result[E, X]
-    ) -&gt; Result[E, List[A]]:
+    def zip(self: Result[E, A], *arg: Result[E, X]) -&gt; Result[E, List[A]]:
         &#34;&#34;&#34;
         Transform a list of Result (including self) into a Result of list.
 
         Is Ok is all results are Ok.
-        Is Error some are Ok, but at least one is an error but no panics.
+        Is Errors some are Ok, but at least one is an errors but no panics.
         Is Panic is there is at least one panic.
         &#34;&#34;&#34;
         return zip((self, *arg))
@@ -1224,43 +1499,43 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     @final
     def unsafe_map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
         &#34;&#34;&#34;
-        Transform the error stored if this result is an `Error`.
+        Transform the errors stored if this result is an `Errors`.
         :param f: the transformation function
         :return:
         &#34;&#34;&#34;
-        if isinstance(self, Error):
-            return Error(f(self.error))
+        if isinstance(self, Errors):
+            return Errors(list(map(f, self.errors)))
         return self  # type: ignore
 
     @final
     @safe
     def map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
         &#34;&#34;&#34;
-        Transform the error stored if this result is an `Error`.
+        Transform the errors stored if this result is an `Errors`.
         :param f: the transformation function
         :return:
         &#34;&#34;&#34;
         return self.unsafe_map_error(f)
 
     @final
-    def unsafe_catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+    def unsafe_catch(self, handler: Callable[[List[E]], Result[E, A]]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
         Otherwise, do nothing.
         &#34;&#34;&#34;
-        if isinstance(self, Error):
-            return handler(self.error)
+        if isinstance(self, Errors):
+            return handler(self.errors)
         return self
 
     @final
     @safe
-    def catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+    def catch(self, handler: Callable[[E], Result[List[E], A]]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
         Otherwise, do nothing.
         &#34;&#34;&#34;
         return self.unsafe_catch(handler)
@@ -1268,41 +1543,43 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     @final
     def unsafe_map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        Transform the exception stored if this result is a `Panic(some_exception)`.
+        Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return Panic(f(self.exception))
+            return Panic(list(map(f, self.exceptions)), self.errors)
         return self
 
     @final
     @safe
     def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        Transform the exception stored if this result is a `Panic(some_exception)`.
+        Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         return self.unsafe_map_panic(f)
 
     @final
     def unsafe_recover(
-        self, handler: Callable[[Exception], Result[E, A]]
+        self, handler: Callable[[List[Exception], List[E]], Result[E, A]]
     ) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
         Otherwise do nothing.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return handler(self.exception)
+            return handler(self.exceptions, self.errors)
         return self
 
     @final
     @safe
-    def recover(self, handler: Callable[[Exception], Result[E, A]]) -&gt; Result[E, A]:
+    def recover(
+        self, handler: Callable[[List[Exception], List[E]], Result[E, A]]
+    ) -&gt; Result[E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
         Otherwise do nothing.
         &#34;&#34;&#34;
         return self.unsafe_recover(handler)
@@ -1310,14 +1587,40 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     @final
     def raise_on_panic(self) -&gt; Result[E, A]:
         &#34;&#34;&#34;
-        If this result is an `Ok` or `Error`, do nothing.
-        If it is a `Panic(some_exception)`, raise the exception.
+        If this result is an `Ok` or `Errors`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exceptions.
 
-        Use with extreme care since it raise exception.
+        Use with extreme care since it raise exceptions.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            raise self.exception
-        return self</code></pre>
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
+        return self
+
+    @final
+    def unsafe_get(self) -&gt; Result[E, A]:
+        &#34;&#34;&#34;
+        If this result is an `Ok`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exceptions.
+
+        Use with extreme care since it raise exceptions.
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return self.success
+        if isinstance(self, Errors):
+            raise DomainErrors(self.errors)
+        if isinstance(self, Panic):
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
+        raise MatchError(f&#34;{self} should be a result.&#34;)
+
+    @final
+    def to_computation_status(self) -&gt; ComputationStatus:
+        &#34;&#34;&#34;
+        Transform this Result into a Computation Status
+        :return:
+        &#34;&#34;&#34;
+        if self.is_ok():
+            return ComputationStatus.SUCCEEDED
+        return ComputationStatus.FAILED</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -1325,7 +1628,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
 </ul>
 <h3>Subclasses</h3>
 <ul class="hlist">
-<li><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></li>
+<li><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></li>
 <li><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></li>
 <li><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a></li>
 </ul>
@@ -1344,7 +1647,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.catch"><code class="name flex">
@@ -1360,7 +1663,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.flat_map"><code class="name flex">
@@ -1376,7 +1679,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.flatten"><code class="name flex">
@@ -1411,7 +1714,7 @@ def flatten(self: Result[E, Result[E, A]]) -&gt; Result[E, A]:
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.fold_raise"><code class="name flex">
@@ -1427,14 +1730,14 @@ def flatten(self: Result[E, Result[E, A]]) -&gt; Result[E, A]:
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.is_error"><code class="name flex">
 <span>def <span class="ident">is_error</span></span>(<span>self) ‑> bool</span>
 </code></dt>
 <dd>
-<div class="desc"><p>:return: True if this result is an <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code></p></div>
+<div class="desc"><p>:return: True if this result is an <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1442,9 +1745,9 @@ def flatten(self: Result[E, Result[E, A]]) -&gt; Result[E, A]:
 <pre><code class="python">@final
 def is_error(self) -&gt; bool:
     &#34;&#34;&#34;
-    :return: True if this result is an `Error`
+    :return: True if this result is an `Errors`
     &#34;&#34;&#34;
-    return isinstance(self, Error)</code></pre>
+    return isinstance(self, Errors)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.is_ok"><code class="name flex">
@@ -1494,7 +1797,7 @@ def is_panic(self) -&gt; bool:
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.map_error"><code class="name flex">
@@ -1510,7 +1813,7 @@ def is_panic(self) -&gt; bool:
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.map_panic"><code class="name flex">
@@ -1526,16 +1829,16 @@ def is_panic(self) -&gt; bool:
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.raise_on_panic"><code class="name flex">
 <span>def <span class="ident">raise_on_panic</span></span>(<span>self) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>If this result is an <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></code> or <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code>, do nothing.
-If it is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(some_exception)</code>, raise the exception.</p>
-<p>Use with extreme care since it raise exception.</p></div>
+<div class="desc"><p>If this result is an <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></code> or <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></code>, do nothing.
+If it is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(some_exception)</code>, raise the exceptions.</p>
+<p>Use with extreme care since it raise exceptions.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1543,13 +1846,13 @@ If it is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Pa
 <pre><code class="python">@final
 def raise_on_panic(self) -&gt; Result[E, A]:
     &#34;&#34;&#34;
-    If this result is an `Ok` or `Error`, do nothing.
-    If it is a `Panic(some_exception)`, raise the exception.
+    If this result is an `Ok` or `Errors`, do nothing.
+    If it is a `Panic(some_exception)`, raise the exceptions.
 
-    Use with extreme care since it raise exception.
+    Use with extreme care since it raise exceptions.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        raise self.exception
+        raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
     return self</code></pre>
 </details>
 </dd>
@@ -1566,7 +1869,28 @@ def raise_on_panic(self) -&gt; Result[E, A]:
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
+</details>
+</dd>
+<dt id="raffiot.result.Result.to_computation_status"><code class="name flex">
+<span>def <span class="ident">to_computation_status</span></span>(<span>self) ‑> <a title="raffiot.utils.ComputationStatus" href="utils.html#raffiot.utils.ComputationStatus">ComputationStatus</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform this Result into a Computation Status
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def to_computation_status(self) -&gt; ComputationStatus:
+    &#34;&#34;&#34;
+    Transform this Result into a Computation Status
+    :return:
+    &#34;&#34;&#34;
+    if self.is_ok():
+        return ComputationStatus.SUCCEEDED
+    return ComputationStatus.FAILED</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.tri_map"><code class="name flex">
@@ -1582,7 +1906,7 @@ def raise_on_panic(self) -&gt; Result[E, A]:
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_ap"><code class="name flex">
@@ -1612,26 +1936,26 @@ def unsafe_ap(
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_catch"><code class="name flex">
-<span>def <span class="ident">unsafe_catch</span></span>(<span>self, handler: Callable[[E], <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
+<span>def <span class="ident">unsafe_catch</span></span>(<span>self, handler: Callable[[List[E]], <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>React to errors (the except part of a try-except).</p>
-<p>If this result is an <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a>(some_error)</code>, then replace it with <code>handler(some_error)</code>.
+<p>If this result is an <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a>(some_error)</code>, then replace it with <code>handler(some_error)</code>.
 Otherwise, do nothing.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-def unsafe_catch(self, handler: Callable[[E], Result[E, A]]) -&gt; Result[E, A]:
+def unsafe_catch(self, handler: Callable[[List[E]], Result[E, A]]) -&gt; Result[E, A]:
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
-    If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+    If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
     Otherwise, do nothing.
     &#34;&#34;&#34;
-    if isinstance(self, Error):
-        return handler(self.error)
+    if isinstance(self, Errors):
+        return handler(self.errors)
     return self</code></pre>
 </details>
 </dd>
@@ -1671,12 +1995,12 @@ def unsafe_flat_map(self, f: Callable[[A], Result[E, A2]]) -&gt; Result[E, A2]:
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_fold"><code class="name flex">
-<span>def <span class="ident">unsafe_fold</span></span>(<span>self, on_success: Callable[[A], X], on_error: Callable[[E], X], on_panic: Callable[[Exception], X]) ‑> ~X</span>
+<span>def <span class="ident">unsafe_fold</span></span>(<span>self, on_success: Callable[[A], X], on_error: Callable[[List[E]], X], on_panic: Callable[[List[Exception], List[E]], X]) ‑> ~X</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform this Result[E,A] into X.
 :param on_success: is called if this result is a <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></code>.
-:param on_error: is called if this result is a <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code>.
+:param on_error: is called if this result is a <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></code>.
 :param on_panic: is called if this result is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a></code>.
 :return:</p></div>
 <details class="source">
@@ -1687,34 +2011,34 @@ def unsafe_flat_map(self, f: Callable[[A], Result[E, A2]]) -&gt; Result[E, A2]:
 def unsafe_fold(
     self,
     on_success: Callable[[A], X],
-    on_error: Callable[[E], X],
-    on_panic: Callable[[Exception], X],
+    on_error: Callable[[List[E]], X],
+    on_panic: Callable[[List[Exception], List[E]], X],
 ) -&gt; X:
     &#34;&#34;&#34;
     Transform this Result[E,A] into X.
     :param on_success: is called if this result is a `Ok`.
-    :param on_error: is called if this result is a `Error`.
+    :param on_error: is called if this result is a `Errors`.
     :param on_panic: is called if this result is a `Panic`.
     :return:
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return on_success(self.success)
-    if isinstance(self, Error):
-        return on_error(self.error)
+    if isinstance(self, Errors):
+        return on_error(self.errors)
     if isinstance(self, Panic):
-        return on_panic(self.exception)
-    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+        return on_panic(self.exceptions, self.errors)
+    raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_fold_raise"><code class="name flex">
-<span>def <span class="ident">unsafe_fold_raise</span></span>(<span>self, on_success: Callable[[A], X], on_error: Callable[[E], X]) ‑> ~X</span>
+<span>def <span class="ident">unsafe_fold_raise</span></span>(<span>self, on_success: Callable[[A], X], on_error: Callable[[List[E]], X]) ‑> ~X</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform this <code><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E,A]</code> into <code>X</code> if this result is an <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></code> or <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code>.
-But raise the stored exception is this is a panic.</p>
-<p>It is useful to raise an exception on panics.</p>
+<div class="desc"><p>Transform this <code><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E,A]</code> into <code>X</code> if this result is an <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></code> or <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></code>.
+But raise the stored exceptions is this is a panic.</p>
+<p>It is useful to raise an exceptions on panics.</p>
 <p>:param on_success: is called if this result is a <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></code>.
-:param on_error: is called if this result is a <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code>.
+:param on_error: is called if this result is a <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></code>.
 :return:</p></div>
 <details class="source">
 <summary>
@@ -1722,25 +2046,53 @@ But raise the stored exception is this is a panic.</p>
 </summary>
 <pre><code class="python">@final
 def unsafe_fold_raise(
-    self, on_success: Callable[[A], X], on_error: Callable[[E], X]
+    self, on_success: Callable[[A], X], on_error: Callable[[List[E]], X]
 ) -&gt; X:
     &#34;&#34;&#34;
-    Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Error`.
-    But raise the stored exception is this is a panic.
+    Transform this `Result[E,A]` into `X` if this result is an `Ok` or `Errors`.
+    But raise the stored exceptions is this is a panic.
 
-    It is useful to raise an exception on panics.
+    It is useful to raise an exceptions on panics.
 
     :param on_success: is called if this result is a `Ok`.
-    :param on_error: is called if this result is a `Error`.
+    :param on_error: is called if this result is a `Errors`.
     :return:
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return on_success(self.success)
-    if isinstance(self, Error):
-        return on_error(self.error)
+    if isinstance(self, Errors):
+        return on_error(self.errors)
     if isinstance(self, Panic):
-        raise self.exception
+        raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
     raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.result.Result.unsafe_get"><code class="name flex">
+<span>def <span class="ident">unsafe_get</span></span>(<span>self) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>If this result is an <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a></code>, do nothing.
+If it is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(some_exception)</code>, raise the exceptions.</p>
+<p>Use with extreme care since it raise exceptions.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+def unsafe_get(self) -&gt; Result[E, A]:
+    &#34;&#34;&#34;
+    If this result is an `Ok`, do nothing.
+    If it is a `Panic(some_exception)`, raise the exceptions.
+
+    Use with extreme care since it raise exceptions.
+    &#34;&#34;&#34;
+    if isinstance(self, Ok):
+        return self.success
+    if isinstance(self, Errors):
+        raise DomainErrors(self.errors)
+    if isinstance(self, Panic):
+        raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
+    raise MatchError(f&#34;{self} should be a result.&#34;)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_map"><code class="name flex">
@@ -1770,7 +2122,7 @@ def unsafe_map(self, f: Callable[[A], A2]) -&gt; Result[E, A2]:
 <span>def <span class="ident">unsafe_map_error</span></span>(<span>self, f: Callable[[E], E2]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E2, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the error stored if this result is an <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code>.
+<div class="desc"><p>Transform the errors stored if this result is an <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></code>.
 :param f: the transformation function
 :return:</p></div>
 <details class="source">
@@ -1780,12 +2132,12 @@ def unsafe_map(self, f: Callable[[A], A2]) -&gt; Result[E, A2]:
 <pre><code class="python">@final
 def unsafe_map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
     &#34;&#34;&#34;
-    Transform the error stored if this result is an `Error`.
+    Transform the errors stored if this result is an `Errors`.
     :param f: the transformation function
     :return:
     &#34;&#34;&#34;
-    if isinstance(self, Error):
-        return Error(f(self.error))
+    if isinstance(self, Errors):
+        return Errors(list(map(f, self.errors)))
     return self  # type: ignore</code></pre>
 </details>
 </dd>
@@ -1793,7 +2145,7 @@ def unsafe_map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
 <span>def <span class="ident">unsafe_map_panic</span></span>(<span>self, f: Callable[[Exception], Exception]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the exception stored if this result is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(some_exception)</code>.</p></div>
+<div class="desc"><p>Transform the exceptions stored if this result is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(some_exception)</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1801,19 +2153,19 @@ def unsafe_map_error(self, f: Callable[[E], E2]) -&gt; Result[E2, A]:
 <pre><code class="python">@final
 def unsafe_map_panic(self, f: Callable[[Exception], Exception]) -&gt; Result[E, A]:
     &#34;&#34;&#34;
-    Transform the exception stored if this result is a `Panic(some_exception)`.
+    Transform the exceptions stored if this result is a `Panic(some_exception)`.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        return Panic(f(self.exception))
+        return Panic(list(map(f, self.exceptions)), self.errors)
     return self</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.unsafe_recover"><code class="name flex">
-<span>def <span class="ident">unsafe_recover</span></span>(<span>self, handler: Callable[[Exception], <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
+<span>def <span class="ident">unsafe_recover</span></span>(<span>self, handler: Callable[[List[Exception], List[E]], <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A]]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
-<p>If this result is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(exception)</code>, replace it by <code>handler(exception)</code>.
+<p>If this result is a <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(exceptions)</code>, replace it by <code>handler(exceptions)</code>.
 Otherwise do nothing.</p></div>
 <details class="source">
 <summary>
@@ -1821,16 +2173,16 @@ Otherwise do nothing.</p></div>
 </summary>
 <pre><code class="python">@final
 def unsafe_recover(
-    self, handler: Callable[[Exception], Result[E, A]]
+    self, handler: Callable[[List[Exception], List[E]], Result[E, A]]
 ) -&gt; Result[E, A]:
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).
 
-    If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+    If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
     Otherwise do nothing.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        return handler(self.exception)
+        return handler(self.exceptions, self.errors)
     return self</code></pre>
 </details>
 </dd>
@@ -1838,10 +2190,10 @@ def unsafe_recover(
 <span>def <span class="ident">unsafe_tri_map</span></span>(<span>self, f: Callable[[A], A2], g: Callable[[E], E2], h: Callable[[Exception], Exception]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E2, ~A2]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the value/error/exception stored in this result.
+<div class="desc"><p>Transform the value/errors/exceptions stored in this result.
 :param f: how to transform the value a if this result is <code><a title="raffiot.result.Ok" href="#raffiot.result.Ok">Ok</a>(a)</code>
-:param g: how to transform the error e if this result is <code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a>(e)</code>
-:param h: how to transform the exception p if this result is <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(p)</code>
+:param g: how to transform the errors e if this result is <code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a>(e)</code>
+:param h: how to transform the exceptions p if this result is <code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a>(p)</code>
 :return: the "same" result with the stored value transformed.</p></div>
 <details class="source">
 <summary>
@@ -1855,40 +2207,38 @@ def unsafe_tri_map(
     h: Callable[[Exception], Exception],
 ) -&gt; Result[E2, A2]:
     &#34;&#34;&#34;
-    Transform the value/error/exception stored in this result.
+    Transform the value/errors/exceptions stored in this result.
     :param f: how to transform the value a if this result is `Ok(a)`
-    :param g: how to transform the error e if this result is `Error(e)`
-    :param h: how to transform the exception p if this result is `Panic(p)`
+    :param g: how to transform the errors e if this result is `Errors(e)`
+    :param h: how to transform the exceptions p if this result is `Panic(p)`
     :return: the &#34;same&#34; result with the stored value transformed.
     &#34;&#34;&#34;
     return self.unsafe_fold(
         lambda x: Ok(f(x)),
-        lambda x: Error(g(x)),
-        lambda x: Panic(h(x)),
+        lambda x: Errors(list(map(g, x))),
+        lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
     )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.result.Result.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, Callable[[X], A]], *arg: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, X]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.List[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>self: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, A], *arg: <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[E, X]) ‑> <a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a>[~E, typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform a list of Result (including self) into a Result of list.</p>
 <p>Is Ok is all results are Ok.
-Is Error some are Ok, but at least one is an error but no panics.
+Is Errors some are Ok, but at least one is an errors but no panics.
 Is Panic is there is at least one panic.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-def zip(
-    self: Result[E, Callable[[X], A]], *arg: Result[E, X]
-) -&gt; Result[E, List[A]]:
+def zip(self: Result[E, A], *arg: Result[E, X]) -&gt; Result[E, List[A]]:
     &#34;&#34;&#34;
     Transform a list of Result (including self) into a Result of list.
 
     Is Ok is all results are Ok.
-    Is Error some are Ok, but at least one is an error but no panics.
+    Is Errors some are Ok, but at least one is an errors but no panics.
     Is Panic is there is at least one panic.
     &#34;&#34;&#34;
     return zip((self, *arg))</code></pre>
@@ -1913,10 +2263,13 @@ def zip(
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="two-column">
 <li><code><a title="raffiot.result.error" href="#raffiot.result.error">error</a></code></li>
+<li><code><a title="raffiot.result.errors" href="#raffiot.result.errors">errors</a></code></li>
+<li><code><a title="raffiot.result.ok" href="#raffiot.result.ok">ok</a></code></li>
 <li><code><a title="raffiot.result.panic" href="#raffiot.result.panic">panic</a></code></li>
 <li><code><a title="raffiot.result.pure" href="#raffiot.result.pure">pure</a></code></li>
 <li><code><a title="raffiot.result.returns_result" href="#raffiot.result.returns_result">returns_result</a></code></li>
 <li><code><a title="raffiot.result.safe" href="#raffiot.result.safe">safe</a></code></li>
+<li><code><a title="raffiot.result.sequence" href="#raffiot.result.sequence">sequence</a></code></li>
 <li><code><a title="raffiot.result.traverse" href="#raffiot.result.traverse">traverse</a></code></li>
 <li><code><a title="raffiot.result.zip" href="#raffiot.result.zip">zip</a></code></li>
 </ul>
@@ -1924,9 +2277,9 @@ def zip(
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
-<h4><code><a title="raffiot.result.Error" href="#raffiot.result.Error">Error</a></code></h4>
+<h4><code><a title="raffiot.result.Errors" href="#raffiot.result.Errors">Errors</a></code></h4>
 <ul class="">
-<li><code><a title="raffiot.result.Error.error" href="#raffiot.result.Error.error">error</a></code></li>
+<li><code><a title="raffiot.result.Errors.errors" href="#raffiot.result.Errors.errors">errors</a></code></li>
 </ul>
 </li>
 <li>
@@ -1938,12 +2291,13 @@ def zip(
 <li>
 <h4><code><a title="raffiot.result.Panic" href="#raffiot.result.Panic">Panic</a></code></h4>
 <ul class="">
-<li><code><a title="raffiot.result.Panic.exception" href="#raffiot.result.Panic.exception">exception</a></code></li>
+<li><code><a title="raffiot.result.Panic.errors" href="#raffiot.result.Panic.errors">errors</a></code></li>
+<li><code><a title="raffiot.result.Panic.exceptions" href="#raffiot.result.Panic.exceptions">exceptions</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="raffiot.result.Result" href="#raffiot.result.Result">Result</a></code></h4>
-<ul class="two-column">
+<ul class="">
 <li><code><a title="raffiot.result.Result.ap" href="#raffiot.result.Result.ap">ap</a></code></li>
 <li><code><a title="raffiot.result.Result.catch" href="#raffiot.result.Result.catch">catch</a></code></li>
 <li><code><a title="raffiot.result.Result.flat_map" href="#raffiot.result.Result.flat_map">flat_map</a></code></li>
@@ -1958,12 +2312,14 @@ def zip(
 <li><code><a title="raffiot.result.Result.map_panic" href="#raffiot.result.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.raise_on_panic" href="#raffiot.result.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.result.Result.recover" href="#raffiot.result.Result.recover">recover</a></code></li>
+<li><code><a title="raffiot.result.Result.to_computation_status" href="#raffiot.result.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.result.Result.tri_map" href="#raffiot.result.Result.tri_map">tri_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_ap" href="#raffiot.result.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_catch" href="#raffiot.result.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_flat_map" href="#raffiot.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold" href="#raffiot.result.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_fold_raise" href="#raffiot.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.result.Result.unsafe_get" href="#raffiot.result.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map" href="#raffiot.result.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_error" href="#raffiot.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.result.Result.unsafe_map_panic" href="#raffiot.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>

@@ -221,9 +221,10 @@ its wonderful failure management.</li>
 result of a computation:</p>
 <ul>
 <li><code>Ok(value)</code>: the computation successfully computed the this <code>value</code>.</li>
-<li><code>Error(error)</code>: the computation failed on some expected failure <code>error</code>, probably
+<li><code>Errors(errors)</code>: the computation failed on some expected failures <code>errors</code>, probably
 from the business domain.</li>
-<li><code>Panic(exception)</code>: the computation failed on some unexpected failure <code>exception</code>.</li>
+<li><code>Panic(exceptions, errors)</code>: the computation failed on some unexpected failures <code>exceptions</code>.
+Note that there may be some domain errors too.</li>
 </ul>
 
                     </main>

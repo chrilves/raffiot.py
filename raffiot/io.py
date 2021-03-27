@@ -11,8 +11,9 @@ from typing import TypeVar, Generic, Callable, Any, List, Iterable
 from typing_extensions import final
 
 from raffiot._internal import IOTag
-from raffiot.result import Result, Ok, Error, Panic
+from raffiot.result import Result, Ok, Errors, Panic
 from raffiot.utils import MatchError
+from raffiot import result
 
 __all__ = [
     "Fiber",
@@ -22,6 +23,7 @@ __all__ = [
     "defer_io",
     "read",
     "error",
+    "errors",
     "panic",
     "from_result",
     "zip",
@@ -33,6 +35,7 @@ __all__ = [
     "traverse",
     "parallel",
     "wait",
+    "zip_par",
     "sleep_until",
     "sleep",
     "rec",
@@ -58,7 +61,7 @@ class Fiber(Generic[R, E, A]):
 class IO(Generic[R, E, A]):
     """
     Represent a computation that computes a value of type A,
-    may fail with an error (expected failure) of type E and have access
+    may fail with an errors (expected failure) of type E and have access
     anytime to a read-only context of type R.
 
     /!\\ **VERY IMPORTANT** /!\\
@@ -116,6 +119,15 @@ class IO(Generic[R, E, A]):
             return IO(IOTag.ZIP, list((self, *others[0])))
         return IO(IOTag.ZIP, list((self, *others)))
 
+    def zip_par(self: IO[R, E, A], *others: IO[R, E, X]) -> IO[R, E, Iterable[A]]:
+        """
+        Pack a list of IO (including self) into an IO computing the list
+        of all values in parallel.
+
+        If one IO fails, the whole computation fails.
+        """
+        return zip_par(self, *others)
+
     def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -> IO[R, E, Iterable[Fiber]]:
         """
         Run all these IO (including self) in parallel.
@@ -150,36 +162,38 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.CONTRA_MAP_READ, (f, self))
 
-    # Error API
+    # Errors API
 
-    def catch(self, handler: Callable[[E], IO[R, E, A]]) -> IO[R, E, A]:
+    def catch(self, handler: Callable[[List[E]], IO[R, E, A]]) -> IO[R, E, A]:
         """
         React to errors (the except part of a try-except).
 
-        On error, call the handler with the error.
+        On errors, call the handler with the errors.
         """
         return IO(IOTag.CATCH, (self, handler))
 
     def map_error(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
         """
-        Transform the stored error if the computation fails on an error.
+        Transform the stored errors if the computation fails on an errors.
         Do nothing otherwise.
         """
         return IO(IOTag.MAP_ERROR, (self, f))
 
     # Panic
 
-    def recover(self, handler: Callable[[Exception], IO[R, E, A]]) -> IO[R, E, A]:
+    def recover(
+        self, handler: Callable[[List[Exception], List[E]], IO[R, E, A]]
+    ) -> IO[R, E, A]:
         """
         React to panics (the except part of a try-except).
 
-        On panic, call the handler with the exception.
+        On panic, call the handler with the exceptions.
         """
         return IO(IOTag.RECOVER, (self, handler))
 
-    def map_panic(self, f: Callable[[E], E2]) -> IO[R, E2, A]:
+    def map_panic(self, f: Callable[[Exception], Exception]) -> IO[R, E, A]:
         """
-        Transform the exception stored if the computation fails on a panic.
+        Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
         """
         return IO(IOTag.MAP_PANIC, (self, f))
@@ -195,7 +209,7 @@ class IO(Generic[R, E, A]):
         only running the IO does.
 
         Note that the return value is a  `Result[E,A]`.
-        No exception will be raised by run (unless there is a bug), run will
+        No exceptions will be raised by run (unless there is a bug), run will
         returns a panic instead!
         """
         from raffiot._runtime import SharedState
@@ -218,7 +232,7 @@ class IO(Generic[R, E, A]):
         that never fails but returns a Result[E,A].
 
         - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-        - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
         - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the computation, unless a catch or
@@ -229,7 +243,7 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.ATTEMPT, self)
 
-    def finally_(self, io: IO[R, Any, Any]) -> IO[R, E, A]:
+    def finally_(self, after: Callable[[Result[E, A]], IO[R, E, Any]]) -> IO[R, E, A]:
         """
         After having computed self, but before returning its result,
         execute the io computation.
@@ -238,7 +252,11 @@ class IO(Generic[R, E, A]):
         unconditionally, at the end of a computation, without changing
         its result, like releasing a resource.
         """
-        return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))
+        return self.attempt().flat_map(
+            lambda r1: after(r1)
+            .attempt()
+            .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+        )
 
     def on_failure(
         self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
@@ -248,17 +266,17 @@ class IO(Generic[R, E, A]):
         React to any failure of the computation.
         Do nothing if the computation is successful.
 
-        - The handler will be called on `Error(e)` if the computation fails with error e.
+        - The handler will be called on `Errors(e)` if the computation fails with errors e.
         - The handler will be called on `Panic(p)` if the computation fails with panic p.
         - The handler will never be called on `Ok(a)`.
         """
-        return self.attempt().flat_map(
-            lambda r: r.unsafe_fold(
-                pure,
-                lambda e: handler(Error(e)),
-                lambda p: handler(Panic(p)),
-            )
-        )
+
+        def g(r: Result[E, A]) -> IO[R, E, A]:
+            if isinstance(r, Ok):
+                return IO(IOTag.PURE, r.success)
+            return handler(r)
+
+        return self.attempt().flat_map(g)
 
     def then_keep(self, *args: IO[R, E, A]) -> IO[R, E, A]:
         """
@@ -295,8 +313,8 @@ class IO(Generic[R, E, A]):
             return f"Read({self.__fields})"
         if self.__tag == IOTag.CONTRA_MAP_READ:
             return f"ContraMapRead({self.__fields})"
-        if self.__tag == IOTag.ERROR:
-            return f"Error({self.__fields})"
+        if self.__tag == IOTag.ERRORS:
+            return f"Errors({self.__fields})"
         if self.__tag == IOTag.CATCH:
             return f"Catch({self.__fields})"
         if self.__tag == IOTag.MAP_ERROR:
@@ -339,7 +357,7 @@ def pure(a: A) -> IO[R, E, A]:
     return IO(IOTag.PURE, a)
 
 
-def defer(deferred: Callable[[], A], *args, **kwargs) -> IO[R, E, A]:
+def defer(deferred: Callable[..., A], *args, **kwargs) -> IO[R, E, A]:
     """
     Defer a computation.
 
@@ -374,12 +392,12 @@ def defer(deferred: Callable[[], A], *args, **kwargs) -> IO[R, E, A]:
     return IO(IOTag.DEFER, (deferred, args, kwargs))
 
 
-def defer_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -> IO[R, E, A]:
+def defer_io(deferred: Callable[..., IO[R, E, A]], *args, **kwargs) -> IO[R, E, A]:
     """
     Make a function that returns an IO, an IO itself.
 
     This is extremely useful with recursive function that would normally blow
-    the stack (raise a stack overflow exception). Deferring recursive calls
+    the stack (raise a stack overflow exceptions). Deferring recursive calls
     eliminates stack overflow.
 
     For example, the following code blow the stack:
@@ -414,29 +432,44 @@ def error(err: E) -> IO[R, E, A]:
     """
     Computation that fails on the error err.
     """
-    return IO(IOTag.ERROR, err)
+    return IO(IOTag.ERRORS, [err])
 
 
-def panic(exception: Exception) -> IO[R, E, A]:
+def errors(*errs: E) -> IO[R, E, A]:
     """
-    Computation that fails with the panic exception.
+    Computation that fails on the errors errs.
     """
-    return IO(IOTag.PANIC, exception)
+    if (
+        len(errs) == 1
+        and isinstance(errs[0], abc.Iterable)
+        and not isinstance(errs[0], str)
+    ):
+        return IO(IOTag.ERRORS, list(errs[0]))
+    return IO(IOTag.ERRORS, list(errs))
+
+
+def panic(*exceptions: Exception, errors: List[E] = None) -> IO[R, E, A]:
+    """
+    Computation that fails with the panic exceptions.
+    """
+    if len(exceptions) == 1 and isinstance(exceptions[0], abc.Iterable):
+        return IO(IOTag.PANIC, (list(exceptions[0]), list(errors) if errors else []))
+    return IO(IOTag.PANIC, (list(exceptions), list(errors) if errors else []))
 
 
 def from_result(r: Result[E, A]) -> IO[R, E, A]:
     """
     Computation that:
     - success if r is an `Ok`
-    - fails with error e if r is `Error(e)`
+    - fails with errors e if r is `Errors(e)`
     - fails with panic p if r is `Panic(p)`
     """
     if isinstance(r, Ok):
         return pure(r.success)
-    if isinstance(r, Error):
-        return error(r.error)
+    if isinstance(r, Errors):
+        return errors(r.errors)
     if isinstance(r, Panic):
-        return panic(r.exception)
+        return panic(r.exceptions, errors=r.errors)
     return panic(MatchError(f"{r} should be a Result"))
 
 
@@ -493,8 +526,8 @@ def async_(
        The value passed to `callback` must be the result of the asynchonous call:
 
         - `Ok(value)` if the call was successful and returned `value`.
-        - `Error(error)` if the call failed on error `error`.
-        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+        - `Errors(errors)` if the call failed on errors `errors`.
+        - `Panic(exceptions)` if the failed unexpectedly on exceptions `exceptions`.
 
     For example:
 
@@ -586,6 +619,22 @@ def wait(*l: Iterable[Fiber[Any, Any, Any]]) -> IO[R, E, List[Result[R, A]]]:
     return IO(IOTag.WAIT, list(l))
 
 
+def zip_par(*others: IO[R, E, X]) -> IO[R, E, List[X]]:
+    """
+    Run these IO in parallel, wait for them to finish, and merge the results.
+
+    :param others:
+    :return:
+    """
+    if len(others) == 1 and isinstance(others[0], abc.Iterable):
+        args = others[0]
+    else:
+        args = others
+    return (
+        parallel(args).flat_map(wait).flat_map(lambda rs: from_result(result.zip(rs)))
+    )
+
+
 def sleep_until(epoch_in_seconds: float) -> IO[R, E, None]:
     """
     Pause the computation until the epoch is reached. The epoch
@@ -616,7 +665,7 @@ def rec(f: Callable[[IO[R, E, A]], IO[R, E, A]]) -> IO[R, E, A]:
 
 def safe(f: Callable[..., IO[R, E, A]]) -> Callable[..., IO[R, E, A]]:
     """
-    Ensures a function retuning an IO never raise any exception but returns a
+    Ensures a function retuning an IO never raise any exceptions but returns a
     panic instead.
     """
 

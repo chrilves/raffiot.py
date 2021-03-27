@@ -1,9 +1,22 @@
 from collections import abc
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, List, Generic, TypeVar
+from enum import IntEnum
+from typing_extensions import final
+from collections import abc
+
+__all__ = [
+    "MatchError",
+    "MultipleExceptions",
+    "ComputationStatus",
+    "seq",
+    "DomainErrors",
+]
+
+E = TypeVar("E", covariant=True)
 
 
-@dataclass
+@dataclass(frozen=True)
 class MatchError(Exception):
     """
     Exception for pattern matching errors (used internally, should NEVER happen).
@@ -11,7 +24,71 @@ class MatchError(Exception):
 
     __slots__ = ["message"]
 
-    message: None
+    message: str
+
+
+@final
+@dataclass(frozen=True)
+class MultipleExceptions(Exception, Generic[E]):
+    """
+    Represents
+    """
+
+    exceptions: List[Exception]
+    """
+    The list exceptions encountered
+    """
+
+    errors: List[E]
+    """
+    The list of errors encountered
+    """
+
+    @classmethod
+    def merge(cls, *exceptions: Exception, errors: List[E] = None) -> Exception:
+        """
+        Merge some exceptions, retuning the exceptions if there is only one
+        or a  `MultipleExceptions` otherwise.
+
+        :param exceptions:
+        :param errors:
+        :return:
+        """
+        stack = [exn for exn in exceptions]
+        base_exceptions = []
+        errs = [x for x in errors] if errors else []
+
+        while stack:
+            item = stack.pop()
+            if isinstance(item, MultipleExceptions):
+                stack.extend(item.exceptions)
+                errs.extend(item.errors)
+                continue
+            if isinstance(item, abc.Iterable) and not isinstance(item, str):
+                stack.extend(item)
+                continue
+            base_exceptions.append(item)
+
+        if len(base_exceptions) == 1:
+            return base_exceptions[0]
+        base_exceptions.reverse()
+        return MultipleExceptions(base_exceptions, [])
+
+
+@final
+@dataclass(frozen=True)
+class DomainErrors(Exception, Generic[E]):
+    """
+    Errors from the business domain
+    """
+
+    errors: List[E]
+
+
+@final
+class ComputationStatus(IntEnum):
+    FAILED = 0
+    SUCCEEDED = 1
 
 
 def seq(*a: Any) -> Any:

@@ -70,6 +70,7 @@ Did I mention **Railway-Oriented Programming**? `Result` is represent the 3 poss
 result of a computation:
 
 - `Ok(value)`: the computation successfully computed the this `value`.
-- `Error(error)`: the computation failed on some expected failure `error`, probably
+- `Errors(errors)`: the computation failed on some expected failures `errors`, probably
    from the business domain.
-- `Panic(exception)`: the computation failed on some unexpected failure `exception`.
+- `Panic(exceptions, errors)`: the computation failed on some unexpected failures `exceptions`.
+  Note that there may be some domain errors too.

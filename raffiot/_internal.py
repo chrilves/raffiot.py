@@ -26,7 +26,7 @@ class IOTag(Enum):
     ATTEMPT = 8  # IO
     READ = 9  #
     CONTRA_MAP_READ = 10  # FUN MAIN
-    ERROR = 11  # ERROR
+    ERRORS = 11  # ERRORS
     CATCH = 12  # MAIN HANDLER
     MAP_ERROR = 13  # MAIN      FUN
     PANIC = 14  # EXCEPTION

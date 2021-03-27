@@ -13,9 +13,11 @@ from typing_extensions import final
 
 from raffiot import _runtime
 from raffiot import io
+from raffiot import result
 from raffiot._internal import IOTag
 from raffiot.io import IO
-from raffiot.result import Result, Ok, Error, Panic
+from raffiot.result import Result, Ok, Errors, Panic
+from raffiot.utils import ComputationStatus, MatchError, MultipleExceptions
 
 __all__ = [
     "Resource",
@@ -27,6 +29,7 @@ __all__ = [
     "defer_read_resource",
     "read",
     "error",
+    "errors",
     "panic",
     "from_result",
     "from_io_resource",
@@ -34,6 +37,7 @@ __all__ = [
     "from_open_close",
     "from_with",
     "zip",
+    "zip_par",
     "traverse",
     "yield_",
     "async_",
@@ -41,6 +45,7 @@ __all__ = [
     "sleep",
     "reentrant_lock",
     "semaphore",
+    "noop_close",
 ]
 
 
@@ -53,8 +58,25 @@ E2 = TypeVar("E2")
 A2 = TypeVar("A2")
 
 
+def close_and_merge_failure(
+    close: Callable[[ComputationStatus], IO[R, E, Any]], r: Result[E, Any]
+) -> IO[R, E, Any]:
+    """
+    Helper to close
+
+    :param close:
+    :param r:
+    :return:
+    """
+    return (
+        io.defer_io(close, ComputationStatus.FAILED)
+        .attempt()
+        .flat_map(lambda r2: io.from_result(result.sequence(r2, r)))
+    )
+
+
 @final
-@dataclass
+@dataclass(frozen=True)
 class Resource(Generic[R, E, A]):
     """
     Essentially an IO-powered data structure that produces resources of type A,
@@ -63,19 +85,21 @@ class Resource(Generic[R, E, A]):
 
     __slots__ = ["create"]
 
-    create: IO[R, E, Tuple[A, IO[R, Any, Any]]]
+    create: IO[R, E, Tuple[A, Callable[[ComputationStatus], IO[R, E, Any]]]]
     """
     IO to create one resource along with the IO for releasing it.
     
     On success, this IO must produce a `Tuple[A, IO[R,Any,Any]`:
         - The first value of the tuple, of type `A`, is the created resource.
-        - The second value of the tuple, of type `IO[R,Any,Any]`, is the IO that
-            release the first value.
+        - The second value of the tuple, of type `Callable[[ComputationStatus], IO[R,E,Any]]`,
+          is the function that releases the resource. 
+          It receives the `Result` (with the value set to None) to indicate
+          whether the computation succeeded, failed or panicked.
     
     For example:
         
         >>> Resource(io.defer(lambda: open("file")).map(
-        >>>     lambda a: (a, io.defer(a.close))))
+        >>>     lambda a: (a, lambda _:io.defer(a.close))))
     """
 
     def use(self, fun: Callable[[A], IO[R, E, X]]) -> IO[R, E, X]:
@@ -88,12 +112,12 @@ class Resource(Generic[R, E, A]):
         This is the only way to use a resource.
         """
 
-        def safe_use(x: Tuple[A, IO[R, E, None]]) -> IO[R, E, X]:
+        def safe_use(
+            x: Tuple[A, Callable[[ComputationStatus], IO[R, E, None]]]
+        ) -> IO[R, E, X]:
             a, close = x
-            return (
-                io.defer_io(fun, a)
-                .attempt()
-                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            return io.defer_io(fun, a).finally_(
+                lambda r: close(r.to_computation_status())
             )
 
         return self.create.flat_map(safe_use)
@@ -116,13 +140,15 @@ class Resource(Generic[R, E, A]):
         """
 
         def safe_map(
-            x: Tuple[A, IO[R, E, None]]
-        ) -> IO[R, E, Tuple[A2, IO[R, E, None]]]:
+            x: Tuple[A, Callable[[ComputationStatus], IO[R, E, None]]]
+        ) -> IO[R, E, Tuple[A2, Callable[[ComputationStatus], IO[R, E, None]]]]:
             a, close = x
             try:
                 return io.pure((f(a), close))
             except Exception as exception:
-                return close.attempt().then(io.panic(exception))
+                return close_and_merge_failure(
+                    close, Panic(exceptions=[exception], errors=[])
+                )
 
         return Resource(self.create.flat_map(safe_map))
 
@@ -133,24 +159,31 @@ class Resource(Generic[R, E, A]):
         """
 
         def safe_flat_map_a(
-            xa: Tuple[A, IO[R, E, None]]
-        ) -> IO[R, E, Tuple[A2, IO[R, E, None]]]:
+            xa: Tuple[A, Callable[[ComputationStatus], IO[R, E, None]]]
+        ) -> IO[R, E, Tuple[A2, Callable[[ComputationStatus], IO[R, E, None]]]]:
             a, close_a = xa
 
             def safe_flat_map_a2(
-                xa2: Tuple[A2, IO[R, Any, None]]
-            ) -> IO[R, E, Tuple[A2, IO[R, Any, None]]]:
+                xa2: Tuple[A2, Callable[[ComputationStatus], IO[R, Any, None]]]
+            ) -> IO[R, E, Tuple[A2, Callable[[ComputationStatus], IO[R, Any, None]]]]:
                 a2, close_a2 = xa2
-                return io.pure((a2, close_a.attempt().then(close_a2)))
+
+                def close_all(cs: ComputationStatus) -> IO[R, E, Any]:
+                    return io.zip(
+                        io.defer_io(close_a2, cs).attempt(),
+                        io.defer_io(close_a, cs).attempt(),
+                    ).flat_map(lambda rs: io.from_result(result.zip(rs)))
+
+                return io.pure((a2, close_all))
 
             return (
-                f(a)
-                .create.attempt()
+                io.defer_io(lambda x: f(x).create, a)
+                .attempt()
                 .flat_map(
-                    lambda r: r.fold(
+                    lambda r: r.unsafe_fold(
                         safe_flat_map_a2,
-                        lambda e: close_a.attempt().then(io.error(e)),
-                        lambda p: close_a.attempt().then(io.panic(p)),
+                        lambda e: close_and_merge_failure(close_a, Errors(e)),
+                        lambda p, e: close_and_merge_failure(close_a, Panic(p, e)),
                     )
                 )
             )
@@ -172,7 +205,19 @@ class Resource(Generic[R, E, A]):
         If one resource creation fails, the whole creation fails (opened resources
         are released then).
         """
-        return zip((self, *rs))
+        return zip(self, *rs)
+
+    def zip_par(
+        self: Resource[R, E, A], *rs: Resource[R, E, A]
+    ) -> Resource[R, E, List[A]]:
+        """
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
+
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
+        """
+        return zip_par(self, *rs)
 
     def ap(
         self: Resource[R, E, Callable[[X], A]], *arg: Resource[R, E, X]
@@ -201,23 +246,23 @@ class Resource(Generic[R, E, A]):
         """
         return Resource(
             self.create.contra_map_read(f).map(
-                lambda x: (x[0], x[1].contra_map_read(f))
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).contra_map_read(f))
             )
         )
 
-    # Error API
+    # Errors API
 
     def catch(self, handler: Callable[[E], Resource[R, E, A]]) -> Resource[R, E, A]:
         """
         React to errors (the except part of a try-except).
 
-        On error, call the handler with the error.
+        On errors, call the handler with the errors.
         """
         return Resource(self.create.catch(lambda e: handler(e).create))
 
     def map_error(self, f: Callable[[E], E2]) -> Resource[R, E2, A]:
         """
-        Transform the stored error if the resource creation fails on an error.
+        Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         """
         return Resource(self.create.map_error(f))
@@ -225,31 +270,31 @@ class Resource(Generic[R, E, A]):
     # Panic
 
     def recover(
-        self, handler: Callable[[Exception], Resource[R, E, A]]
+        self, handler: Callable[[List[Exception], List[E]], Resource[R, E, A]]
     ) -> Resource[R, E, A]:
         """
         React to panics (the except part of a try-except).
 
-        On panic, call the handler with the exception.
+        On panic, call the handler with the exceptions.
         """
-        return Resource(self.create.recover(lambda p: handler(p).create))
+        return Resource(self.create.recover(lambda p, e: handler(p, e).create))
 
-    def map_panic(self, f: Callable[[E], E2]) -> Resource[R, E2, A]:
+    def map_panic(self, f: Callable[[Exception], Exception]) -> Resource[R, E, A]:
         """
-        Transform the exception stored if the computation fails on a panic.
+        Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
         """
         return Resource(
             self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
         )
 
-    def attempt(self) -> IO[R, Any, Result[E, A]]:
+    def attempt(self) -> Resource[R, Any, Result[E, A]]:
         """
         Transform this Resource that may fail into a Resource
         that never fails but creates a Result[E,A].
 
         - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-        - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If self fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
         - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the resource creation, unless a catch or
@@ -260,15 +305,15 @@ class Resource(Generic[R, E, A]):
         """
         return Resource(
             self.create.attempt().map(
-                lambda x: x.fold(
+                lambda x: x.unsafe_fold(
                     lambda v: (Ok(v[0]), v[1]),
-                    lambda e: (Error(e), io.pure(None)),
-                    lambda p: (Panic(p), io.pure(None)),
+                    lambda e: (Errors(e), noop_close),
+                    lambda p, e: (Panic(p, e), noop_close),
                 )
             )
         )
 
-    def finally_(self, rs: Resource[R, Any, Any]) -> Resource[R, E, A]:
+    def finally_(self, after: Resource[R, Any, Any]) -> Resource[R, E, A]:
         """
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -277,7 +322,11 @@ class Resource(Generic[R, E, A]):
         unconditionally, at the end of a resource creation, without changing
         its result, like executing a lifted IO.
         """
-        return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
+        return self.attempt().flat_map(
+            lambda r1: after(r1)
+            .attempt()
+            .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+        )
 
     def on_failure(
         self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
@@ -287,17 +336,17 @@ class Resource(Generic[R, E, A]):
         React to any failure of the resource creation.
         Do nothing if the resource creation is successful.
 
-        - The handler will be called on `Error(e)` if the resource creation fails with error e.
+        - The handler will be called on `Errors(e)` if the resource creation fails with errors e.
         - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
         - The handler will never be called on `Ok(a)`.
         """
-        return self.attempt().flat_map(
-            lambda r: r.fold(
-                pure,
-                lambda e: handler(Error(e)),
-                lambda p: handler(Panic(p)),
-            )
-        )
+
+        def g(r: Result[E, A]) -> Resource[R, E, A]:
+            if isinstance(r, Ok):
+                return pure(r.success)
+            return handler(r)
+
+        return self.attempt().flat_map(g)
 
 
 def lift_io(mio: IO[R, E, A]) -> Resource[R, E, A]:
@@ -305,14 +354,14 @@ def lift_io(mio: IO[R, E, A]) -> Resource[R, E, A]:
     Transform an IO into a Resource whose created resource if the result of the IO.
     The releasing IO does nothing.
     """
-    return Resource(mio.map(lambda a: (a, io.pure(None))))
+    return Resource(mio.map(lambda a: (a, noop_close)))
 
 
 def pure(a: A) -> Resource[R, E, A]:
     """
     A Resource that always returns the same constant.
     """
-    return Resource(io.pure((a, io.pure(None))))
+    return Resource(io.pure((a, noop_close)))
 
 
 def defer(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
@@ -333,7 +382,7 @@ def defer_resource(
     Make a function that returns an `Resource`, a `Resource` itself.
 
     This is extremely useful with recursive function that would normally blow
-    the stack (raise a stack overflow exception). Deferring recursive calls
+    the stack (raise a stack overflow exceptions). Deferring recursive calls
     eliminates stack overflow.
 
     For more information see `io.defer_io`
@@ -384,21 +433,46 @@ def error(err: E) -> Resource[R, E, A]:
     return Resource(io.error(err))
 
 
-def panic(exception: Exception) -> Resource[R, E, A]:
+def errors(*errs: E) -> Resource[R, E, A]:
     """
-    Resource creation that always fails with the panic exception.
+    Resource creation that always fails on the errors err.
     """
-    return Resource(io.panic(exception))
+    if (
+        len(errs) == 1
+        and isinstance(errs[0], abc.Iterable)
+        and not isinstance(errs[0], str)
+    ):
+        return Resource(io.errors(errs[0]))
+    return Resource(io.errors(errs))
+
+
+def panic(*exceptions: Exception, errors: List[E] = None) -> Resource[R, E, A]:
+    """
+    Resource creation that always fails with the panic exceptions.
+    """
+    if (
+        len(exceptions) == 1
+        and isinstance(exceptions[0], abc.Iterable)
+        and not isinstance(exceptions[0], str)
+    ):
+        return Resource(io.panic(exceptions[0], errors=errors))
+    return Resource(io.panic(exceptions, errors=errors))
 
 
 def from_result(r: Result[E, A]) -> Resource[R, E, A]:
     """
     Resource creation that:
     - success if r is an `Ok`
-    - fails with error e if r is `Error(e)`
+    - fails with errors e if r is `Errors(e)`
     - fails with panic p if r is `Panic(p)`
     """
-    return r.fold(pure, error, panic)
+    if isinstance(r, Ok):
+        return pure(r.success)
+    if isinstance(r, Errors):
+        return errors(r.errors)
+    if isinstance(r, Panic):
+        return panic(r.exceptions, errors=r.errors)
+    return panic(MatchError(f"{r} should be a Result"))
 
 
 def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -> Resource[R, E, A]:
@@ -409,21 +483,23 @@ def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -> Resource[R, E, A]:
 
 
 def from_open_close_io(
-    open: IO[R, E, A], close: Callable[[A], IO[R, Any, Any]]
+    open: IO[R, E, A], close: Callable[[A, ComputationStatus], IO[R, Any, Any]]
 ) -> Resource[R, E, A]:
     """
     Construct a `Resource` from an IO to open a resource and one to close it.
     """
-    return Resource(open.map(lambda a: (a, close(a))))
+    return Resource(open.map(lambda a: (a, lambda cs: io.defer_io(close, a, cs))))
 
 
 def from_open_close(
-    open: Callable[[], A], close: Callable[[A], None]
+    open: Callable[[], A], close: Callable[[A, ComputationStatus], None]
 ) -> Resource[R, E, A]:
     """
     Construct a `Resource` from a function to open a resource and one to close it.
     """
-    return Resource(io.defer(open).map(lambda a: (a, io.defer(close, a))))
+    return Resource(
+        io.defer(open).map(lambda a: (a, lambda cs: io.defer(close, a, cs)))
+    )
 
 
 def from_with(the_io: IO[R, E, Any]) -> Resource[R, E, A]:
@@ -441,7 +517,10 @@ def from_with(the_io: IO[R, E, Any]) -> Resource[R, E, A]:
     def manager_handler(manager):
         enter = type(manager).__enter__
         exit = type(manager).__exit__
-        return (enter(manager), io.defer(lambda: exit(manager, None, None, None)))
+        return (
+            enter(manager),
+            lambda _, cs: io.defer(lambda: exit(manager, None, None, None)),
+        )
 
     return Resource(the_io.map(manager_handler))
 
@@ -457,36 +536,78 @@ def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
     :return:
     """
     if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
+        args = iter(rs[0])
+    else:
+        args = iter(rs)
+
+    def append(l: List[A], a: A) -> List[A]:
+        l.append(a)
+        return l
+
+    def reverse(l: List[A]) -> List[A]:
+        l.reverse()
+        return l
+
+    def aux() -> Resource[R, E, List[A]]:
+        try:
+            return next(args).flat_map(
+                lambda a: defer_resource(aux).map(lambda l: append(l, a))
+            )
+        except StopIteration:
+            return pure([])
+
+    return aux().map(reverse)
+
+
+def zip_par(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
+    """
+    Transform a list of Resource into a Resource creating a list
+    of all resources.
+
+    If once resource creation fails, the whole creation fails.
+    The resources opened are then released.
+    :param rs: the list of resources to pack.
+    :return:
+    """
+    if len(rs) == 1 and isinstance(rs[0], abc.Iterable):
         args = rs[0]
     else:
         args = rs
 
-    def process(l: Result[E, A]):
-        close = []
-        args = []
-        level = 0
-        error = None
+    def process(
+        l: List[Result[E, A]]
+    ) -> IO[R, List[E], Tuple[A, Callable[[ComputationStatus], IO[R, E, Any]]]]:
+        values = []
+        closes = []
+        errors = []
+        panics = []
 
         for arg in l:
-            if arg.is_ok():
-                args.append(arg.success[0])
-                close.append(arg.success[1].attempt())
-            elif arg.is_error() and level < 1:
-                error = arg
-                level = 1
-            elif arg.is_panic() and level < 2:
-                error = arg
-                level = 2
+            if isinstance(arg, Ok):
+                values.append(arg.success[0])
+                closes.append(arg.success[1])
+            elif isinstance(arg, Errors):
+                errors.extend(arg.errors)
+            elif isinstance(arg, Panic):
+                panics.extend(arg.exceptions)
+                errors.extend(arg.errors)
             else:
-                level = 2
-                error = Panic(MatchError(f"{arg} should be a Result "))
+                panics.append(MatchError(f"{arg} should be a Result "))
 
-        if level == 0:
-            return io.pure((args, io.sequence(close)))
-        else:
-            return io.sequence(close).attempt().then(io.from_result(error))
+        def close_all(cs: ComputationStatus) -> IO[R, E, Any]:
+            return io.zip([io.defer_io(f, cs).attempt() for f in closes]).flat_map(
+                lambda rs: io.from_result(result.zip(rs))
+            )
 
-    return Resource(io.zip([x.create.attempt() for x in args]).flat_map(process))
+        if panics:
+            return close_and_merge_failure(close_all, Panic(panics, errors=errors))
+        if errors:
+            return close_and_merge_failure(close_all, Errors(errors))
+        return io.pure((values, close_all))
+
+    return Resource(
+        io.parallel([x.create for x in args]).flat_map(io.wait).flat_map(process)
+    )
 
 
 def traverse(
@@ -539,8 +660,8 @@ def async_(
        The value passed to `callback` must be the result of the asynchonous call:
 
         - `Ok(value)` if the call was successful and returned `value`.
-        - `Error(error)` if the call failed on error `error`.
-        - `Panic(exception)` if the failed unexpectedly on exception `exception`.
+        - `Errors(errors)` if the call failed on errors `errors`.
+        - `Panic(exceptions)` if the failed unexpectedly on exceptions `exceptions`.
 
     For example:
 
@@ -580,7 +701,9 @@ def sleep(seconds: float) -> Resource[R, E, None]:
 
 reentrant_lock: IO[Any, None, Resource[Any, None, None]] = io.defer(_runtime.Lock).map(
     lambda new_lock: Resource(
-        IO(IOTag.ACQUIRE, new_lock).then(io.pure((None, IO(IOTag.RELEASE, new_lock))))
+        IO(IOTag.ACQUIRE, new_lock).then(
+            io.pure((None, lambda _: IO(IOTag.RELEASE, new_lock)))
+        )
     )
 )
 """
@@ -607,8 +730,12 @@ def semaphore(tokens: int) -> IO[Any, None, Resource[Any, None, None]]:
         new_semaphore = _runtime.Semaphore(tokens)
         return Resource(
             IO(IOTag.ACQUIRE, new_semaphore).then(
-                io.pure((None, IO(IOTag.RELEASE, new_semaphore)))
+                io.pure((None, lambda _: IO(IOTag.RELEASE, new_semaphore)))
             )
         )
 
     return io.defer(h)
+
+
+def noop_close(cs: ComputationStatus) -> IO[Any, None, None]:
+    return io.pure(None)

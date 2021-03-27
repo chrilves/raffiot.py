@@ -1,6 +1,6 @@
 from raffiot import io, resource, result
-from raffiot.utils import MatchError, seq
-from raffiot.result import Result, Ok, Error, Panic
+from raffiot.utils import MatchError, MultipleExceptions, ComputationStatus, seq
+from raffiot.result import Result, Ok, Errors, Panic
 from raffiot.io import IO
 from raffiot.resource import Resource
 from raffiot.val import Val
@@ -11,10 +11,12 @@ __all__ = [
     "resource",
     "result",
     "MatchError",
+    "MultipleExceptions",
+    "ComputationStatus",
     "seq",
     "Result",
     "Ok",
-    "Error",
+    "Errors",
     "Panic",
     "IO",
     "Resource",

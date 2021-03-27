@@ -27,8 +27,8 @@
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">from raffiot.untyped import io, resource, result
-from raffiot.untyped.utils import MatchError, seq
-from raffiot.untyped.result import Result, Ok, Error, Panic
+from raffiot.untyped.utils import MatchError, MultipleExceptions, ComputationStatus, seq
+from raffiot.untyped.result import Result, Ok, Errors, Panic
 from raffiot.untyped.io import IO
 from raffiot.untyped.resource import Resource
 from raffiot.untyped.val import Val
@@ -39,10 +39,12 @@ __all__ = [
     &#34;resource&#34;,
     &#34;result&#34;,
     &#34;MatchError&#34;,
+    &#34;MultipleExceptions&#34;,
+    &#34;ComputationStatus&#34;,
     &#34;seq&#34;,
     &#34;Result&#34;,
     &#34;Ok&#34;,
-    &#34;Error&#34;,
+    &#34;Errors&#34;,
     &#34;Panic&#34;,
     &#34;IO&#34;,
     &#34;Resource&#34;,
@@ -117,27 +119,59 @@ Ensure that create resources are always nicely released after use.</p></div>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="raffiot.untyped.Error"><code class="flex name class">
-<span>class <span class="ident">Error</span></span>
-<span>(</span><span>error: None)</span>
+<dt id="raffiot.untyped.ComputationStatus"><code class="flex name class">
+<span>class <span class="ident">ComputationStatus</span></span>
+<span>(</span><span>value, names=None, *, module=None, qualname=None, type=None, start=1)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>The result of a computation that failed on an excepted normal error case.
+<div class="desc"><p>An enumeration.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ComputationStatus(IntEnum):
+    FAILED = 0
+    SUCCEEDED = 1</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>enum.IntEnum</li>
+<li>builtins.int</li>
+<li>enum.Enum</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.untyped.ComputationStatus.FAILED"><code class="name">var <span class="ident">FAILED</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="raffiot.untyped.ComputationStatus.SUCCEEDED"><code class="name">var <span class="ident">SUCCEEDED</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.untyped.Errors"><code class="flex name class">
+<span>class <span class="ident">Errors</span></span>
+<span>(</span><span>errors: None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>The result of a computation that failed on an excepted normal errors case.
 The program is still in a valid state and can progress safely.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
-class Error(Result):
+<pre><code class="python">@dataclass(frozen=True)
+class Errors(Result):
     &#34;&#34;&#34;
-    The result of a computation that failed on an excepted normal error case.
+    The result of a computation that failed on an excepted normal errors case.
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;error&#34;]
+    __slots__ = [&#34;errors&#34;]
 
-    error: None</code></pre>
+    errors: None</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -145,7 +179,7 @@ class Error(Result):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="raffiot.untyped.Error.error"><code class="name">var <span class="ident">error</span> : NoneType</code></dt>
+<dt id="raffiot.untyped.Errors.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
 <dd>
 <div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
@@ -159,11 +193,13 @@ class Error(Result):
 <li><code><a title="raffiot.untyped.result.Result.is_ok" href="result.html#raffiot.untyped.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.is_panic" href="result.html#raffiot.untyped.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.raise_on_panic" href="result.html#raffiot.untyped.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.untyped.result.Result.to_computation_status" href="result.html#raffiot.untyped.result.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_ap" href="result.html#raffiot.untyped.result.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_catch" href="result.html#raffiot.untyped.result.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_flat_map" href="result.html#raffiot.untyped.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_fold" href="result.html#raffiot.untyped.result.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_fold_raise" href="result.html#raffiot.untyped.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.untyped.result.Result.unsafe_get" href="result.html#raffiot.untyped.result.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map" href="result.html#raffiot.untyped.result.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map_error" href="result.html#raffiot.untyped.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map_panic" href="result.html#raffiot.untyped.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
@@ -180,7 +216,7 @@ class Error(Result):
 </code></dt>
 <dd>
 <div class="desc"><p>Represent a computation that computes a value of type A,
-may fail with an error (expected failure) of type E and have access
+may fail with an errors (expected failure) of type E and have access
 anytime to a read-only context of type R.</p>
 <p>/!\ <strong>VERY IMPORTANT</strong> /!\</p>
 <ol>
@@ -202,7 +238,7 @@ use defer and defer_io to avoid stack-overflow.</li>
 <pre><code class="python">class IO:
     &#34;&#34;&#34;
     Represent a computation that computes a value of type A,
-    may fail with an error (expected failure) of type E and have access
+    may fail with an errors (expected failure) of type E and have access
     anytime to a read-only context of type R.
 
     /!\\ **VERY IMPORTANT** /!\\
@@ -260,6 +296,15 @@ use defer and defer_io to avoid stack-overflow.</li>
             return IO(IOTag.ZIP, list((self, *others[0])))
         return IO(IOTag.ZIP, list((self, *others)))
 
+    def zip_par(self, *others):
+        &#34;&#34;&#34;
+        Pack a list of IO (including self) into an IO computing the list
+        of all values in parallel.
+
+        If one IO fails, the whole computation fails.
+        &#34;&#34;&#34;
+        return zip_par(self, *others)
+
     def parallel(self, *others):
         &#34;&#34;&#34;
         Run all these IO (including self) in parallel.
@@ -294,19 +339,19 @@ use defer and defer_io to avoid stack-overflow.</li>
         &#34;&#34;&#34;
         return IO(IOTag.CONTRA_MAP_READ, (f, self))
 
-    # Error API
+    # Errors API
 
     def catch(self, handler):
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        On error, call the handler with the error.
+        On errors, call the handler with the errors.
         &#34;&#34;&#34;
         return IO(IOTag.CATCH, (self, handler))
 
     def map_error(self, f):
         &#34;&#34;&#34;
-        Transform the stored error if the computation fails on an error.
+        Transform the stored errors if the computation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return IO(IOTag.MAP_ERROR, (self, f))
@@ -317,13 +362,13 @@ use defer and defer_io to avoid stack-overflow.</li>
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        On panic, call the handler with the exception.
+        On panic, call the handler with the exceptions.
         &#34;&#34;&#34;
         return IO(IOTag.RECOVER, (self, handler))
 
     def map_panic(self, f):
         &#34;&#34;&#34;
-        Transform the exception stored if the computation fails on a panic.
+        Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return IO(IOTag.MAP_PANIC, (self, f))
@@ -339,7 +384,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         only running the IO does.
 
         Note that the return value is a  `Result`.
-        No exception will be raised by run (unless there is a bug), run will
+        No exceptions will be raised by run (unless there is a bug), run will
         returns a panic instead!
         &#34;&#34;&#34;
         from raffiot.untyped._runtime import SharedState
@@ -362,7 +407,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         that never fails but returns a Result.
 
         - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-        - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
         - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the computation, unless a catch or
@@ -373,7 +418,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         &#34;&#34;&#34;
         return IO(IOTag.ATTEMPT, self)
 
-    def finally_(self, io):
+    def finally_(self, after):
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the io computation.
@@ -382,7 +427,11 @@ use defer and defer_io to avoid stack-overflow.</li>
         unconditionally, at the end of a computation, without changing
         its result, like releasing a resource.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))
+        return self.attempt().flat_map(
+            lambda r1: after(r1)
+            .attempt()
+            .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+        )
 
     def on_failure(self, handler):
         &#34;&#34;&#34;
@@ -390,17 +439,17 @@ use defer and defer_io to avoid stack-overflow.</li>
         React to any failure of the computation.
         Do nothing if the computation is successful.
 
-        - The handler will be called on `Error(e)` if the computation fails with error e.
+        - The handler will be called on `Errors(e)` if the computation fails with errors e.
         - The handler will be called on `Panic(p)` if the computation fails with panic p.
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(
-            lambda r: r.unsafe_fold(
-                pure,
-                lambda e: handler(Error(e)),
-                lambda p: handler(Panic(p)),
-            )
-        )
+
+        def g(r):
+            if isinstance(r, Ok):
+                return IO(IOTag.PURE, r.success)
+            return handler(r)
+
+        return self.attempt().flat_map(g)
 
     def then_keep(self, *args):
         &#34;&#34;&#34;
@@ -437,8 +486,8 @@ use defer and defer_io to avoid stack-overflow.</li>
             return f&#34;Read({self.__fields})&#34;
         if self.__tag == IOTag.CONTRA_MAP_READ:
             return f&#34;ContraMapRead({self.__fields})&#34;
-        if self.__tag == IOTag.ERROR:
-            return f&#34;Error({self.__fields})&#34;
+        if self.__tag == IOTag.ERRORS:
+            return f&#34;Errors({self.__fields})&#34;
         if self.__tag == IOTag.CATCH:
             return f&#34;Catch({self.__fields})&#34;
         if self.__tag == IOTag.MAP_ERROR:
@@ -506,7 +555,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
 that never fails but returns a Result.</p>
 <ul>
 <li>If <code>self</code> successfully computes a, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a>(a)</code>.</li>
-<li>If <code>self</code> fails on error e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a>(e)</code>.</li>
+<li>If <code>self</code> fails on errors e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(e)</code>.</li>
 <li>If <code>self</code> fails on panic p, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code>.</li>
 </ul>
 <p>Note that errors and panics stop the computation, unless a catch or
@@ -524,7 +573,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     that never fails but returns a Result.
 
     - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-    - If `self` fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+    - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
     - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
     Note that errors and panics stop the computation, unless a catch or
@@ -541,7 +590,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>React to errors (the except part of a try-except).</p>
-<p>On error, call the handler with the error.</p></div>
+<p>On errors, call the handler with the errors.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -550,7 +599,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
-    On error, call the handler with the error.
+    On errors, call the handler with the errors.
     &#34;&#34;&#34;
     return IO(IOTag.CATCH, (self, handler))</code></pre>
 </details>
@@ -574,7 +623,7 @@ Note that f is not from R to R2 but from R2 to R!</p></div>
 </details>
 </dd>
 <dt id="raffiot.untyped.IO.finally_"><code class="name flex">
-<span>def <span class="ident">finally_</span></span>(<span>self, io)</span>
+<span>def <span class="ident">finally_</span></span>(<span>self, after)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>After having computed self, but before returning its result,
@@ -586,7 +635,7 @@ its result, like releasing a resource.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def finally_(self, io):
+<pre><code class="python">def finally_(self, after):
     &#34;&#34;&#34;
     After having computed self, but before returning its result,
     execute the io computation.
@@ -595,7 +644,11 @@ its result, like releasing a resource.</p></div>
     unconditionally, at the end of a computation, without changing
     its result, like releasing a resource.
     &#34;&#34;&#34;
-    return self.attempt().flat_map(lambda r: io.attempt().then(from_result(r)))</code></pre>
+    return self.attempt().flat_map(
+        lambda r1: after(r1)
+        .attempt()
+        .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.IO.flat_map"><code class="name flex">
@@ -656,7 +709,7 @@ Do nothing otherwise.</p></div>
 <span>def <span class="ident">map_error</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the stored error if the computation fails on an error.
+<div class="desc"><p>Transform the stored errors if the computation fails on an errors.
 Do nothing otherwise.</p></div>
 <details class="source">
 <summary>
@@ -664,7 +717,7 @@ Do nothing otherwise.</p></div>
 </summary>
 <pre><code class="python">def map_error(self, f):
     &#34;&#34;&#34;
-    Transform the stored error if the computation fails on an error.
+    Transform the stored errors if the computation fails on an errors.
     Do nothing otherwise.
     &#34;&#34;&#34;
     return IO(IOTag.MAP_ERROR, (self, f))</code></pre>
@@ -674,7 +727,7 @@ Do nothing otherwise.</p></div>
 <span>def <span class="ident">map_panic</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the exception stored if the computation fails on a panic.
+<div class="desc"><p>Transform the exceptions stored if the computation fails on a panic.
 Do nothing otherwise.</p></div>
 <details class="source">
 <summary>
@@ -682,7 +735,7 @@ Do nothing otherwise.</p></div>
 </summary>
 <pre><code class="python">def map_panic(self, f):
     &#34;&#34;&#34;
-    Transform the exception stored if the computation fails on a panic.
+    Transform the exceptions stored if the computation fails on a panic.
     Do nothing otherwise.
     &#34;&#34;&#34;
     return IO(IOTag.MAP_PANIC, (self, f))</code></pre>
@@ -696,7 +749,7 @@ Do nothing otherwise.</p></div>
 React to any failure of the computation.
 Do nothing if the computation is successful.</p>
 <ul>
-<li>The handler will be called on <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a>(e)</code> if the computation fails with error e.</li>
+<li>The handler will be called on <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(e)</code> if the computation fails with errors e.</li>
 <li>The handler will be called on <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code> if the computation fails with panic p.</li>
 <li>The handler will never be called on <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a>(a)</code>.</li>
 </ul></div>
@@ -710,17 +763,17 @@ Do nothing if the computation is successful.</p>
     React to any failure of the computation.
     Do nothing if the computation is successful.
 
-    - The handler will be called on `Error(e)` if the computation fails with error e.
+    - The handler will be called on `Errors(e)` if the computation fails with errors e.
     - The handler will be called on `Panic(p)` if the computation fails with panic p.
     - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
-    return self.attempt().flat_map(
-        lambda r: r.unsafe_fold(
-            pure,
-            lambda e: handler(Error(e)),
-            lambda p: handler(Panic(p)),
-        )
-    )</code></pre>
+
+    def g(r):
+        if isinstance(r, Ok):
+            return IO(IOTag.PURE, r.success)
+        return handler(r)
+
+    return self.attempt().flat_map(g)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.IO.parallel"><code class="name flex">
@@ -762,7 +815,7 @@ Return the list of fibers, in the same order.</p>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
-<p>On panic, call the handler with the exception.</p></div>
+<p>On panic, call the handler with the exceptions.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -771,7 +824,7 @@ Return the list of fibers, in the same order.</p>
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).
 
-    On panic, call the handler with the exception.
+    On panic, call the handler with the exceptions.
     &#34;&#34;&#34;
     return IO(IOTag.RECOVER, (self, handler))</code></pre>
 </details>
@@ -788,7 +841,7 @@ function does. Likewise, declaring an IO does not execute its content,
 only running the IO does.</p>
 <p>Note that the return value is a
 <code><a title="raffiot.untyped.Result" href="#raffiot.untyped.Result">Result</a></code>.
-No exception will be raised by run (unless there is a bug), run will
+No exceptions will be raised by run (unless there is a bug), run will
 returns a panic instead!</p></div>
 <details class="source">
 <summary>
@@ -805,7 +858,7 @@ returns a panic instead!</p></div>
     only running the IO does.
 
     Note that the return value is a  `Result`.
-    No exception will be raised by run (unless there is a bug), run will
+    No exceptions will be raised by run (unless there is a bug), run will
     returns a panic instead!
     &#34;&#34;&#34;
     from raffiot.untyped._runtime import SharedState
@@ -883,6 +936,27 @@ of all values.</p>
     return IO(IOTag.ZIP, list((self, *others)))</code></pre>
 </details>
 </dd>
+<dt id="raffiot.untyped.IO.zip_par"><code class="name flex">
+<span>def <span class="ident">zip_par</span></span>(<span>self, *others)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pack a list of IO (including self) into an IO computing the list
+of all values in parallel.</p>
+<p>If one IO fails, the whole computation fails.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip_par(self, *others):
+    &#34;&#34;&#34;
+    Pack a list of IO (including self) into an IO computing the list
+    of all values in parallel.
+
+    If one IO fails, the whole computation fails.
+    &#34;&#34;&#34;
+    return zip_par(self, *others)</code></pre>
+</details>
+</dd>
 </dl>
 </dd>
 <dt id="raffiot.untyped.MatchError"><code class="flex name class">
@@ -895,7 +969,7 @@ of all values.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
@@ -918,6 +992,127 @@ class MatchError(Exception):
 </dd>
 </dl>
 </dd>
+<dt id="raffiot.untyped.MultipleExceptions"><code class="flex name class">
+<span>class <span class="ident">MultipleExceptions</span></span>
+<span>(</span><span>exceptions: None, errors: None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Represents</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@dataclass(frozen=True)
+class MultipleExceptions(Exception):
+    &#34;&#34;&#34;
+    Represents
+    &#34;&#34;&#34;
+
+    exceptions: None
+    &#34;&#34;&#34;
+    The list exceptions encountered
+    &#34;&#34;&#34;
+
+    errors: None
+    &#34;&#34;&#34;
+    The list of errors encountered
+    &#34;&#34;&#34;
+
+    @classmethod
+    def merge(cls, *exceptions, errors=None):
+        &#34;&#34;&#34;
+        Merge some exceptions, retuning the exceptions if there is only one
+        or a  `MultipleExceptions` otherwise.
+
+        :param exceptions:
+        :param errors:
+        :return:
+        &#34;&#34;&#34;
+        stack = [exn for exn in exceptions]
+        base_exceptions = []
+        errs = [x for x in errors] if errors else []
+
+        while stack:
+            item = stack.pop()
+            if isinstance(item, MultipleExceptions):
+                stack.extend(item.exceptions)
+                errs.extend(item.errors)
+                continue
+            if isinstance(item, abc.Iterable) and not isinstance(item, str):
+                stack.extend(item)
+                continue
+            base_exceptions.append(item)
+
+        if len(base_exceptions) == 1:
+            return base_exceptions[0]
+        base_exceptions.reverse()
+        return MultipleExceptions(base_exceptions, [])</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.untyped.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.untyped.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
+</dd>
+</dl>
+<h3>Static methods</h3>
+<dl>
+<dt id="raffiot.untyped.MultipleExceptions.merge"><code class="name flex">
+<span>def <span class="ident">merge</span></span>(<span>*exceptions, errors=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Merge some exceptions, retuning the exceptions if there is only one
+or a
+<code><a title="raffiot.untyped.MultipleExceptions" href="#raffiot.untyped.MultipleExceptions">MultipleExceptions</a></code> otherwise.</p>
+<p>:param exceptions:
+:param errors:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def merge(cls, *exceptions, errors=None):
+    &#34;&#34;&#34;
+    Merge some exceptions, retuning the exceptions if there is only one
+    or a  `MultipleExceptions` otherwise.
+
+    :param exceptions:
+    :param errors:
+    :return:
+    &#34;&#34;&#34;
+    stack = [exn for exn in exceptions]
+    base_exceptions = []
+    errs = [x for x in errors] if errors else []
+
+    while stack:
+        item = stack.pop()
+        if isinstance(item, MultipleExceptions):
+            stack.extend(item.exceptions)
+            errs.extend(item.errors)
+            continue
+        if isinstance(item, abc.Iterable) and not isinstance(item, str):
+            stack.extend(item)
+            continue
+        base_exceptions.append(item)
+
+    if len(base_exceptions) == 1:
+        return base_exceptions[0]
+    base_exceptions.reverse()
+    return MultipleExceptions(base_exceptions, [])</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
 <dt id="raffiot.untyped.Ok"><code class="flex name class">
 <span>class <span class="ident">Ok</span></span>
 <span>(</span><span>success: None)</span>
@@ -928,7 +1123,7 @@ class MatchError(Exception):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class Ok(Result):
     &#34;&#34;&#34;
     The result of a successful computation.
@@ -958,11 +1153,13 @@ class Ok(Result):
 <li><code><a title="raffiot.untyped.result.Result.is_ok" href="result.html#raffiot.untyped.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.is_panic" href="result.html#raffiot.untyped.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.raise_on_panic" href="result.html#raffiot.untyped.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.untyped.result.Result.to_computation_status" href="result.html#raffiot.untyped.result.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_ap" href="result.html#raffiot.untyped.result.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_catch" href="result.html#raffiot.untyped.result.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_flat_map" href="result.html#raffiot.untyped.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_fold" href="result.html#raffiot.untyped.result.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_fold_raise" href="result.html#raffiot.untyped.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.untyped.result.Result.unsafe_get" href="result.html#raffiot.untyped.result.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map" href="result.html#raffiot.untyped.result.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map_error" href="result.html#raffiot.untyped.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map_panic" href="result.html#raffiot.untyped.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
@@ -975,7 +1172,7 @@ class Ok(Result):
 </dd>
 <dt id="raffiot.untyped.Panic"><code class="flex name class">
 <span>class <span class="ident">Panic</span></span>
-<span>(</span><span>exception: None)</span>
+<span>(</span><span>exceptions: None, errors: None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>The result of a computation that failed unexpectedly.
@@ -984,16 +1181,18 @@ The program is not in a valid state and must terminate safely.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class Panic(Result):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exception&#34;]
+    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
 
-    exception: None</code></pre>
+    exceptions: None
+
+    errors: None</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -1001,7 +1200,11 @@ class Panic(Result):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="raffiot.untyped.Panic.exception"><code class="name">var <span class="ident">exception</span> : NoneType</code></dt>
+<dt id="raffiot.untyped.Panic.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+<dt id="raffiot.untyped.Panic.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
 <dd>
 <div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
@@ -1015,11 +1218,13 @@ class Panic(Result):
 <li><code><a title="raffiot.untyped.result.Result.is_ok" href="result.html#raffiot.untyped.result.Result.is_ok">is_ok</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.is_panic" href="result.html#raffiot.untyped.result.Result.is_panic">is_panic</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.raise_on_panic" href="result.html#raffiot.untyped.result.Result.raise_on_panic">raise_on_panic</a></code></li>
+<li><code><a title="raffiot.untyped.result.Result.to_computation_status" href="result.html#raffiot.untyped.result.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_ap" href="result.html#raffiot.untyped.result.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_catch" href="result.html#raffiot.untyped.result.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_flat_map" href="result.html#raffiot.untyped.result.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_fold" href="result.html#raffiot.untyped.result.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_fold_raise" href="result.html#raffiot.untyped.result.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.untyped.result.Result.unsafe_get" href="result.html#raffiot.untyped.result.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map" href="result.html#raffiot.untyped.result.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map_error" href="result.html#raffiot.untyped.result.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.untyped.result.Result.unsafe_map_panic" href="result.html#raffiot.untyped.result.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>
@@ -1041,7 +1246,7 @@ can fail with errors of type E and read a context of type R.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class Resource:
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
@@ -1056,13 +1261,15 @@ class Resource:
     
     On success, this IO must produce a `Tuple[A, IO[R,Any,Any]`:
         - The first value of the tuple, of type `A`, is the created resource.
-        - The second value of the tuple, of type `IO[R,Any,Any]`, is the IO that
-            release the first value.
+        - The second value of the tuple, of type `Callable[[ComputationStatus], IO[R,E,Any]]`,
+          is the function that releases the resource. 
+          It receives the `Result` (with the value set to None) to indicate
+          whether the computation succeeded, failed or panicked.
     
     For example:
         
         &gt;&gt;&gt; Resource(io.defer(lambda: open(&#34;file&#34;)).map(
-        &gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+        &gt;&gt;&gt;     lambda a: (a, lambda _:io.defer(a.close))))
     &#34;&#34;&#34;
 
     def use(self, fun):
@@ -1077,10 +1284,8 @@ class Resource:
 
         def safe_use(x):
             a, close = x
-            return (
-                io.defer_io(fun, a)
-                .attempt()
-                .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+            return io.defer_io(fun, a).finally_(
+                lambda r: close(r.to_computation_status())
             )
 
         return self.create.flat_map(safe_use)
@@ -1107,7 +1312,9 @@ class Resource:
             try:
                 return io.pure((f(a), close))
             except Exception as exception:
-                return close.attempt().then(io.panic(exception))
+                return close_and_merge_failure(
+                    close, Panic(exceptions=[exception], errors=[])
+                )
 
         return Resource(self.create.flat_map(safe_map))
 
@@ -1122,16 +1329,23 @@ class Resource:
 
             def safe_flat_map_a2(xa2):
                 a2, close_a2 = xa2
-                return io.pure((a2, close_a.attempt().then(close_a2)))
+
+                def close_all(cs):
+                    return io.zip(
+                        io.defer_io(close_a2, cs).attempt(),
+                        io.defer_io(close_a, cs).attempt(),
+                    ).flat_map(lambda rs: io.from_result(result.zip(rs)))
+
+                return io.pure((a2, close_all))
 
             return (
-                f(a)
-                .create.attempt()
+                io.defer_io(lambda x: f(x).create, a)
+                .attempt()
                 .flat_map(
-                    lambda r: r.fold(
+                    lambda r: r.unsafe_fold(
                         safe_flat_map_a2,
-                        lambda e: close_a.attempt().then(io.error(e)),
-                        lambda p: close_a.attempt().then(io.panic(p)),
+                        lambda e: close_and_merge_failure(close_a, Errors(e)),
+                        lambda p, e: close_and_merge_failure(close_a, Panic(p, e)),
                     )
                 )
             )
@@ -1153,7 +1367,17 @@ class Resource:
         If one resource creation fails, the whole creation fails (opened resources
         are released then).
         &#34;&#34;&#34;
-        return zip((self, *rs))
+        return zip(self, *rs)
+
+    def zip_par(self, *rs):
+        &#34;&#34;&#34;
+        Pack a list of resources (including self) into a Resource creating the
+        list of all resources.
+
+        If one resource creation fails, the whole creation fails (opened resources
+        are released then).
+        &#34;&#34;&#34;
+        return zip_par(self, *rs)
 
     def ap(self, *arg):
         &#34;&#34;&#34;
@@ -1180,23 +1404,23 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(
             self.create.contra_map_read(f).map(
-                lambda x: (x[0], x[1].contra_map_read(f))
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).contra_map_read(f))
             )
         )
 
-    # Error API
+    # Errors API
 
     def catch(self, handler):
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        On error, call the handler with the error.
+        On errors, call the handler with the errors.
         &#34;&#34;&#34;
         return Resource(self.create.catch(lambda e: handler(e).create))
 
     def map_error(self, f):
         &#34;&#34;&#34;
-        Transform the stored error if the resource creation fails on an error.
+        Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(self.create.map_error(f))
@@ -1207,13 +1431,13 @@ class Resource:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        On panic, call the handler with the exception.
+        On panic, call the handler with the exceptions.
         &#34;&#34;&#34;
-        return Resource(self.create.recover(lambda p: handler(p).create))
+        return Resource(self.create.recover(lambda p, e: handler(p, e).create))
 
     def map_panic(self, f):
         &#34;&#34;&#34;
-        Transform the exception stored if the computation fails on a panic.
+        Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
@@ -1226,7 +1450,7 @@ class Resource:
         that never fails but creates a Result.
 
         - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-        - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+        - If self fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
         - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
         Note that errors and panics stop the resource creation, unless a catch or
@@ -1237,15 +1461,15 @@ class Resource:
         &#34;&#34;&#34;
         return Resource(
             self.create.attempt().map(
-                lambda x: x.fold(
+                lambda x: x.unsafe_fold(
                     lambda v: (Ok(v[0]), v[1]),
-                    lambda e: (Error(e), io.pure(None)),
-                    lambda p: (Panic(p), io.pure(None)),
+                    lambda e: (Errors(e), noop_close),
+                    lambda p, e: (Panic(p, e), noop_close),
                 )
             )
         )
 
-    def finally_(self, rs):
+    def finally_(self, after):
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -1254,7 +1478,11 @@ class Resource:
         unconditionally, at the end of a resource creation, without changing
         its result, like executing a lifted IO.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))
+        return self.attempt().flat_map(
+            lambda r1: after(r1)
+            .attempt()
+            .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+        )
 
     def on_failure(self, handler):
         &#34;&#34;&#34;
@@ -1262,17 +1490,17 @@ class Resource:
         React to any failure of the resource creation.
         Do nothing if the resource creation is successful.
 
-        - The handler will be called on `Error(e)` if the resource creation fails with error e.
+        - The handler will be called on `Errors(e)` if the resource creation fails with errors e.
         - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
-        return self.attempt().flat_map(
-            lambda r: r.fold(
-                pure,
-                lambda e: handler(Error(e)),
-                lambda p: handler(Panic(p)),
-            )
-        )</code></pre>
+
+        def g(r):
+            if isinstance(r, Ok):
+                return pure(r.success)
+            return handler(r)
+
+        return self.attempt().flat_map(g)</code></pre>
 </details>
 <h3>Instance variables</h3>
 <dl>
@@ -1281,11 +1509,13 @@ class Resource:
 <div class="desc"><p>IO to create one resource along with the IO for releasing it.</p>
 <p>On success, this IO must produce a <code>Tuple[A, <a title="raffiot.untyped.IO" href="#raffiot.untyped.IO">IO</a>[R,Any,Any]</code>:
 - The first value of the tuple, of type <code>A</code>, is the created resource.
-- The second value of the tuple, of type <code><a title="raffiot.untyped.IO" href="#raffiot.untyped.IO">IO</a>[R,Any,Any]</code>, is the IO that
-release the first value.</p>
+- The second value of the tuple, of type <code>Callable[[<a title="raffiot.untyped.ComputationStatus" href="#raffiot.untyped.ComputationStatus">ComputationStatus</a>], <a title="raffiot.untyped.IO" href="#raffiot.untyped.IO">IO</a>[R,E,Any]]</code>,
+is the function that releases the resource.
+It receives the <code><a title="raffiot.untyped.Result" href="#raffiot.untyped.Result">Result</a></code> (with the value set to None) to indicate
+whether the computation succeeded, failed or panicked.</p>
 <p>For example:</p>
 <pre><code>&gt;&gt;&gt; Resource(io.defer(lambda: open("file")).map(
-&gt;&gt;&gt;     lambda a: (a, io.defer(a.close))))
+&gt;&gt;&gt;     lambda a: (a, lambda _:io.defer(a.close))))
 </code></pre></div>
 </dd>
 </dl>
@@ -1322,7 +1552,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
 that never fails but creates a Result.</p>
 <ul>
 <li>If self successfully computes a, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a>(a)</code>.</li>
-<li>If self fails on error e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a>(e)</code>.</li>
+<li>If self fails on errors e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(e)</code>.</li>
 <li>If self fails on panic p, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code>.</li>
 </ul>
 <p>Note that errors and panics stop the resource creation, unless a catch or
@@ -1340,7 +1570,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     that never fails but creates a Result.
 
     - If self successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
-    - If self fails on error e, then `self.attempt()` successfully computes `Error(e)`.
+    - If self fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
     - If self fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
 
     Note that errors and panics stop the resource creation, unless a catch or
@@ -1351,10 +1581,10 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     &#34;&#34;&#34;
     return Resource(
         self.create.attempt().map(
-            lambda x: x.fold(
+            lambda x: x.unsafe_fold(
                 lambda v: (Ok(v[0]), v[1]),
-                lambda e: (Error(e), io.pure(None)),
-                lambda p: (Panic(p), io.pure(None)),
+                lambda e: (Errors(e), noop_close),
+                lambda p, e: (Panic(p, e), noop_close),
             )
         )
     )</code></pre>
@@ -1365,7 +1595,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 </code></dt>
 <dd>
 <div class="desc"><p>React to errors (the except part of a try-except).</p>
-<p>On error, call the handler with the error.</p></div>
+<p>On errors, call the handler with the errors.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1374,7 +1604,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
-    On error, call the handler with the error.
+    On errors, call the handler with the errors.
     &#34;&#34;&#34;
     return Resource(self.create.catch(lambda e: handler(e).create))</code></pre>
 </details>
@@ -1396,13 +1626,13 @@ Note that f is not from R to R2 but from R2 to R!</p></div>
     &#34;&#34;&#34;
     return Resource(
         self.create.contra_map_read(f).map(
-            lambda x: (x[0], x[1].contra_map_read(f))
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).contra_map_read(f))
         )
     )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Resource.finally_"><code class="name flex">
-<span>def <span class="ident">finally_</span></span>(<span>self, rs)</span>
+<span>def <span class="ident">finally_</span></span>(<span>self, after)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>After having computed self, but before returning its result,
@@ -1414,7 +1644,7 @@ its result, like executing a lifted IO.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def finally_(self, rs):
+<pre><code class="python">def finally_(self, after):
     &#34;&#34;&#34;
     After having computed self, but before returning its result,
     execute the rs Resource creation.
@@ -1423,7 +1653,11 @@ its result, like executing a lifted IO.</p></div>
     unconditionally, at the end of a resource creation, without changing
     its result, like executing a lifted IO.
     &#34;&#34;&#34;
-    return self.attempt().flat_map(lambda r: rs.attempt().then(from_result(r)))</code></pre>
+    return self.attempt().flat_map(
+        lambda r1: after(r1)
+        .attempt()
+        .flat_map(lambda r2: from_result(result.sequence(r2, r1)))
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Resource.flat_map"><code class="name flex">
@@ -1447,16 +1681,23 @@ The resource created by the first one (self) can be used to create the second (f
 
         def safe_flat_map_a2(xa2):
             a2, close_a2 = xa2
-            return io.pure((a2, close_a.attempt().then(close_a2)))
+
+            def close_all(cs):
+                return io.zip(
+                    io.defer_io(close_a2, cs).attempt(),
+                    io.defer_io(close_a, cs).attempt(),
+                ).flat_map(lambda rs: io.from_result(result.zip(rs)))
+
+            return io.pure((a2, close_all))
 
         return (
-            f(a)
-            .create.attempt()
+            io.defer_io(lambda x: f(x).create, a)
+            .attempt()
             .flat_map(
-                lambda r: r.fold(
+                lambda r: r.unsafe_fold(
                     safe_flat_map_a2,
-                    lambda e: close_a.attempt().then(io.error(e)),
-                    lambda p: close_a.attempt().then(io.panic(p)),
+                    lambda e: close_and_merge_failure(close_a, Errors(e)),
+                    lambda p, e: close_and_merge_failure(close_a, Panic(p, e)),
                 )
             )
         )
@@ -1501,7 +1742,9 @@ Do nothing otherwise.</p></div>
         try:
             return io.pure((f(a), close))
         except Exception as exception:
-            return close.attempt().then(io.panic(exception))
+            return close_and_merge_failure(
+                close, Panic(exceptions=[exception], errors=[])
+            )
 
     return Resource(self.create.flat_map(safe_map))</code></pre>
 </details>
@@ -1510,7 +1753,7 @@ Do nothing otherwise.</p></div>
 <span>def <span class="ident">map_error</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the stored error if the resource creation fails on an error.
+<div class="desc"><p>Transform the stored errors if the resource creation fails on an errors.
 Do nothing otherwise.</p></div>
 <details class="source">
 <summary>
@@ -1518,7 +1761,7 @@ Do nothing otherwise.</p></div>
 </summary>
 <pre><code class="python">def map_error(self, f):
     &#34;&#34;&#34;
-    Transform the stored error if the resource creation fails on an error.
+    Transform the stored errors if the resource creation fails on an errors.
     Do nothing otherwise.
     &#34;&#34;&#34;
     return Resource(self.create.map_error(f))</code></pre>
@@ -1528,7 +1771,7 @@ Do nothing otherwise.</p></div>
 <span>def <span class="ident">map_panic</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the exception stored if the computation fails on a panic.
+<div class="desc"><p>Transform the exceptions stored if the computation fails on a panic.
 Do nothing otherwise.</p></div>
 <details class="source">
 <summary>
@@ -1536,7 +1779,7 @@ Do nothing otherwise.</p></div>
 </summary>
 <pre><code class="python">def map_panic(self, f):
     &#34;&#34;&#34;
-    Transform the exception stored if the computation fails on a panic.
+    Transform the exceptions stored if the computation fails on a panic.
     Do nothing otherwise.
     &#34;&#34;&#34;
     return Resource(
@@ -1552,7 +1795,7 @@ Do nothing otherwise.</p></div>
 React to any failure of the resource creation.
 Do nothing if the resource creation is successful.</p>
 <ul>
-<li>The handler will be called on <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a>(e)</code> if the resource creation fails with error e.</li>
+<li>The handler will be called on <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(e)</code> if the resource creation fails with errors e.</li>
 <li>The handler will be called on <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code> if the resource creation fails with panic p.</li>
 <li>The handler will never be called on <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a>(a)</code>.</li>
 </ul></div>
@@ -1566,17 +1809,17 @@ Do nothing if the resource creation is successful.</p>
     React to any failure of the resource creation.
     Do nothing if the resource creation is successful.
 
-    - The handler will be called on `Error(e)` if the resource creation fails with error e.
+    - The handler will be called on `Errors(e)` if the resource creation fails with errors e.
     - The handler will be called on `Panic(p)` if the resource creation fails with panic p.
     - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
-    return self.attempt().flat_map(
-        lambda r: r.fold(
-            pure,
-            lambda e: handler(Error(e)),
-            lambda p: handler(Panic(p)),
-        )
-    )</code></pre>
+
+    def g(r):
+        if isinstance(r, Ok):
+            return pure(r.success)
+        return handler(r)
+
+    return self.attempt().flat_map(g)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Resource.recover"><code class="name flex">
@@ -1584,7 +1827,7 @@ Do nothing if the resource creation is successful.</p>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
-<p>On panic, call the handler with the exception.</p></div>
+<p>On panic, call the handler with the exceptions.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -1593,9 +1836,9 @@ Do nothing if the resource creation is successful.</p>
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).
 
-    On panic, call the handler with the exception.
+    On panic, call the handler with the exceptions.
     &#34;&#34;&#34;
-    return Resource(self.create.recover(lambda p: handler(p).create))</code></pre>
+    return Resource(self.create.recover(lambda p, e: handler(p, e).create))</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Resource.then"><code class="name flex">
@@ -1640,10 +1883,8 @@ its releasing IO). The return value if the result of fun(a).</p>
 
     def safe_use(x):
         a, close = x
-        return (
-            io.defer_io(fun, a)
-            .attempt()
-            .flat_map(lambda r: close.attempt().then(io.from_result(r)))
+        return io.defer_io(fun, a).finally_(
+            lambda r: close(r.to_computation_status())
         )
 
     return self.create.flat_map(safe_use)</code></pre>
@@ -1693,7 +1934,30 @@ are released then).</p></div>
     If one resource creation fails, the whole creation fails (opened resources
     are released then).
     &#34;&#34;&#34;
-    return zip((self, *rs))</code></pre>
+    return zip(self, *rs)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.Resource.zip_par"><code class="name flex">
+<span>def <span class="ident">zip_par</span></span>(<span>self, *rs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Pack a list of resources (including self) into a Resource creating the
+list of all resources.</p>
+<p>If one resource creation fails, the whole creation fails (opened resources
+are released then).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def zip_par(self, *rs):
+    &#34;&#34;&#34;
+    Pack a list of resources (including self) into a Resource creating the
+    list of all resources.
+
+    If one resource creation fails, the whole creation fails (opened resources
+    are released then).
+    &#34;&#34;&#34;
+    return zip_par(self, *rs)</code></pre>
 </details>
 </dd>
 </dl>
@@ -1708,16 +1972,16 @@ are released then).</p></div>
 <li><em>Ok(some_value: A)</em>
 The computation succeeded.
 The value some_value, of type A, is the result of the computation</li>
-<li><em>Error(some_error: E)</em>
-The computation failed with an expected error.
-The error some_error, of type E, is the expected error encountered.</li>
-<li><em>Panic(some_exception: Exception)</em>
-The computation failed on an unexpected error.
-The exception some_exception is the unexpected error encountered.</li>
+<li><em>Errors(some_errors: List[E])</em>
+The computation failed with an expected errors.
+The errors some_errors, of type List[E], is the expected errors encountered.</li>
+<li><em>Panic(some_exceptions: List[Exception], errors: List[E])</em>
+The computation failed on an unexpected errors.
+The exceptions some_exceptions is the unexpected errors encountered.</li>
 </ul>
 <p>The distinction between errors (expected failures) and panics (unexpected
 failures) is essential.</p>
-<p>Errors are failures your program is prepared to deal with safely. An error
+<p>Errors are failures your program is prepared to deal with safely. An errors
 simply means some operation was not successful, but your program is still
 behaving nicely. Nothing terribly wrong happened. Generally errors belong to
 your business domain. You can take any type as E.</p>
@@ -1726,7 +1990,7 @@ can not progress further. All you can do when panics occur, is stopping your
 computation gracefully (like releasing resources before dying). The panic type
 is always Exception.</p>
 <p>As an example, if your program is an HTTP server. Errors are bad requests
-(error code 400) while panics are internal server errors (error code 500).
+(errors code 400) while panics are internal server errors (errors code 500).
 Receiving bad request is part of the normal life of any HTTP server, it must
 know how to reply nicely. But internal server errors are bugs.</p></div>
 <details class="source">
@@ -1741,17 +2005,17 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     - *Ok(some_value: A)*
             The computation succeeded.
             The value some_value, of type A, is the result of the computation
-    - *Error(some_error: E)*
-            The computation failed with an expected error.
-            The error some_error, of type E, is the expected error encountered.
-    - *Panic(some_exception: Exception)*
-            The computation failed on an unexpected error.
-            The exception some_exception is the unexpected error encountered.
+    - *Errors(some_errors: List[E])*
+            The computation failed with an expected errors.
+            The errors some_errors, of type List[E], is the expected errors encountered.
+    - *Panic(some_exceptions: List[Exception], errors: List[E])*
+            The computation failed on an unexpected errors.
+            The exceptions some_exceptions is the unexpected errors encountered.
 
     The distinction between errors (expected failures) and panics (unexpected
     failures) is essential.
 
-    Errors are failures your program is prepared to deal with safely. An error
+    Errors are failures your program is prepared to deal with safely. An errors
     simply means some operation was not successful, but your program is still
     behaving nicely. Nothing terribly wrong happened. Generally errors belong to
     your business domain. You can take any type as E.
@@ -1762,7 +2026,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     is always Exception.
 
     As an example, if your program is an HTTP server. Errors are bad requests
-    (error code 400) while panics are internal server errors (error code 500).
+    (errors code 400) while panics are internal server errors (errors code 500).
     Receiving bad request is part of the normal life of any HTTP server, it must
     know how to reply nicely. But internal server errors are bugs.
     &#34;&#34;&#34;
@@ -1776,17 +2040,17 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         Transform this Result into X.
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :param on_panic: is called if this result is a `Panic`.
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return on_success(self.success)
-        if isinstance(self, Error):
-            return on_error(self.error)
+        if isinstance(self, Errors):
+            return on_error(self.errors)
         if isinstance(self, Panic):
-            return on_panic(self.exception)
-        raise MatchError(f&#34;{self} should be a Result&#34;)
+            return on_panic(self.exceptions, self.errors)
+        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])
 
     @safe
     def fold(
@@ -1798,7 +2062,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         Transform this Result into X.
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :param on_panic: is called if this result is a `Panic`.
         :return:
         &#34;&#34;&#34;
@@ -1806,33 +2070,33 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
 
     def unsafe_fold_raise(self, on_success, on_error):
         &#34;&#34;&#34;
-        Transform this `Result` into `X` if this result is an `Ok` or `Error`.
-        But raise the stored exception is this is a panic.
+        Transform this `Result` into `X` if this result is an `Ok` or `Errors`.
+        But raise the stored exceptions is this is a panic.
 
-        It is useful to raise an exception on panics.
+        It is useful to raise an exceptions on panics.
 
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return on_success(self.success)
-        if isinstance(self, Error):
-            return on_error(self.error)
+        if isinstance(self, Errors):
+            return on_error(self.errors)
         if isinstance(self, Panic):
-            raise self.exception
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
         raise MatchError(f&#34;{self} should be a Result&#34;)
 
     @safe
     def fold_raise(self, on_success, on_error):
         &#34;&#34;&#34;
-        Transform this `Result` into `X` if this result is an `Ok` or `Error`.
-        But raise the stored exception is this is a panic.
+        Transform this `Result` into `X` if this result is an `Ok` or `Errors`.
+        But raise the stored exceptions is this is a panic.
 
-        It is useful to raise an exception on panics.
+        It is useful to raise an exceptions on panics.
 
         :param on_success: is called if this result is a `Ok`.
-        :param on_error: is called if this result is a `Error`.
+        :param on_error: is called if this result is a `Errors`.
         :return:
         &#34;&#34;&#34;
         return self.unsafe_fold_raise(on_success, on_error)
@@ -1877,16 +2141,16 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         h,
     ):
         &#34;&#34;&#34;
-        Transform the value/error/exception stored in this result.
+        Transform the value/errors/exceptions stored in this result.
         :param f: how to transform the value a if this result is `Ok(a)`
-        :param g: how to transform the error e if this result is `Error(e)`
-        :param h: how to transform the exception p if this result is `Panic(p)`
+        :param g: how to transform the errors e if this result is `Errors(e)`
+        :param h: how to transform the exceptions p if this result is `Panic(p)`
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.unsafe_fold(
             lambda x: Ok(f(x)),
-            lambda x: Error(g(x)),
-            lambda x: Panic(h(x)),
+            lambda x: Errors(list(map(g, x))),
+            lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
         )
 
     @safe
@@ -1897,10 +2161,10 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         h,
     ):
         &#34;&#34;&#34;
-        Transform the value/error/exception stored in this result.
+        Transform the value/errors/exceptions stored in this result.
         :param f: how to transform the value a if this result is `Ok(a)`
-        :param g: how to transform the error e if this result is `Error(e)`
-        :param h: how to transform the exception p if this result is `Panic(p)`
+        :param g: how to transform the errors e if this result is `Errors(e)`
+        :param h: how to transform the exceptions p if this result is `Panic(p)`
         :return: the &#34;same&#34; result with the stored value transformed.
         &#34;&#34;&#34;
         return self.unsafe_tri_map(f, g, h)
@@ -1913,9 +2177,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
 
     def is_error(self):
         &#34;&#34;&#34;
-        :return: True if this result is an `Error`
+        :return: True if this result is an `Errors`
         &#34;&#34;&#34;
-        return isinstance(self, Error)
+        return isinstance(self, Errors)
 
     def is_panic(self):
         &#34;&#34;&#34;
@@ -1947,7 +2211,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         Transform a list of Result (including self) into a Result of list.
 
         Is Ok is all results are Ok.
-        Is Error some are Ok, but at least one is an error but no panics.
+        Is Errors some are Ok, but at least one is an errors but no panics.
         Is Panic is there is at least one panic.
         &#34;&#34;&#34;
         return zip((self, *arg))
@@ -1983,18 +2247,18 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
 
     def unsafe_map_error(self, f):
         &#34;&#34;&#34;
-        Transform the error stored if this result is an `Error`.
+        Transform the errors stored if this result is an `Errors`.
         :param f: the transformation function
         :return:
         &#34;&#34;&#34;
-        if isinstance(self, Error):
-            return Error(f(self.error))
+        if isinstance(self, Errors):
+            return Errors(list(map(f, self.errors)))
         return self  # type: ignore
 
     @safe
     def map_error(self, f):
         &#34;&#34;&#34;
-        Transform the error stored if this result is an `Error`.
+        Transform the errors stored if this result is an `Errors`.
         :param f: the transformation function
         :return:
         &#34;&#34;&#34;
@@ -2004,11 +2268,11 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
         Otherwise, do nothing.
         &#34;&#34;&#34;
-        if isinstance(self, Error):
-            return handler(self.error)
+        if isinstance(self, Errors):
+            return handler(self.errors)
         return self
 
     @safe
@@ -2016,23 +2280,23 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
-        If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+        If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
         Otherwise, do nothing.
         &#34;&#34;&#34;
         return self.unsafe_catch(handler)
 
     def unsafe_map_panic(self, f):
         &#34;&#34;&#34;
-        Transform the exception stored if this result is a `Panic(some_exception)`.
+        Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return Panic(f(self.exception))
+            return Panic(list(map(f, self.exceptions)), self.errors)
         return self
 
     @safe
     def map_panic(self, f):
         &#34;&#34;&#34;
-        Transform the exception stored if this result is a `Panic(some_exception)`.
+        Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         return self.unsafe_map_panic(f)
 
@@ -2040,11 +2304,11 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
         Otherwise do nothing.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return handler(self.exception)
+            return handler(self.exceptions, self.errors)
         return self
 
     @safe
@@ -2052,25 +2316,49 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
 
-        If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+        If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
         Otherwise do nothing.
         &#34;&#34;&#34;
         return self.unsafe_recover(handler)
 
     def raise_on_panic(self):
         &#34;&#34;&#34;
-        If this result is an `Ok` or `Error`, do nothing.
-        If it is a `Panic(some_exception)`, raise the exception.
+        If this result is an `Ok` or `Errors`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exceptions.
 
-        Use with extreme care since it raise exception.
+        Use with extreme care since it raise exceptions.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            raise self.exception
-        return self</code></pre>
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
+        return self
+
+    def unsafe_get(self):
+        &#34;&#34;&#34;
+        If this result is an `Ok`, do nothing.
+        If it is a `Panic(some_exception)`, raise the exceptions.
+
+        Use with extreme care since it raise exceptions.
+        &#34;&#34;&#34;
+        if isinstance(self, Ok):
+            return self.success
+        if isinstance(self, Errors):
+            raise DomainErrors(self.errors)
+        if isinstance(self, Panic):
+            raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
+        raise MatchError(f&#34;{self} should be a result.&#34;)
+
+    def to_computation_status(self):
+        &#34;&#34;&#34;
+        Transform this Result into a Computation Status
+        :return:
+        &#34;&#34;&#34;
+        if self.is_ok():
+            return ComputationStatus.SUCCEEDED
+        return ComputationStatus.FAILED</code></pre>
 </details>
 <h3>Subclasses</h3>
 <ul class="hlist">
-<li><a title="raffiot.untyped.result.Error" href="result.html#raffiot.untyped.result.Error">Error</a></li>
+<li><a title="raffiot.untyped.result.Errors" href="result.html#raffiot.untyped.result.Errors">Errors</a></li>
 <li><a title="raffiot.untyped.result.Ok" href="result.html#raffiot.untyped.result.Ok">Ok</a></li>
 <li><a title="raffiot.untyped.result.Panic" href="result.html#raffiot.untyped.result.Panic">Panic</a></li>
 </ul>
@@ -2089,7 +2377,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.catch"><code class="name flex">
@@ -2105,7 +2393,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.flat_map"><code class="name flex">
@@ -2121,7 +2409,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.flatten"><code class="name flex">
@@ -2155,7 +2443,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.fold_raise"><code class="name flex">
@@ -2171,23 +2459,23 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.is_error"><code class="name flex">
 <span>def <span class="ident">is_error</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>:return: True if this result is an <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a></code></p></div>
+<div class="desc"><p>:return: True if this result is an <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a></code></p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def is_error(self):
     &#34;&#34;&#34;
-    :return: True if this result is an `Error`
+    :return: True if this result is an `Errors`
     &#34;&#34;&#34;
-    return isinstance(self, Error)</code></pre>
+    return isinstance(self, Errors)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.is_ok"><code class="name flex">
@@ -2235,7 +2523,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.map_error"><code class="name flex">
@@ -2251,7 +2539,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.map_panic"><code class="name flex">
@@ -2267,29 +2555,29 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.raise_on_panic"><code class="name flex">
 <span>def <span class="ident">raise_on_panic</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>If this result is an <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a></code> or <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a></code>, do nothing.
-If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(some_exception)</code>, raise the exception.</p>
-<p>Use with extreme care since it raise exception.</p></div>
+<div class="desc"><p>If this result is an <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a></code> or <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a></code>, do nothing.
+If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(some_exception)</code>, raise the exceptions.</p>
+<p>Use with extreme care since it raise exceptions.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def raise_on_panic(self):
     &#34;&#34;&#34;
-    If this result is an `Ok` or `Error`, do nothing.
-    If it is a `Panic(some_exception)`, raise the exception.
+    If this result is an `Ok` or `Errors`, do nothing.
+    If it is a `Panic(some_exception)`, raise the exceptions.
 
-    Use with extreme care since it raise exception.
+    Use with extreme care since it raise exceptions.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        raise self.exception
+        raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
     return self</code></pre>
 </details>
 </dd>
@@ -2306,7 +2594,27 @@ If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.Result.to_computation_status"><code class="name flex">
+<span>def <span class="ident">to_computation_status</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform this Result into a Computation Status
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def to_computation_status(self):
+    &#34;&#34;&#34;
+    Transform this Result into a Computation Status
+    :return:
+    &#34;&#34;&#34;
+    if self.is_ok():
+        return ComputationStatus.SUCCEEDED
+    return ComputationStatus.FAILED</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.tri_map"><code class="name flex">
@@ -2322,7 +2630,7 @@ If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exception)</code></pre>
+        return Panic(exceptions=[exception], errors=[])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_ap"><code class="name flex">
@@ -2353,7 +2661,7 @@ and arg represent a computation returning a value <code>x1: X1</code>,&hellip;,<
 </code></dt>
 <dd>
 <div class="desc"><p>React to errors (the except part of a try-except).</p>
-<p>If this result is an <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a>(some_error)</code>, then replace it with <code>handler(some_error)</code>.
+<p>If this result is an <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(some_error)</code>, then replace it with <code>handler(some_error)</code>.
 Otherwise, do nothing.</p></div>
 <details class="source">
 <summary>
@@ -2363,11 +2671,11 @@ Otherwise, do nothing.</p></div>
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
-    If this result is an `Error(some_error)`, then replace it with `handler(some_error)`.
+    If this result is an `Errors(some_error)`, then replace it with `handler(some_error)`.
     Otherwise, do nothing.
     &#34;&#34;&#34;
-    if isinstance(self, Error):
-        return handler(self.error)
+    if isinstance(self, Errors):
+        return handler(self.errors)
     return self</code></pre>
 </details>
 </dd>
@@ -2411,7 +2719,7 @@ Otherwise, do nothing.</p></div>
 <dd>
 <div class="desc"><p>Transform this Result into X.
 :param on_success: is called if this result is a <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a></code>.
-:param on_error: is called if this result is a <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a></code>.
+:param on_error: is called if this result is a <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a></code>.
 :param on_panic: is called if this result is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a></code>.
 :return:</p></div>
 <details class="source">
@@ -2427,28 +2735,28 @@ Otherwise, do nothing.</p></div>
     &#34;&#34;&#34;
     Transform this Result into X.
     :param on_success: is called if this result is a `Ok`.
-    :param on_error: is called if this result is a `Error`.
+    :param on_error: is called if this result is a `Errors`.
     :param on_panic: is called if this result is a `Panic`.
     :return:
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return on_success(self.success)
-    if isinstance(self, Error):
-        return on_error(self.error)
+    if isinstance(self, Errors):
+        return on_error(self.errors)
     if isinstance(self, Panic):
-        return on_panic(self.exception)
-    raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+        return on_panic(self.exceptions, self.errors)
+    raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_fold_raise"><code class="name flex">
 <span>def <span class="ident">unsafe_fold_raise</span></span>(<span>self, on_success, on_error)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform this <code><a title="raffiot.untyped.Result" href="#raffiot.untyped.Result">Result</a></code> into <code>X</code> if this result is an <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a></code> or <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a></code>.
-But raise the stored exception is this is a panic.</p>
-<p>It is useful to raise an exception on panics.</p>
+<div class="desc"><p>Transform this <code><a title="raffiot.untyped.Result" href="#raffiot.untyped.Result">Result</a></code> into <code>X</code> if this result is an <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a></code> or <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a></code>.
+But raise the stored exceptions is this is a panic.</p>
+<p>It is useful to raise an exceptions on panics.</p>
 <p>:param on_success: is called if this result is a <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a></code>.
-:param on_error: is called if this result is a <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a></code>.
+:param on_error: is called if this result is a <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a></code>.
 :return:</p></div>
 <details class="source">
 <summary>
@@ -2456,22 +2764,49 @@ But raise the stored exception is this is a panic.</p>
 </summary>
 <pre><code class="python">def unsafe_fold_raise(self, on_success, on_error):
     &#34;&#34;&#34;
-    Transform this `Result` into `X` if this result is an `Ok` or `Error`.
-    But raise the stored exception is this is a panic.
+    Transform this `Result` into `X` if this result is an `Ok` or `Errors`.
+    But raise the stored exceptions is this is a panic.
 
-    It is useful to raise an exception on panics.
+    It is useful to raise an exceptions on panics.
 
     :param on_success: is called if this result is a `Ok`.
-    :param on_error: is called if this result is a `Error`.
+    :param on_error: is called if this result is a `Errors`.
     :return:
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return on_success(self.success)
-    if isinstance(self, Error):
-        return on_error(self.error)
+    if isinstance(self, Errors):
+        return on_error(self.errors)
     if isinstance(self, Panic):
-        raise self.exception
+        raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
     raise MatchError(f&#34;{self} should be a Result&#34;)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.Result.unsafe_get"><code class="name flex">
+<span>def <span class="ident">unsafe_get</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>If this result is an <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a></code>, do nothing.
+If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(some_exception)</code>, raise the exceptions.</p>
+<p>Use with extreme care since it raise exceptions.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def unsafe_get(self):
+    &#34;&#34;&#34;
+    If this result is an `Ok`, do nothing.
+    If it is a `Panic(some_exception)`, raise the exceptions.
+
+    Use with extreme care since it raise exceptions.
+    &#34;&#34;&#34;
+    if isinstance(self, Ok):
+        return self.success
+    if isinstance(self, Errors):
+        raise DomainErrors(self.errors)
+    if isinstance(self, Panic):
+        raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
+    raise MatchError(f&#34;{self} should be a result.&#34;)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_map"><code class="name flex">
@@ -2500,7 +2835,7 @@ But raise the stored exception is this is a panic.</p>
 <span>def <span class="ident">unsafe_map_error</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the error stored if this result is an <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a></code>.
+<div class="desc"><p>Transform the errors stored if this result is an <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a></code>.
 :param f: the transformation function
 :return:</p></div>
 <details class="source">
@@ -2509,12 +2844,12 @@ But raise the stored exception is this is a panic.</p>
 </summary>
 <pre><code class="python">def unsafe_map_error(self, f):
     &#34;&#34;&#34;
-    Transform the error stored if this result is an `Error`.
+    Transform the errors stored if this result is an `Errors`.
     :param f: the transformation function
     :return:
     &#34;&#34;&#34;
-    if isinstance(self, Error):
-        return Error(f(self.error))
+    if isinstance(self, Errors):
+        return Errors(list(map(f, self.errors)))
     return self  # type: ignore</code></pre>
 </details>
 </dd>
@@ -2522,17 +2857,17 @@ But raise the stored exception is this is a panic.</p>
 <span>def <span class="ident">unsafe_map_panic</span></span>(<span>self, f)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the exception stored if this result is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(some_exception)</code>.</p></div>
+<div class="desc"><p>Transform the exceptions stored if this result is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(some_exception)</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def unsafe_map_panic(self, f):
     &#34;&#34;&#34;
-    Transform the exception stored if this result is a `Panic(some_exception)`.
+    Transform the exceptions stored if this result is a `Panic(some_exception)`.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        return Panic(f(self.exception))
+        return Panic(list(map(f, self.exceptions)), self.errors)
     return self</code></pre>
 </details>
 </dd>
@@ -2541,7 +2876,7 @@ But raise the stored exception is this is a panic.</p>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
-<p>If this result is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(exception)</code>, replace it by <code>handler(exception)</code>.
+<p>If this result is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(exceptions)</code>, replace it by <code>handler(exceptions)</code>.
 Otherwise do nothing.</p></div>
 <details class="source">
 <summary>
@@ -2551,11 +2886,11 @@ Otherwise do nothing.</p></div>
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).
 
-    If this result is a `Panic(exception)`, replace it by `handler(exception)`.
+    If this result is a `Panic(exceptions)`, replace it by `handler(exceptions)`.
     Otherwise do nothing.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        return handler(self.exception)
+        return handler(self.exceptions, self.errors)
     return self</code></pre>
 </details>
 </dd>
@@ -2563,10 +2898,10 @@ Otherwise do nothing.</p></div>
 <span>def <span class="ident">unsafe_tri_map</span></span>(<span>self, f, g, h)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Transform the value/error/exception stored in this result.
+<div class="desc"><p>Transform the value/errors/exceptions stored in this result.
 :param f: how to transform the value a if this result is <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a>(a)</code>
-:param g: how to transform the error e if this result is <code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a>(e)</code>
-:param h: how to transform the exception p if this result is <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code>
+:param g: how to transform the errors e if this result is <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(e)</code>
+:param h: how to transform the exceptions p if this result is <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code>
 :return: the "same" result with the stored value transformed.</p></div>
 <details class="source">
 <summary>
@@ -2579,16 +2914,16 @@ Otherwise do nothing.</p></div>
     h,
 ):
     &#34;&#34;&#34;
-    Transform the value/error/exception stored in this result.
+    Transform the value/errors/exceptions stored in this result.
     :param f: how to transform the value a if this result is `Ok(a)`
-    :param g: how to transform the error e if this result is `Error(e)`
-    :param h: how to transform the exception p if this result is `Panic(p)`
+    :param g: how to transform the errors e if this result is `Errors(e)`
+    :param h: how to transform the exceptions p if this result is `Panic(p)`
     :return: the &#34;same&#34; result with the stored value transformed.
     &#34;&#34;&#34;
     return self.unsafe_fold(
         lambda x: Ok(f(x)),
-        lambda x: Error(g(x)),
-        lambda x: Panic(h(x)),
+        lambda x: Errors(list(map(g, x))),
+        lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
     )</code></pre>
 </details>
 </dd>
@@ -2598,7 +2933,7 @@ Otherwise do nothing.</p></div>
 <dd>
 <div class="desc"><p>Transform a list of Result (including self) into a Result of list.</p>
 <p>Is Ok is all results are Ok.
-Is Error some are Ok, but at least one is an error but no panics.
+Is Errors some are Ok, but at least one is an errors but no panics.
 Is Panic is there is at least one panic.</p></div>
 <details class="source">
 <summary>
@@ -2609,7 +2944,7 @@ Is Panic is there is at least one panic.</p></div>
     Transform a list of Result (including self) into a Result of list.
 
     Is Ok is all results are Ok.
-    Is Error some are Ok, but at least one is an error but no panics.
+    Is Errors some are Ok, but at least one is an errors but no panics.
     Is Panic is there is at least one panic.
     &#34;&#34;&#34;
     return zip((self, *arg))</code></pre>
@@ -2627,7 +2962,7 @@ Is Panic is there is at least one panic.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class UpdateResult:
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.
@@ -3699,9 +4034,16 @@ def zip(cls, *vars):
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
-<h4><code><a title="raffiot.untyped.Error" href="#raffiot.untyped.Error">Error</a></code></h4>
+<h4><code><a title="raffiot.untyped.ComputationStatus" href="#raffiot.untyped.ComputationStatus">ComputationStatus</a></code></h4>
 <ul class="">
-<li><code><a title="raffiot.untyped.Error.error" href="#raffiot.untyped.Error.error">error</a></code></li>
+<li><code><a title="raffiot.untyped.ComputationStatus.FAILED" href="#raffiot.untyped.ComputationStatus.FAILED">FAILED</a></code></li>
+<li><code><a title="raffiot.untyped.ComputationStatus.SUCCEEDED" href="#raffiot.untyped.ComputationStatus.SUCCEEDED">SUCCEEDED</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.untyped.Errors.errors" href="#raffiot.untyped.Errors.errors">errors</a></code></li>
 </ul>
 </li>
 <li>
@@ -3724,12 +4066,21 @@ def zip(cls, *vars):
 <li><code><a title="raffiot.untyped.IO.then" href="#raffiot.untyped.IO.then">then</a></code></li>
 <li><code><a title="raffiot.untyped.IO.then_keep" href="#raffiot.untyped.IO.then_keep">then_keep</a></code></li>
 <li><code><a title="raffiot.untyped.IO.zip" href="#raffiot.untyped.IO.zip">zip</a></code></li>
+<li><code><a title="raffiot.untyped.IO.zip_par" href="#raffiot.untyped.IO.zip_par">zip_par</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="raffiot.untyped.MatchError" href="#raffiot.untyped.MatchError">MatchError</a></code></h4>
 <ul class="">
 <li><code><a title="raffiot.untyped.MatchError.message" href="#raffiot.untyped.MatchError.message">message</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.untyped.MultipleExceptions" href="#raffiot.untyped.MultipleExceptions">MultipleExceptions</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.untyped.MultipleExceptions.errors" href="#raffiot.untyped.MultipleExceptions.errors">errors</a></code></li>
+<li><code><a title="raffiot.untyped.MultipleExceptions.exceptions" href="#raffiot.untyped.MultipleExceptions.exceptions">exceptions</a></code></li>
+<li><code><a title="raffiot.untyped.MultipleExceptions.merge" href="#raffiot.untyped.MultipleExceptions.merge">merge</a></code></li>
 </ul>
 </li>
 <li>
@@ -3741,7 +4092,8 @@ def zip(cls, *vars):
 <li>
 <h4><code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a></code></h4>
 <ul class="">
-<li><code><a title="raffiot.untyped.Panic.exception" href="#raffiot.untyped.Panic.exception">exception</a></code></li>
+<li><code><a title="raffiot.untyped.Panic.errors" href="#raffiot.untyped.Panic.errors">errors</a></code></li>
+<li><code><a title="raffiot.untyped.Panic.exceptions" href="#raffiot.untyped.Panic.exceptions">exceptions</a></code></li>
 </ul>
 </li>
 <li>
@@ -3764,11 +4116,12 @@ def zip(cls, *vars):
 <li><code><a title="raffiot.untyped.Resource.use" href="#raffiot.untyped.Resource.use">use</a></code></li>
 <li><code><a title="raffiot.untyped.Resource.with_" href="#raffiot.untyped.Resource.with_">with_</a></code></li>
 <li><code><a title="raffiot.untyped.Resource.zip" href="#raffiot.untyped.Resource.zip">zip</a></code></li>
+<li><code><a title="raffiot.untyped.Resource.zip_par" href="#raffiot.untyped.Resource.zip_par">zip_par</a></code></li>
 </ul>
 </li>
 <li>
 <h4><code><a title="raffiot.untyped.Result" href="#raffiot.untyped.Result">Result</a></code></h4>
-<ul class="two-column">
+<ul class="">
 <li><code><a title="raffiot.untyped.Result.ap" href="#raffiot.untyped.Result.ap">ap</a></code></li>
 <li><code><a title="raffiot.untyped.Result.catch" href="#raffiot.untyped.Result.catch">catch</a></code></li>
 <li><code><a title="raffiot.untyped.Result.flat_map" href="#raffiot.untyped.Result.flat_map">flat_map</a></code></li>
@@ -3783,12 +4136,14 @@ def zip(cls, *vars):
 <li><code><a title="raffiot.untyped.Result.map_panic" href="#raffiot.untyped.Result.map_panic">map_panic</a></code></li>
 <li><code><a title="raffiot.untyped.Result.raise_on_panic" href="#raffiot.untyped.Result.raise_on_panic">raise_on_panic</a></code></li>
 <li><code><a title="raffiot.untyped.Result.recover" href="#raffiot.untyped.Result.recover">recover</a></code></li>
+<li><code><a title="raffiot.untyped.Result.to_computation_status" href="#raffiot.untyped.Result.to_computation_status">to_computation_status</a></code></li>
 <li><code><a title="raffiot.untyped.Result.tri_map" href="#raffiot.untyped.Result.tri_map">tri_map</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_ap" href="#raffiot.untyped.Result.unsafe_ap">unsafe_ap</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_catch" href="#raffiot.untyped.Result.unsafe_catch">unsafe_catch</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_flat_map" href="#raffiot.untyped.Result.unsafe_flat_map">unsafe_flat_map</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_fold" href="#raffiot.untyped.Result.unsafe_fold">unsafe_fold</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_fold_raise" href="#raffiot.untyped.Result.unsafe_fold_raise">unsafe_fold_raise</a></code></li>
+<li><code><a title="raffiot.untyped.Result.unsafe_get" href="#raffiot.untyped.Result.unsafe_get">unsafe_get</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_map" href="#raffiot.untyped.Result.unsafe_map">unsafe_map</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_map_error" href="#raffiot.untyped.Result.unsafe_map_error">unsafe_map_error</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_map_panic" href="#raffiot.untyped.Result.unsafe_map_panic">unsafe_map_panic</a></code></li>

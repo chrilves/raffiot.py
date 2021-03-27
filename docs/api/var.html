@@ -57,7 +57,7 @@ B = TypeVar(&#34;B&#34;)
 
 
 @final
-@dataclass
+@dataclass(frozen=True)
 class UpdateResult(Generic[A, B]):
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.
@@ -342,7 +342,7 @@ class Var(Generic[A]):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass
+@dataclass(frozen=True)
 class UpdateResult(Generic[A, B]):
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.

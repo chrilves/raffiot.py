@@ -22,7 +22,7 @@ from typing_extensions import final
 
 from raffiot._internal import ContTag, FiberState, IOTag, ResultTag
 from raffiot.io import IO
-from raffiot.result import Result, Ok, Error, Panic
+from raffiot.result import Result, Ok, Errors, Panic
 from raffiot.utils import MatchError
 
 __all__ = [
@@ -302,8 +302,13 @@ class Runner(Thread):
                             if arg_tag == ResultTag.OK:
                                 arg_value = fun(arg_value)
                         except Exception as exception:
+                            if arg_tag == ResultTag.OK:
+                                arg_value = ([exception], [])
+                            elif arg_tag == ResultTag.ERROR:
+                                arg_value = ([exception], arg_value)
+                            else:
+                                arg_value[0].append(exception)
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
                         continue
                     if tag == ContTag.FLATMAP:
                         context = cont.pop()
@@ -313,8 +318,13 @@ class Runner(Thread):
                                 io = f(arg_value)
                                 break
                         except Exception as exception:
+                            if arg_tag == ResultTag.OK:
+                                arg_value = ([exception], [])
+                            elif arg_tag == ResultTag.ERROR:
+                                arg_value = ([exception], arg_value)
+                            else:
+                                arg_value[0].append(exception)
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
                         continue
                     if tag == ContTag.SEQUENCE:
                         if arg_tag == ResultTag.OK:
@@ -349,8 +359,13 @@ class Runner(Thread):
                                 cont.pop()  # CONTEXT
                                 cont.pop()  # IOS
                                 cont.pop()  # RESULT LIST
+                                if arg_tag == ResultTag.OK:
+                                    arg_value = ([exception], [])
+                                elif arg_tag == ResultTag.ERROR:
+                                    arg_value = ([exception], arg_value)
+                                else:
+                                    arg_value[0].append(exception)
                                 arg_tag = ResultTag.PANIC
-                                arg_value = exception
                                 continue
                             context = cont[-1]
                             cont.append(ContTag.ZIP)
@@ -372,11 +387,11 @@ class Runner(Thread):
                             continue
                         if arg_tag == ResultTag.ERROR:
                             arg_tag = ResultTag.OK
-                            arg_value = Error(arg_value)
+                            arg_value = Errors(arg_value)
                             continue
                         if arg_tag == ResultTag.PANIC:
                             arg_tag = ResultTag.OK
-                            arg_value = Panic(arg_value)
+                            arg_value = Panic(arg_value[0], arg_value[1])
                             continue
                         arg_tag = ResultTag.OK
                         arg_value = Panic(MatchError(f"Wrong result tag {arg_tag}"))
@@ -389,56 +404,86 @@ class Runner(Thread):
                                 io = handler(arg_value)
                                 break
                         except Exception as exception:
+                            if arg_tag == ResultTag.OK:
+                                arg_value = ([exception], [])
+                            elif arg_tag == ResultTag.ERROR:
+                                arg_value = ([exception], arg_value)
+                            else:
+                                arg_value[0].append(exception)
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
                         continue
                     if tag == ContTag.MAP_ERROR:
                         fun = cont.pop()
                         try:
                             if arg_tag == ResultTag.ERROR:
-                                arg_value = fun(arg_value)
+                                arg_value = list(map(fun, arg_value))
+                            if arg_tag == ResultTag.PANIC:
+                                arg_value[1] = list(map(fun, arg_value[1]))
                         except Exception as exception:
+                            if arg_tag == ResultTag.OK:
+                                arg_value = ([exception], [])
+                            elif arg_tag == ResultTag.ERROR:
+                                arg_value = ([exception], arg_value)
+                            else:
+                                arg_value[0].append(exception)
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
                         continue
                     if tag == ContTag.RECOVER:
                         context = cont.pop()
                         handler = cont.pop()
                         try:
                             if arg_tag == ResultTag.PANIC:
-                                io = handler(arg_value)
+                                io = handler(arg_value[0], arg_value[1])
                                 break
                         except Exception as exception:
+                            if arg_tag == ResultTag.OK:
+                                arg_value = ([exception], [])
+                            elif arg_tag == ResultTag.ERROR:
+                                arg_value = ([exception], arg_value)
+                            else:
+                                arg_value[0].append(exception)
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
                         continue
                     if tag == ContTag.MAP_PANIC:
                         fun = cont.pop()
                         try:
                             if arg_tag == ResultTag.PANIC:
-                                arg_value = fun(arg_value)
+                                arg_value = (list(map(fun, arg_value[0])), arg_value[1])
                         except Exception as exception:
+                            if arg_tag == ResultTag.OK:
+                                arg_value = ([exception], [])
+                            elif arg_tag == ResultTag.ERROR:
+                                arg_value = ([exception], arg_value)
+                            else:
+                                arg_value[0].append(exception)
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
                         continue
                     if tag == ContTag.ID:
                         if arg_tag == ResultTag.OK:
                             fiber.result = Ok(arg_value)
                         elif arg_tag == ResultTag.ERROR:
-                            fiber.result = Error(arg_value)
+                            fiber.result = Errors(arg_value)
                         elif arg_tag == ResultTag.PANIC:
-                            fiber.result = Panic(arg_value)
+                            fiber.result = Panic(arg_value[0], arg_value[1])
                         else:
                             fiber.result = Panic(
-                                MatchError(f"Wrong result tag {arg_tag}")
+                                [MatchError(f"Wrong result tag {arg_tag}")], []
                             )
                         finish_fiber(fiber)
                         return False
                     if tag == ContTag.START:
                         io = cont.pop()
                         break
+                    if arg_tag == ResultTag.OK:
+                        arg_value = ([MatchError(f"Invalid cont {cont + [tag]}")], [])
+                    elif arg_tag == ResultTag.ERROR:
+                        arg_value = (
+                            [MatchError(f"Invalid cont {cont + [tag]}")],
+                            arg_value,
+                        )
+                    else:
+                        arg_value[0].append(MatchError(f"Invalid cont {cont + [tag]}"))
                     arg_tag = ResultTag.PANIC
-                    arg_value = Panic(MatchError(f"Invalid cont {cont + [tag]}"))
 
                 # Eval IO
                 while True:
@@ -485,7 +530,7 @@ class Runner(Thread):
                             break
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                             break
                         cont.append([])
                         cont.append(ios)
@@ -505,7 +550,7 @@ class Runner(Thread):
                             )
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                         break
                     if tag == IOTag.DEFER_IO:
                         try:
@@ -515,7 +560,7 @@ class Runner(Thread):
                             continue
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                             break
                     if tag == IOTag.ATTEMPT:
                         io = io._IO__fields
@@ -532,9 +577,9 @@ class Runner(Thread):
                             continue
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                             break
-                    if tag == IOTag.ERROR:
+                    if tag == IOTag.ERRORS:
                         arg_tag = ResultTag.ERROR
                         arg_value = io._IO__fields
                         break
@@ -597,18 +642,19 @@ class Runner(Thread):
                                         if isinstance(r, Ok):
                                             fiber._arg_tag = ResultTag.OK
                                             fiber._arg_value = r.success
-                                        elif isinstance(r, Error):
+                                        elif isinstance(r, Errors):
                                             fiber._arg_tag = ResultTag.ERROR
-                                            fiber._arg_value = r.error
+                                            fiber._arg_value = r.errors
                                         elif isinstance(r, Panic):
                                             fiber._arg_tag = ResultTag.PANIC
-                                            fiber._arg_value = r.exception
+                                            fiber._arg_value = (r.exceptions, r.errors)
                                         else:
                                             fiber._arg_tag = ResultTag.PANIC
-                                            fiber._arg_value = Panic(
+                                            fiber._arg_value = (
                                                 MatchError(
                                                     "{res} should be a Result in defer_read"
-                                                )
+                                                ),
+                                                [],
                                             )
                                         resume_fiber(fiber)
 
@@ -630,7 +676,7 @@ class Runner(Thread):
                                     fiber._state = FiberState.ACTIVE
                                     self.count_local -= 1
                                     arg_tag = ResultTag.PANIC
-                                    arg_value = exception
+                                    arg_value = ([exception], [])
                                     break
                         with fiber._state_lock:
                             if fiber._state == FiberState.ACTIVE:
@@ -647,22 +693,23 @@ class Runner(Thread):
                                 arg_tag = ResultTag.OK
                                 arg_value = res.success
                                 break
-                            if isinstance(res, Error):
+                            if isinstance(res, Errors):
                                 arg_tag = ResultTag.ERROR
-                                arg_value = res.error
+                                arg_value = res.errors
                                 break
                             if isinstance(res, Panic):
                                 arg_tag = ResultTag.PANIC
-                                arg_value = res.exception
+                                arg_value = (res.exceptions, res.errors)
                                 break
                             arg_tag = ResultTag.PANIC
-                            arg_value = Panic(
-                                MatchError("{res} should be a Result in defer_read")
+                            arg_value = (
+                                [MatchError("{res} should be a Result in defer_read")],
+                                [],
                             )
                             break
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                         break
                     if tag == IOTag.DEFER_READ_IO:
                         try:
@@ -672,7 +719,7 @@ class Runner(Thread):
                             continue
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                             break
                     if tag == IOTag.PARALLEL:
                         arg_value = []
@@ -726,7 +773,7 @@ class Runner(Thread):
                             continue
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                             break
                     if tag == IOTag.ACQUIRE:
                         lock = io._IO__fields
@@ -744,7 +791,7 @@ class Runner(Thread):
                                 return False
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                             break
                     if tag == IOTag.RELEASE:
                         lock = io._IO__fields
@@ -754,14 +801,14 @@ class Runner(Thread):
                             arg_value = None
                         except Exception as exception:
                             arg_tag = ResultTag.PANIC
-                            arg_value = exception
+                            arg_value = ([exception], [])
                         break
                     arg_tag = ResultTag.PANIC
-                    arg_value = MatchError(f"{io} should be an IO")
+                    arg_value = ([MatchError(f"{io} should be an IO")], [])
                     break
 
         except Exception as exception:
-            fiber.result = Panic(exception)
+            fiber.result = Panic([exception], [])
             finish_fiber(fiber)
 
 

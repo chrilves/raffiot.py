@@ -109,9 +109,13 @@ Let's start by the `IO` creating and printing the string:
 Now the function releasing the string (i.e. printing it):
 
 ```python
->>> def rs_close(s: str) -> IO[None, None, None]:
+>>> def rs_close(s: str, cs: ComputationStatus) -> IO[None, None, None]:
 ...   return io.defer(print, f"Closing {s}")
 ```
+
+The first function argument is the created resource. The second one indicates
+whether the computation was successful. It can be either
+`ComputationStatus.SUCCEEDED` or `ComputationStatus.FAILED`.
 
 From there, creating a `Resource` is as simple as a single call
 to `resource.from_open_close_io`:
@@ -197,10 +201,14 @@ use the function `resource.from_open_close`:
 ...   )
 ...   print(f"Opening {s}")
 ...   return s
->>> def rs_close(s: str) -> None:
+>>> def rs_close(s: str, cs: ComputationStatus) -> None:
 ...   print(f"Closing {s}")
 >>> rs : Resource[None,None,str] = resource.from_open_close(rs_open, rs_close)
 ```
+
+Once again, the he first argument of `rs_close` is the created resource and
+the second one indicates whether the computation was successful:
+`ComputationStatus.SUCCEEDED` or `ComputationStatus.FAILED`.
 
 ## `from_with` : Resource from `with`
 
@@ -214,19 +222,24 @@ one single call to `resource.from_with`
 
 ## Creating a Resource directly
 
-A `Resource[R,E,A]` is essentially an `IO[R,E,Tuple[A, IO[R,Any,Any]]]`.
-When the `IO` runs, it returns a pair `Tuple[A, IO[R,Any,Any]]`.
+A `Resource[R,E,A]` is essentially an
+`IO[R,E,Tuple[A, Callable[[ComputationStatus], IO[R,E,Any]]]]`.
+When the `IO` runs, it returns a pair
+`Tuple[A, Callable[[ComputationStatus], IO[R,Any,Any]]]`.
 The fist member of the pair is the created resource of type `A`.
-The second member of the pair is the `IO` to run to release the
-resource.
-Note that the result and failures of the releasing `IO` are ignored.
+The second member of the pair is the release function. Its argument is a
+`ComputationStatus` indicating whether the computation was successful.
+It must return an `IO` that perform the release of the resource.
+
+Note that any failure encountered when releasing the resource makes the `IO`
+to fail too.
 
 
 ```python
 >>> create : IO[None,None,Tuple[str, IO[None,Any,Any]]] = (
 ...   rnd_str.flat_map(lambda filename:
 ...     io.defer(print, f"Opening {filename}").map(lambda file:
-...       (file, io.defer(print, f"Closing {filename}"))
+...       (file, lambda computationStatus: io.defer(print, f"Closing {filename}"))
 ...     )
 ...   )
 ... )
@@ -247,8 +260,8 @@ This is a complete use case of a `Resource` creating a random file.
 ...     .then(io.defer(open, filename, "w"))
 ...     .map(lambda file:
 ...       ( file,
-...         io.defer(print, f"Closing {filename}")
-...         .then(io.defer(f.close))
+...         lambda computationStatus: io.defer(print, f"Closing {filename}")
+...         .then(io.defer(file.close))
 ...       )
 ...     )
 ...    )
@@ -260,6 +273,9 @@ This is a complete use case of a `Resource` creating a random file.
 ...   )
 ... )
 >>> io_ok.run(None)
+Opening 6E21M413
+Closing 6E21M413
+Ok(success=12)
 >>> io_error : IO[None,None,None] = (
 ...   rs.use(lambda file:
 ...     io.defer(file.write, "Hello World!")
@@ -269,7 +285,7 @@ This is a complete use case of a `Resource` creating a random file.
 >>> io_error.run(None)
 Opening R9A1YSJ3
 Closing R9A1YSJ3
-Error(error='Oups!')
+Errors(errors=['Oups!'])
 >>> io_panic : IO[None,None,None] = (
 ...   rs.use(lambda file:
 ...     io.defer(file.write, "Hello World!")
@@ -277,7 +293,7 @@ Error(error='Oups!')
 ...   )
 ... )
 >>> io_panic.run(None)
-Opening PSUNW6M5
-Closing PSUNW6M5
-Panic(exception=Exception('BOOM!'))
+Opening R1V3A0SO
+Closing R1V3A0SO
+Panic(exceptions=[Exception('BOOM!')], errors=[])
 ```

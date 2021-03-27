@@ -50,7 +50,7 @@ __all__ = [
 ]
 
 
-@dataclass
+@dataclass(frozen=True)
 class UpdateResult:
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.
@@ -329,7 +329,7 @@ class Var:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class UpdateResult:
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.

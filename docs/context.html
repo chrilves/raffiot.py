@@ -228,9 +228,9 @@ you want to execute later. But unlike <code>io.defer</code>, this function:</p>
 errors while <code>io.defer</code> can only raise panics.</p>
 <pre><code class="language-python">&gt;&gt;&gt; def f(context:int, i: int) -&gt; Result[str,int]:
 ...   if context &gt; 0:
-...     return Ok(context + i)
+...     return result.ok(context + i)
 ...   else:
-...     return Error(&quot;Ooups!&quot;)
+...     return result.error(&quot;Ooups!&quot;)
 &gt;&gt;&gt; main : IO[int,None,int] = io.defer_read(f, 5)
 &gt;&gt;&gt; main.run(10)
 Ok(success=15)
@@ -250,7 +250,7 @@ to execute later returns an <code>IO</code>.</p>
 &gt;&gt;&gt; main.run(10)
 Ok(success=15)
 &gt;&gt;&gt; main.run(-1)
-Error(error='Ooups!')
+Errors(errors=['Ooups!'])
 </code></pre>
 <h2 id="use-case-dependency-injection"><a class="header" href="#use-case-dependency-injection">Use Case: Dependency Injection</a></h2>
 <p>As a demonstration of how dependency injection works in <em>Raffiot</em>,

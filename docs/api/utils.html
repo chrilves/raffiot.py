@@ -28,10 +28,23 @@
 </summary>
 <pre><code class="python">from collections import abc
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, List, Generic, TypeVar
+from enum import IntEnum
+from typing_extensions import final
+from collections import abc
+
+__all__ = [
+    &#34;MatchError&#34;,
+    &#34;MultipleExceptions&#34;,
+    &#34;ComputationStatus&#34;,
+    &#34;seq&#34;,
+    &#34;DomainErrors&#34;,
+]
+
+E = TypeVar(&#34;E&#34;, covariant=True)
 
 
-@dataclass
+@dataclass(frozen=True)
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
@@ -39,7 +52,71 @@ class MatchError(Exception):
 
     __slots__ = [&#34;message&#34;]
 
-    message: None
+    message: str
+
+
+@final
+@dataclass(frozen=True)
+class MultipleExceptions(Exception, Generic[E]):
+    &#34;&#34;&#34;
+    Represents
+    &#34;&#34;&#34;
+
+    exceptions: List[Exception]
+    &#34;&#34;&#34;
+    The list exceptions encountered
+    &#34;&#34;&#34;
+
+    errors: List[E]
+    &#34;&#34;&#34;
+    The list of errors encountered
+    &#34;&#34;&#34;
+
+    @classmethod
+    def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
+        &#34;&#34;&#34;
+        Merge some exceptions, retuning the exceptions if there is only one
+        or a  `MultipleExceptions` otherwise.
+
+        :param exceptions:
+        :param errors:
+        :return:
+        &#34;&#34;&#34;
+        stack = [exn for exn in exceptions]
+        base_exceptions = []
+        errs = [x for x in errors] if errors else []
+
+        while stack:
+            item = stack.pop()
+            if isinstance(item, MultipleExceptions):
+                stack.extend(item.exceptions)
+                errs.extend(item.errors)
+                continue
+            if isinstance(item, abc.Iterable) and not isinstance(item, str):
+                stack.extend(item)
+                continue
+            base_exceptions.append(item)
+
+        if len(base_exceptions) == 1:
+            return base_exceptions[0]
+        base_exceptions.reverse()
+        return MultipleExceptions(base_exceptions, [])
+
+
+@final
+@dataclass(frozen=True)
+class DomainErrors(Exception, Generic[E]):
+    &#34;&#34;&#34;
+    Errors from the business domain
+    &#34;&#34;&#34;
+
+    errors: List[E]
+
+
+@final
+class ComputationStatus(IntEnum):
+    FAILED = 0
+    SUCCEEDED = 1
 
 
 def seq(*a: Any) -&gt; Any:
@@ -92,9 +169,75 @@ def seq(*a: Any) -&gt; Any:
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="raffiot.utils.ComputationStatus"><code class="flex name class">
+<span>class <span class="ident">ComputationStatus</span></span>
+<span>(</span><span>value, names=None, *, module=None, qualname=None, type=None, start=1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>An enumeration.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+class ComputationStatus(IntEnum):
+    FAILED = 0
+    SUCCEEDED = 1</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>enum.IntEnum</li>
+<li>builtins.int</li>
+<li>enum.Enum</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.utils.ComputationStatus.FAILED"><code class="name">var <span class="ident">FAILED</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt id="raffiot.utils.ComputationStatus.SUCCEEDED"><code class="name">var <span class="ident">SUCCEEDED</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.utils.DomainErrors"><code class="flex name class">
+<span>class <span class="ident">DomainErrors</span></span>
+<span>(</span><span>errors: List[+E])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Errors from the business domain</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass(frozen=True)
+class DomainErrors(Exception, Generic[E]):
+    &#34;&#34;&#34;
+    Errors from the business domain
+    &#34;&#34;&#34;
+
+    errors: List[E]</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+<li>typing.Generic</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.utils.DomainErrors.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+</dd>
 <dt id="raffiot.utils.MatchError"><code class="flex name class">
 <span>class <span class="ident">MatchError</span></span>
-<span>(</span><span>message: None)</span>
+<span>(</span><span>message: str)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Exception for pattern matching errors (used internally, should NEVER happen).</p></div>
@@ -102,7 +245,7 @@ def seq(*a: Any) -&gt; Any:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass
+<pre><code class="python">@dataclass(frozen=True)
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
@@ -110,7 +253,7 @@ class MatchError(Exception):
 
     __slots__ = [&#34;message&#34;]
 
-    message: None</code></pre>
+    message: str</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -119,9 +262,132 @@ class MatchError(Exception):
 </ul>
 <h3>Instance variables</h3>
 <dl>
-<dt id="raffiot.utils.MatchError.message"><code class="name">var <span class="ident">message</span> : NoneType</code></dt>
+<dt id="raffiot.utils.MatchError.message"><code class="name">var <span class="ident">message</span> : str</code></dt>
 <dd>
 <div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.utils.MultipleExceptions"><code class="flex name class">
+<span>class <span class="ident">MultipleExceptions</span></span>
+<span>(</span><span>exceptions: List[Exception], errors: List[+E])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Represents</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass(frozen=True)
+class MultipleExceptions(Exception, Generic[E]):
+    &#34;&#34;&#34;
+    Represents
+    &#34;&#34;&#34;
+
+    exceptions: List[Exception]
+    &#34;&#34;&#34;
+    The list exceptions encountered
+    &#34;&#34;&#34;
+
+    errors: List[E]
+    &#34;&#34;&#34;
+    The list of errors encountered
+    &#34;&#34;&#34;
+
+    @classmethod
+    def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
+        &#34;&#34;&#34;
+        Merge some exceptions, retuning the exceptions if there is only one
+        or a  `MultipleExceptions` otherwise.
+
+        :param exceptions:
+        :param errors:
+        :return:
+        &#34;&#34;&#34;
+        stack = [exn for exn in exceptions]
+        base_exceptions = []
+        errs = [x for x in errors] if errors else []
+
+        while stack:
+            item = stack.pop()
+            if isinstance(item, MultipleExceptions):
+                stack.extend(item.exceptions)
+                errs.extend(item.errors)
+                continue
+            if isinstance(item, abc.Iterable) and not isinstance(item, str):
+                stack.extend(item)
+                continue
+            base_exceptions.append(item)
+
+        if len(base_exceptions) == 1:
+            return base_exceptions[0]
+        base_exceptions.reverse()
+        return MultipleExceptions(base_exceptions, [])</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+<li>typing.Generic</li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.utils.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.utils.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[Exception]</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
+</dd>
+</dl>
+<h3>Static methods</h3>
+<dl>
+<dt id="raffiot.utils.MultipleExceptions.merge"><code class="name flex">
+<span>def <span class="ident">merge</span></span>(<span>*exceptions: Exception, errors: List[+E] = None) ‑> Exception</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Merge some exceptions, retuning the exceptions if there is only one
+or a
+<code><a title="raffiot.utils.MultipleExceptions" href="#raffiot.utils.MultipleExceptions">MultipleExceptions</a></code> otherwise.</p>
+<p>:param exceptions:
+:param errors:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
+    &#34;&#34;&#34;
+    Merge some exceptions, retuning the exceptions if there is only one
+    or a  `MultipleExceptions` otherwise.
+
+    :param exceptions:
+    :param errors:
+    :return:
+    &#34;&#34;&#34;
+    stack = [exn for exn in exceptions]
+    base_exceptions = []
+    errs = [x for x in errors] if errors else []
+
+    while stack:
+        item = stack.pop()
+        if isinstance(item, MultipleExceptions):
+            stack.extend(item.exceptions)
+            errs.extend(item.errors)
+            continue
+        if isinstance(item, abc.Iterable) and not isinstance(item, str):
+            stack.extend(item)
+            continue
+        base_exceptions.append(item)
+
+    if len(base_exceptions) == 1:
+        return base_exceptions[0]
+    base_exceptions.reverse()
+    return MultipleExceptions(base_exceptions, [])</code></pre>
+</details>
 </dd>
 </dl>
 </dd>
@@ -147,9 +413,30 @@ class MatchError(Exception):
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
+<h4><code><a title="raffiot.utils.ComputationStatus" href="#raffiot.utils.ComputationStatus">ComputationStatus</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.utils.ComputationStatus.FAILED" href="#raffiot.utils.ComputationStatus.FAILED">FAILED</a></code></li>
+<li><code><a title="raffiot.utils.ComputationStatus.SUCCEEDED" href="#raffiot.utils.ComputationStatus.SUCCEEDED">SUCCEEDED</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.utils.DomainErrors" href="#raffiot.utils.DomainErrors">DomainErrors</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.utils.DomainErrors.errors" href="#raffiot.utils.DomainErrors.errors">errors</a></code></li>
+</ul>
+</li>
+<li>
 <h4><code><a title="raffiot.utils.MatchError" href="#raffiot.utils.MatchError">MatchError</a></code></h4>
 <ul class="">
 <li><code><a title="raffiot.utils.MatchError.message" href="#raffiot.utils.MatchError.message">message</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.utils.MultipleExceptions" href="#raffiot.utils.MultipleExceptions">MultipleExceptions</a></code></h4>
+<ul class="">
+<li><code><a title="raffiot.utils.MultipleExceptions.errors" href="#raffiot.utils.MultipleExceptions.errors">errors</a></code></li>
+<li><code><a title="raffiot.utils.MultipleExceptions.exceptions" href="#raffiot.utils.MultipleExceptions.exceptions">exceptions</a></code></li>
+<li><code><a title="raffiot.utils.MultipleExceptions.merge" href="#raffiot.utils.MultipleExceptions.merge">merge</a></code></li>
 </ul>
 </li>
 </ul>

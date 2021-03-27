@@ -180,7 +180,7 @@ input list.</p>
 Ok(success=[8, 'Hello'])
 &gt;&gt;&gt; main : IO[None,str,List] = io.zip(io.pure(8), io.error(&quot;Oups&quot;))
 &gt;&gt;&gt; main.run(None)
-Error(error='Oups')
+Errors(errors=['Oups'])
 </code></pre>
 <h2 id="sequence--running-ios-in-sequence"><a class="header" href="#sequence--running-ios-in-sequence"><code>sequence</code> : running IOs in sequence</a></h2>
 <p>The function <code>io.sequence</code> is like the method <code>then</code>:
