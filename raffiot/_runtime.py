@@ -47,7 +47,7 @@ class Scheduled:
     schedule: float
     fiber: Any
 
-    __slots__ = ["schedule", "fiber"]
+    __slots__ = "schedule", "fiber"
 
     def __init__(self, schedule: float, fiber: Fiber[R, E, A]):
         self.schedule = schedule
@@ -65,13 +65,13 @@ class Scheduled:
 @final
 class SharedState:
 
-    __slots__ = [
+    __slots__ = (
         "scheduled_lock",
         "scheduled",
         "pool",
         "pool_size",
         "nighttime",
-    ]
+    )
 
     def __init__(self, pool_size: int, nighttime: float) -> None:
         self.scheduled_lock = threading.Lock()
@@ -127,7 +127,7 @@ class SharedState:
 
 @final
 class Fiber(Generic[R, E, A]):
-    __slots__ = [
+    __slots__ = (
         "_context",
         "_cont",
         "_arg_tag",
@@ -141,7 +141,7 @@ class Fiber(Generic[R, E, A]):
         "_paused",
         "_runner",
         "uuid",
-    ]
+    )
 
     def __init__(self, io: IO[R, E, A], context: R) -> None:
         self._context = context
@@ -205,12 +205,17 @@ def finish_fiber(fiber: Fiber[Any, Any, Any]):
         for waiting_fiber, index in fiber._callbacks:
             run_callback(waiting_fiber, index, fiber.result)
         fiber._callbacks = None
+        fiber._context = None
+        fiber._cont = None
+        fiber._arg_tag = None
+        fiber._arg_value = None
+        fiber._runner = None
 
 
 @final
 class Runner(Thread):
 
-    __slots__ = [
+    __slots__ = (
         "queue",
         "shared_state",
         "state_lock",
@@ -218,7 +223,7 @@ class Runner(Thread):
         "count_lock",
         "count_local",
         "count_remote",
-    ]
+    )
 
     def __init__(self, shared_state: SharedState, index: int) -> None:
         super().__init__()
@@ -289,6 +294,8 @@ class Runner(Thread):
         arg_tag = fiber._arg_tag
         arg_value = fiber._arg_value
 
+        fiber._cont = None
+        fiber._context = None
         fiber._arg_value = None
 
         try:
@@ -748,6 +755,8 @@ class Runner(Thread):
                                     break
                                 else:
                                     fiber._paused = True
+                                    fiber._context = context
+                                    fiber._cont = cont
                                     return False
                         arg_tag = ResultTag.OK
                         arg_value = []
@@ -810,12 +819,13 @@ class Runner(Thread):
         except Exception as exception:
             fiber.result = Panic([exception], [])
             finish_fiber(fiber)
+            return False
 
 
 @final
 class Lock:
 
-    __slots__ = ["_lock", "_fiber", "_nb_taken", "_waiting"]
+    __slots__ = "_lock", "_fiber", "_nb_taken", "_waiting"
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -853,7 +863,7 @@ class Lock:
 @final
 class Semaphore:
 
-    __slots__ = ["_lock", "_tokens", "_waiting"]
+    __slots__ = "_lock", "_tokens", "_waiting"
 
     def __init__(self, tokens: int):
         self._lock = threading.Lock()

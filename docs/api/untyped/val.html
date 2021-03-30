@@ -48,7 +48,7 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True)
+@dataclass
 class Val:
     &#34;&#34;&#34;
     Immutable Value.
@@ -56,7 +56,7 @@ class Val:
     Used to create local &#34;variables&#34; in lambdas.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;value&#34;]
+    __slots__ = &#34;value&#34;
 
     value: None
 
@@ -181,7 +181,7 @@ class Val:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class Val:
     &#34;&#34;&#34;
     Immutable Value.
@@ -189,7 +189,7 @@ class Val:
     Used to create local &#34;variables&#34; in lambdas.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;value&#34;]
+    __slots__ = &#34;value&#34;
 
     value: None
 

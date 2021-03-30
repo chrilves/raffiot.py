@@ -25,7 +25,7 @@ B = TypeVar("B")
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Val(Generic[A]):
     """
     Immutable Value.
@@ -33,7 +33,7 @@ class Val(Generic[A]):
     Used to create local "variables" in lambdas.
     """
 
-    __slots__ = ["value"]
+    __slots__ = "value"
 
     value: A
 

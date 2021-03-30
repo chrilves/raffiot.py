@@ -17,7 +17,7 @@ from raffiot import result
 from raffiot._internal import IOTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Errors, Panic
-from raffiot.utils import ComputationStatus, MatchError, MultipleExceptions
+from raffiot.utils import ComputationStatus, MatchError
 
 __all__ = [
     "Resource",
@@ -76,14 +76,14 @@ def close_and_merge_failure(
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Resource(Generic[R, E, A]):
     """
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     """
 
-    __slots__ = ["create"]
+    __slots__ = "create"
 
     create: IO[R, E, Tuple[A, Callable[[ComputationStatus], IO[R, E, Any]]]]
     """
@@ -519,7 +519,7 @@ def from_with(the_io: IO[R, E, Any]) -> Resource[R, E, A]:
         exit = type(manager).__exit__
         return (
             enter(manager),
-            lambda _, cs: io.defer(lambda: exit(manager, None, None, None)),
+            lambda cs: io.defer(exit, manager, None, None, None),
         )
 
     return Resource(the_io.map(manager_handler))

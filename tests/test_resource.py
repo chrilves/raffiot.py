@@ -12,6 +12,7 @@ from raffiot.io import IO
 from raffiot.resource import *
 from raffiot.result import Result
 from raffiot.utils import MatchError, ComputationStatus
+from contextlib import contextmanager
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)
@@ -189,6 +190,54 @@ class TestResource(TestCase):
         from_open_close(open, close).use(io.pure).run(None)
         assert opened
         assert closed
+
+    @given(
+        st.booleans(),
+        st.booleans(),
+        st.booleans(),
+    )
+    def test_from_with(
+        self,
+        can_open: bool,
+        can_close: bool,
+        can_use: bool,
+    ) -> None:
+
+        opened = 0
+        called = 0
+
+        a = 5
+
+        @contextmanager
+        def with_example():
+            nonlocal opened, called, can_open, can_close, a
+            called += 1
+
+            if can_open:
+                opened += 1
+            else:
+                raise Exception("Can not open")
+
+            try:
+                yield a
+            finally:
+                if can_close:
+                    opened -= 1
+                else:
+                    raise Exception("Can not close")
+
+        def f_use(x):
+            return io.pure(x) if can_use else io.panic(Exception("panic use"))
+
+        ret = from_with(io.defer(with_example)).use(f_use).run(None)
+
+        assert called == 1
+        assert opened == (1 if can_open and not can_close else 0)
+
+        if can_open and can_close and can_use:
+            assert ret == result.ok(a)
+        if ret.is_ok():
+            assert can_open and can_close and can_use
 
     @given(st.integers(min_value=1000, max_value=2000))
     def test_defer(self, i: int) -> None:

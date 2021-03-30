@@ -491,39 +491,39 @@ class Result(Generic[E, A]):
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Ok(Result[E, A]):
     &#34;&#34;&#34;
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: A
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Errors(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed on an excepted normal errors case.
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: List[E]
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Panic(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[Exception]
 
@@ -1015,14 +1015,14 @@ The program is still in a valid state and can progress safely.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Errors(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed on an excepted normal errors case.
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: List[E]</code></pre>
 </details>
@@ -1075,13 +1075,13 @@ class Errors(Result[E, A]):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Ok(Result[E, A]):
     &#34;&#34;&#34;
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: A</code></pre>
 </details>
@@ -1135,14 +1135,14 @@ The program is not in a valid state and must terminate safely.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Panic(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[Exception]
 

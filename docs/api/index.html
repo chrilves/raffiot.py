@@ -168,14 +168,14 @@ The program is still in a valid state and can progress safely.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Errors(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed on an excepted normal errors case.
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: List[E]</code></pre>
 </details>
@@ -989,13 +989,13 @@ of all values in parallel.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;message&#34;]
+    __slots__ = &#34;message&#34;
 
     message: str</code></pre>
 </details>
@@ -1023,11 +1023,13 @@ class MatchError(Exception):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class MultipleExceptions(Exception, Generic[E]):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
+
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[Exception]
     &#34;&#34;&#34;
@@ -1067,7 +1069,7 @@ class MultipleExceptions(Exception, Generic[E]):
         if len(base_exceptions) == 1:
             return base_exceptions[0]
         base_exceptions.reverse()
-        return MultipleExceptions(base_exceptions, [])</code></pre>
+        return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -1075,17 +1077,6 @@ class MultipleExceptions(Exception, Generic[E]):
 <li>builtins.BaseException</li>
 <li>typing.Generic</li>
 </ul>
-<h3>Class variables</h3>
-<dl>
-<dt id="raffiot.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
-<dd>
-<div class="desc"><p>The list of errors encountered</p></div>
-</dd>
-<dt id="raffiot.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[Exception]</code></dt>
-<dd>
-<div class="desc"><p>The list exceptions encountered</p></div>
-</dd>
-</dl>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.MultipleExceptions.merge"><code class="name flex">
@@ -1130,8 +1121,19 @@ def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
     if len(base_exceptions) == 1:
         return base_exceptions[0]
     base_exceptions.reverse()
-    return MultipleExceptions(base_exceptions, [])</code></pre>
+    return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[Exception]</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
 </dd>
 </dl>
 </dd>
@@ -1146,13 +1148,13 @@ def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Ok(Result[E, A]):
     &#34;&#34;&#34;
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: A</code></pre>
 </details>
@@ -1206,14 +1208,14 @@ The program is not in a valid state and must terminate safely.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Panic(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[Exception]
 
@@ -1273,14 +1275,14 @@ can fail with errors of type E and read a context of type R.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Resource(Generic[R, E, A]):
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;create&#34;]
+    __slots__ = &#34;create&#34;
 
     create: IO[R, E, Tuple[A, Callable[[ComputationStatus], IO[R, E, Any]]]]
     &#34;&#34;&#34;
@@ -3092,13 +3094,13 @@ def zip(self: Result[E, A], *arg: Result[E, X]) -&gt; Result[E, List[A]]:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class UpdateResult(Generic[A, B]):
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;]
+    __slots__ = &#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;
 
     &#34;&#34;&#34;
     The result of an Update
@@ -3151,7 +3153,7 @@ class UpdateResult(Generic[A, B]):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Val(Generic[A]):
     &#34;&#34;&#34;
     Immutable Value.
@@ -3159,7 +3161,7 @@ class Val(Generic[A]):
     Used to create local &#34;variables&#34; in lambdas.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;value&#34;]
+    __slots__ = &#34;value&#34;
 
     value: A
 
@@ -3532,7 +3534,7 @@ class Var(Generic[A]):
     Use `Var.create instead.`
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;_lock&#34;, &#34;_value&#34;]
+    __slots__ = &#34;_lock&#34;, &#34;_value&#34;
 
     def __init__(self, lock: Resource[Any, None, None], value: A):
         self._lock = lock

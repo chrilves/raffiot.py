@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List
 
 
-@dataclass(frozen=True)
+@dataclass
 class NotFound(Exception):
     url: str
 

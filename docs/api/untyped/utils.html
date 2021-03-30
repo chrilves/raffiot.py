@@ -40,22 +40,24 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True)
+@dataclass
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;message&#34;]
+    __slots__ = &#34;message&#34;
 
     message: None
 
 
-@dataclass(frozen=True)
+@dataclass
 class MultipleExceptions(Exception):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
+
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: None
     &#34;&#34;&#34;
@@ -95,14 +97,16 @@ class MultipleExceptions(Exception):
         if len(base_exceptions) == 1:
             return base_exceptions[0]
         base_exceptions.reverse()
-        return MultipleExceptions(base_exceptions, [])
+        return MultipleExceptions(base_exceptions, errs)
 
 
-@dataclass(frozen=True)
+@dataclass
 class DomainErrors(Exception):
     &#34;&#34;&#34;
     Errors from the business domain
     &#34;&#34;&#34;
+
+    __slots__ = &#34;error&#34;
 
     errors: None
 
@@ -204,11 +208,13 @@ def seq(*a):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class DomainErrors(Exception):
     &#34;&#34;&#34;
     Errors from the business domain
     &#34;&#34;&#34;
+
+    __slots__ = &#34;error&#34;
 
     errors: None</code></pre>
 </details>
@@ -224,6 +230,13 @@ class DomainErrors(Exception):
 <div class="desc"></div>
 </dd>
 </dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.untyped.utils.DomainErrors.error"><code class="name">var <span class="ident">error</span></code></dt>
+<dd>
+<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+</dd>
+</dl>
 </dd>
 <dt id="raffiot.untyped.utils.MatchError"><code class="flex name class">
 <span>class <span class="ident">MatchError</span></span>
@@ -235,13 +248,13 @@ class DomainErrors(Exception):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;message&#34;]
+    __slots__ = &#34;message&#34;
 
     message: None</code></pre>
 </details>
@@ -268,11 +281,13 @@ class MatchError(Exception):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class MultipleExceptions(Exception):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
+
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: None
     &#34;&#34;&#34;
@@ -312,24 +327,13 @@ class MultipleExceptions(Exception):
         if len(base_exceptions) == 1:
             return base_exceptions[0]
         base_exceptions.reverse()
-        return MultipleExceptions(base_exceptions, [])</code></pre>
+        return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
-<h3>Class variables</h3>
-<dl>
-<dt id="raffiot.untyped.utils.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
-<dd>
-<div class="desc"><p>The list of errors encountered</p></div>
-</dd>
-<dt id="raffiot.untyped.utils.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
-<dd>
-<div class="desc"><p>The list exceptions encountered</p></div>
-</dd>
-</dl>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.untyped.utils.MultipleExceptions.merge"><code class="name flex">
@@ -374,8 +378,19 @@ def merge(cls, *exceptions, errors=None):
     if len(base_exceptions) == 1:
         return base_exceptions[0]
     base_exceptions.reverse()
-    return MultipleExceptions(base_exceptions, [])</code></pre>
+    return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.untyped.utils.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.untyped.utils.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
 </dd>
 </dl>
 </dd>
@@ -410,6 +425,7 @@ def merge(cls, *exceptions, errors=None):
 <li>
 <h4><code><a title="raffiot.untyped.utils.DomainErrors" href="#raffiot.untyped.utils.DomainErrors">DomainErrors</a></code></h4>
 <ul class="">
+<li><code><a title="raffiot.untyped.utils.DomainErrors.error" href="#raffiot.untyped.utils.DomainErrors.error">error</a></code></li>
 <li><code><a title="raffiot.untyped.utils.DomainErrors.errors" href="#raffiot.untyped.utils.DomainErrors.errors">errors</a></code></li>
 </ul>
 </li>

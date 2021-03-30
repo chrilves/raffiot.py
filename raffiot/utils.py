@@ -16,23 +16,25 @@ __all__ = [
 E = TypeVar("E", covariant=True)
 
 
-@dataclass(frozen=True)
+@dataclass
 class MatchError(Exception):
     """
     Exception for pattern matching errors (used internally, should NEVER happen).
     """
 
-    __slots__ = ["message"]
+    __slots__ = "message"
 
     message: str
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class MultipleExceptions(Exception, Generic[E]):
     """
     Represents
     """
+
+    __slots__ = "exceptions", "errors"
 
     exceptions: List[Exception]
     """
@@ -72,15 +74,17 @@ class MultipleExceptions(Exception, Generic[E]):
         if len(base_exceptions) == 1:
             return base_exceptions[0]
         base_exceptions.reverse()
-        return MultipleExceptions(base_exceptions, [])
+        return MultipleExceptions(base_exceptions, errs)
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class DomainErrors(Exception, Generic[E]):
     """
     Errors from the business domain
     """
+
+    __slots__ = "error"
 
     errors: List[E]
 

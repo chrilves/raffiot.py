@@ -462,39 +462,39 @@ class Result(Generic[E, A]):
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Ok(Result[E, A]):
     """
     The result of a successful computation.
     """
 
-    __slots__ = ["success"]
+    __slots__ = "success"
 
     success: A
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Errors(Result[E, A]):
     """
     The result of a computation that failed on an excepted normal errors case.
     The program is still in a valid state and can progress safely.
     """
 
-    __slots__ = ["errors"]
+    __slots__ = "errors"
 
     errors: List[E]
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Panic(Result[E, A]):
     """
     The result of a computation that failed unexpectedly.
     The program is not in a valid state and must terminate safely.
     """
 
-    __slots__ = ["exceptions", "errors"]
+    __slots__ = "exceptions", "errors"
 
     exceptions: List[Exception]
 

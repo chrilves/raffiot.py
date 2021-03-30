@@ -46,7 +46,7 @@ from raffiot.untyped import result
 from raffiot.untyped._internal import IOTag
 from raffiot.untyped.io import IO
 from raffiot.untyped.result import Result, Ok, Errors, Panic
-from raffiot.untyped.utils import ComputationStatus, MatchError, MultipleExceptions
+from raffiot.untyped.utils import ComputationStatus, MatchError
 
 __all__ = [
     &#34;Resource&#34;,
@@ -93,14 +93,14 @@ def close_and_merge_failure(close, r):
     )
 
 
-@dataclass(frozen=True)
+@dataclass
 class Resource:
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;create&#34;]
+    __slots__ = &#34;create&#34;
 
     create: None
     &#34;&#34;&#34;
@@ -512,7 +512,7 @@ def from_with(the_io):
         exit = type(manager).__exit__
         return (
             enter(manager),
-            lambda _, cs: io.defer(lambda: exit(manager, None, None, None)),
+            lambda cs: io.defer(exit, manager, None, None, None),
         )
 
     return Resource(the_io.map(manager_handler))
@@ -1077,7 +1077,7 @@ body</p>
         exit = type(manager).__exit__
         return (
             enter(manager),
-            lambda _, cs: io.defer(lambda: exit(manager, None, None, None)),
+            lambda cs: io.defer(exit, manager, None, None, None),
         )
 
     return Resource(the_io.map(manager_handler))</code></pre>
@@ -1395,14 +1395,14 @@ can fail with errors of type E and read a context of type R.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class Resource:
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;create&#34;]
+    __slots__ = &#34;create&#34;
 
     create: None
     &#34;&#34;&#34;
