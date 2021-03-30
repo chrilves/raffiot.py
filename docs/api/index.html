@@ -168,7 +168,7 @@ The program is still in a valid state and can progress safely.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Errors(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed on an excepted normal errors case.
@@ -1146,7 +1146,7 @@ def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Ok(Result[E, A]):
     &#34;&#34;&#34;
     The result of a successful computation.
@@ -1206,7 +1206,7 @@ The program is not in a valid state and must terminate safely.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Panic(Result[E, A]):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.

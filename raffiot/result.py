@@ -462,7 +462,7 @@ class Result(Generic[E, A]):
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Ok(Result[E, A]):
     """
     The result of a successful computation.
@@ -474,7 +474,7 @@ class Ok(Result[E, A]):
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Errors(Result[E, A]):
     """
     The result of a computation that failed on an excepted normal errors case.
@@ -487,7 +487,7 @@ class Errors(Result[E, A]):
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Panic(Result[E, A]):
     """
     The result of a computation that failed unexpectedly.

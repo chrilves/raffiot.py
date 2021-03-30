@@ -443,7 +443,7 @@ class Result:
         return ComputationStatus.FAILED
 
 
-@dataclass(frozen=True)
+@dataclass
 class Ok(Result):
     &#34;&#34;&#34;
     The result of a successful computation.
@@ -454,7 +454,7 @@ class Ok(Result):
     success: None
 
 
-@dataclass(frozen=True)
+@dataclass
 class Errors(Result):
     &#34;&#34;&#34;
     The result of a computation that failed on an excepted normal errors case.
@@ -466,7 +466,7 @@ class Errors(Result):
     errors: None
 
 
-@dataclass(frozen=True)
+@dataclass
 class Panic(Result):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
@@ -960,7 +960,7 @@ The program is still in a valid state and can progress safely.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class Errors(Result):
     &#34;&#34;&#34;
     The result of a computation that failed on an excepted normal errors case.
@@ -1018,7 +1018,7 @@ class Errors(Result):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class Ok(Result):
     &#34;&#34;&#34;
     The result of a successful computation.
@@ -1076,7 +1076,7 @@ The program is not in a valid state and must terminate safely.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class Panic(Result):
     &#34;&#34;&#34;
     The result of a computation that failed unexpectedly.
