@@ -497,7 +497,7 @@ class Ok(Result[E, A]):
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: A
 
@@ -510,7 +510,7 @@ class Errors(Result[E, A]):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: List[E]
 
@@ -523,7 +523,7 @@ class Panic(Result[E, A]):
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[Exception]
 
@@ -1022,7 +1022,7 @@ class Errors(Result[E, A]):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: List[E]</code></pre>
 </details>
@@ -1081,7 +1081,7 @@ class Ok(Result[E, A]):
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: A</code></pre>
 </details>
@@ -1142,7 +1142,7 @@ class Panic(Result[E, A]):
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[Exception]
 

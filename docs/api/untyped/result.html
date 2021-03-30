@@ -449,7 +449,7 @@ class Ok(Result):
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: None
 
@@ -461,7 +461,7 @@ class Errors(Result):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: None
 
@@ -473,7 +473,7 @@ class Panic(Result):
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: None
 
@@ -967,7 +967,7 @@ class Errors(Result):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: None</code></pre>
 </details>
@@ -1024,7 +1024,7 @@ class Ok(Result):
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: None</code></pre>
 </details>
@@ -1083,7 +1083,7 @@ class Panic(Result):
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: None
 

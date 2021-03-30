@@ -27,13 +27,13 @@ B = TypeVar("B")
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class UpdateResult(Generic[A, B]):
     """
     The result of the `update` methods of `Var`.
     """
 
-    __slots__ = ["old_value", "new_value", "returned"]
+    __slots__ = "old_value", "new_value", "returned"
 
     """
     The result of an Update
@@ -66,7 +66,7 @@ class Var(Generic[A]):
     Use `Var.create instead.`
     """
 
-    __slots__ = ["_lock", "_value"]
+    __slots__ = "_lock", "_value"
 
     def __init__(self, lock: Resource[Any, None, None], value: A):
         self._lock = lock

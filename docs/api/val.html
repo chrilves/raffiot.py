@@ -55,7 +55,7 @@ B = TypeVar(&#34;B&#34;)
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Val(Generic[A]):
     &#34;&#34;&#34;
     Immutable Value.
@@ -63,7 +63,7 @@ class Val(Generic[A]):
     Used to create local &#34;variables&#34; in lambdas.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;value&#34;]
+    __slots__ = &#34;value&#34;
 
     value: A
 
@@ -189,7 +189,7 @@ class Val(Generic[A]):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@final
-@dataclass(frozen=True)
+@dataclass
 class Val(Generic[A]):
     &#34;&#34;&#34;
     Immutable Value.
@@ -197,7 +197,7 @@ class Val(Generic[A]):
     Used to create local &#34;variables&#34; in lambdas.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;value&#34;]
+    __slots__ = &#34;value&#34;
 
     value: A
 

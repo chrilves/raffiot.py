@@ -169,7 +169,7 @@ class Errors(Result):
     The program is still in a valid state and can progress safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;errors&#34;]
+    __slots__ = &#34;errors&#34;
 
     errors: None</code></pre>
 </details>
@@ -969,13 +969,13 @@ of all values in parallel.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class MatchError(Exception):
     &#34;&#34;&#34;
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;message&#34;]
+    __slots__ = &#34;message&#34;
 
     message: None</code></pre>
 </details>
@@ -1002,11 +1002,13 @@ class MatchError(Exception):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class MultipleExceptions(Exception):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
+
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: None
     &#34;&#34;&#34;
@@ -1046,24 +1048,13 @@ class MultipleExceptions(Exception):
         if len(base_exceptions) == 1:
             return base_exceptions[0]
         base_exceptions.reverse()
-        return MultipleExceptions(base_exceptions, [])</code></pre>
+        return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
-<h3>Class variables</h3>
-<dl>
-<dt id="raffiot.untyped.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
-<dd>
-<div class="desc"><p>The list of errors encountered</p></div>
-</dd>
-<dt id="raffiot.untyped.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
-<dd>
-<div class="desc"><p>The list exceptions encountered</p></div>
-</dd>
-</dl>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.untyped.MultipleExceptions.merge"><code class="name flex">
@@ -1108,8 +1099,19 @@ def merge(cls, *exceptions, errors=None):
     if len(base_exceptions) == 1:
         return base_exceptions[0]
     base_exceptions.reverse()
-    return MultipleExceptions(base_exceptions, [])</code></pre>
+    return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.untyped.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.untyped.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
 </dd>
 </dl>
 </dd>
@@ -1129,7 +1131,7 @@ class Ok(Result):
     The result of a successful computation.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;success&#34;]
+    __slots__ = &#34;success&#34;
 
     success: None</code></pre>
 </details>
@@ -1188,7 +1190,7 @@ class Panic(Result):
     The program is not in a valid state and must terminate safely.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;exceptions&#34;, &#34;errors&#34;]
+    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: None
 
@@ -1246,14 +1248,14 @@ can fail with errors of type E and read a context of type R.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class Resource:
     &#34;&#34;&#34;
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;create&#34;]
+    __slots__ = &#34;create&#34;
 
     create: None
     &#34;&#34;&#34;
@@ -2962,13 +2964,13 @@ Is Panic is there is at least one panic.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class UpdateResult:
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;]
+    __slots__ = &#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;
 
     &#34;&#34;&#34;
     The result of an Update
@@ -3016,7 +3018,7 @@ class UpdateResult:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class Val:
     &#34;&#34;&#34;
     Immutable Value.
@@ -3024,7 +3026,7 @@ class Val:
     Used to create local &#34;variables&#34; in lambdas.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;value&#34;]
+    __slots__ = &#34;value&#34;
 
     value: None
 
@@ -3392,7 +3394,7 @@ Flatten this <code><a title="raffiot.untyped.Val" href="#raffiot.untyped.Val">Va
     Use `Var.create instead.`
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;_lock&#34;, &#34;_value&#34;]
+    __slots__ = &#34;_lock&#34;, &#34;_value&#34;
 
     def __init__(self, lock, value):
         self._lock = lock

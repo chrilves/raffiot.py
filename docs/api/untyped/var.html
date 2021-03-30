@@ -50,13 +50,13 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True)
+@dataclass
 class UpdateResult:
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;]
+    __slots__ = &#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;
 
     &#34;&#34;&#34;
     The result of an Update
@@ -88,7 +88,7 @@ class Var:
     Use `Var.create instead.`
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;_lock&#34;, &#34;_value&#34;]
+    __slots__ = &#34;_lock&#34;, &#34;_value&#34;
 
     def __init__(self, lock, value):
         self._lock = lock
@@ -329,13 +329,13 @@ class Var:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@dataclass(frozen=True)
+<pre><code class="python">@dataclass
 class UpdateResult:
     &#34;&#34;&#34;
     The result of the `update` methods of `Var`.
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;]
+    __slots__ = &#34;old_value&#34;, &#34;new_value&#34;, &#34;returned&#34;
 
     &#34;&#34;&#34;
     The result of an Update
@@ -395,7 +395,7 @@ class UpdateResult:
     Use `Var.create instead.`
     &#34;&#34;&#34;
 
-    __slots__ = [&#34;_lock&#34;, &#34;_value&#34;]
+    __slots__ = &#34;_lock&#34;, &#34;_value&#34;
 
     def __init__(self, lock, value):
         self._lock = lock

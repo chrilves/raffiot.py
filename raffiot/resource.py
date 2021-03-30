@@ -76,14 +76,14 @@ def close_and_merge_failure(
 
 
 @final
-@dataclass(frozen=True)
+@dataclass
 class Resource(Generic[R, E, A]):
     """
     Essentially an IO-powered data structure that produces resources of type A,
     can fail with errors of type E and read a context of type R.
     """
 
-    __slots__ = ["create"]
+    __slots__ = "create"
 
     create: IO[R, E, Tuple[A, Callable[[ComputationStatus], IO[R, E, Any]]]]
     """
