@@ -136,7 +136,7 @@ class Result:
             return on_error(self.errors)
         if isinstance(self, Panic):
             return on_panic(self.exceptions, self.errors)
-        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])
+        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)], [])
 
     @safe
     def fold(
@@ -202,7 +202,7 @@ class Result:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return f(self.success)
-        return self
+        return self  # type: ignore
 
     @safe
     def flat_map(self, f):
@@ -281,7 +281,7 @@ class Result:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return Ok(f(self.success))
-        return self
+        return self  # type: ignore
 
     @safe
     def map(self, f):
@@ -300,7 +300,7 @@ class Result:
         Is Errors some are Ok, but at least one is an errors but no panics.
         Is Panic is there is at least one panic.
         &#34;&#34;&#34;
-        return zip((self, *arg))
+        return zip((self, *arg))  # type: ignore
 
     def unsafe_ap(self, *arg):
         &#34;&#34;&#34;
@@ -310,7 +310,7 @@ class Result:
         and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))  # type: ignore
 
     @safe
     def ap(self, *arg):
@@ -321,7 +321,7 @@ class Result:
         and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.unsafe_ap(*arg)
+        return self.unsafe_ap(*arg)  # type: ignore
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -329,7 +329,7 @@ class Result:
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return self.success
-        return self
+        return self  # type: ignore
 
     def unsafe_map_error(self, f):
         &#34;&#34;&#34;
@@ -1218,7 +1218,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
             return on_error(self.errors)
         if isinstance(self, Panic):
             return on_panic(self.exceptions, self.errors)
-        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])
+        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)], [])
 
     @safe
     def fold(
@@ -1284,7 +1284,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return f(self.success)
-        return self
+        return self  # type: ignore
 
     @safe
     def flat_map(self, f):
@@ -1363,7 +1363,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return Ok(f(self.success))
-        return self
+        return self  # type: ignore
 
     @safe
     def map(self, f):
@@ -1382,7 +1382,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         Is Errors some are Ok, but at least one is an errors but no panics.
         Is Panic is there is at least one panic.
         &#34;&#34;&#34;
-        return zip((self, *arg))
+        return zip((self, *arg))  # type: ignore
 
     def unsafe_ap(self, *arg):
         &#34;&#34;&#34;
@@ -1392,7 +1392,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))  # type: ignore
 
     @safe
     def ap(self, *arg):
@@ -1403,7 +1403,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.unsafe_ap(*arg)
+        return self.unsafe_ap(*arg)  # type: ignore
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -1411,7 +1411,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return self.success
-        return self
+        return self  # type: ignore
 
     def unsafe_map_error(self, f):
         &#34;&#34;&#34;
@@ -1595,7 +1595,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return self.success
-    return self</code></pre>
+    return self  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.fold"><code class="name flex">
@@ -1821,7 +1821,7 @@ and arg represent a computation returning a value <code>x1: X1</code>,&hellip;,<
     and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
     `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))</code></pre>
+    return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.unsafe_catch"><code class="name flex">
@@ -1878,7 +1878,7 @@ Otherwise, do nothing.</p></div>
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return f(self.success)
-    return self</code></pre>
+    return self  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.unsafe_fold"><code class="name flex">
@@ -1913,7 +1913,7 @@ Otherwise, do nothing.</p></div>
         return on_error(self.errors)
     if isinstance(self, Panic):
         return on_panic(self.exceptions, self.errors)
-    raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])</code></pre>
+    raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)], [])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.unsafe_fold_raise"><code class="name flex">
@@ -1996,7 +1996,7 @@ If it is a <code><a title="raffiot.untyped.result.Panic" href="#raffiot.untyped.
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return Ok(f(self.success))
-    return self</code></pre>
+    return self  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.unsafe_map_error"><code class="name flex">
@@ -2115,7 +2115,7 @@ Is Panic is there is at least one panic.</p></div>
     Is Errors some are Ok, but at least one is an errors but no panics.
     Is Panic is there is at least one panic.
     &#34;&#34;&#34;
-    return zip((self, *arg))</code></pre>
+    return zip((self, *arg))  # type: ignore</code></pre>
 </details>
 </dd>
 </dl>

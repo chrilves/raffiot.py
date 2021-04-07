@@ -134,7 +134,7 @@ class Val:
 
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
-        return Val([x.value for x in vals])
+        return Val([x.value for x in vals])  # type: ignore
 
     def zip_with(self, *vals):
         &#34;&#34;&#34;
@@ -158,7 +158,7 @@ class Val:
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
-        return Val(self.value(*l))</code></pre>
+        return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 </section>
 <section>
@@ -267,7 +267,7 @@ class Val:
 
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
-        return Val([x.value for x in vals])
+        return Val([x.value for x in vals])  # type: ignore
 
     def zip_with(self, *vals):
         &#34;&#34;&#34;
@@ -291,7 +291,7 @@ class Val:
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
-        return Val(self.value(*l))</code></pre>
+        return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 <h3>Static methods</h3>
 <dl>
@@ -335,7 +335,7 @@ def zip(cls, *vals):
 
     if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
         return Val([x.value for x in vals[0]])
-    return Val([x.value for x in vals])</code></pre>
+    return Val([x.value for x in vals])  # type: ignore</code></pre>
 </details>
 </dd>
 </dl>
@@ -371,7 +371,7 @@ def zip(cls, *vals):
         l = [x.value for x in arg[0]]
     else:
         l = [x.value for x in arg]
-    return Val(self.value(*l))</code></pre>
+    return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.val.Val.flat_map"><code class="name flex">

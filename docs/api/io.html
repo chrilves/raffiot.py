@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import time
 from collections import abc
-from typing import TypeVar, Generic, Callable, Any, List, Iterable
+from typing import TypeVar, Generic, Callable, Any, List, Iterable, Union
 
 from typing_extensions import final
 
@@ -148,7 +148,7 @@ class IO(Generic[R, E, A]):
             return IO(IOTag.ZIP, list((self, *others[0])))
         return IO(IOTag.ZIP, list((self, *others)))
 
-    def zip_par(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
+    def zip_par(self: IO[R, E, A], *others: IO[R, E, A]) -&gt; IO[R, E, List[A]]:
         &#34;&#34;&#34;
         Pack a list of IO (including self) into an IO computing the list
         of all values in parallel.
@@ -157,7 +157,7 @@ class IO(Generic[R, E, A]):
         &#34;&#34;&#34;
         return zip_par(self, *others)
 
-    def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[Fiber]]:
+    def parallel(self: IO[R, E, A], *others: IO[R, E, A]) -&gt; IO[R, E, List[Fiber]]:
         &#34;&#34;&#34;
         Run all these IO (including self) in parallel.
         Return the list of fibers, in the same order.
@@ -253,7 +253,7 @@ class IO(Generic[R, E, A]):
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def attempt(self) -&gt; IO[R, E, Result[E, A]]:
         &#34;&#34;&#34;
@@ -374,6 +374,7 @@ class IO(Generic[R, E, A]):
             return f&#34;Acquire({self.__fields})&#34;
         if self.__tag == IOTag.RELEASE:
             return f&#34;Release({self.__fields})&#34;
+        raise MatchError(f&#34;{self} should be an IO&#34;)
 
     def __repr__(self):
         return str(self)
@@ -464,7 +465,7 @@ def error(err: E) -&gt; IO[R, E, A]:
     return IO(IOTag.ERRORS, [err])
 
 
-def errors(*errs: E) -&gt; IO[R, E, A]:
+def errors(*errs: Union[E, Iterable[E]]) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails on the errors errs.
     &#34;&#34;&#34;
@@ -477,7 +478,9 @@ def errors(*errs: E) -&gt; IO[R, E, A]:
     return IO(IOTag.ERRORS, list(errs))
 
 
-def panic(*exceptions: Exception, errors: List[E] = None) -&gt; IO[R, E, A]:
+def panic(
+    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
+) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails with the panic exceptions.
     &#34;&#34;&#34;
@@ -502,7 +505,7 @@ def from_result(r: Result[E, A]) -&gt; IO[R, E, A]:
     return panic(MatchError(f&#34;{r} should be a Result&#34;))
 
 
-def zip(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
+def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Transform a list of IO into an IO of list.
     :param l:
@@ -513,7 +516,7 @@ def zip(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
     return IO(IOTag.ZIP, list(l))
 
 
-def sequence(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
+def sequence(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Run these ios in sequence
     :param l:
@@ -535,7 +538,7 @@ other tasks be run on the thread pool until the IO start progressing again.
 
 
 def async_(
-    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs
 ) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
@@ -574,7 +577,7 @@ def async_(
     return IO(IOTag.ASYNC, (f, args, kwargs))
 
 
-def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; IO[R, E, A]:
+def defer_read(deferred: Callable[[R, ...], A], *args, **kwargs) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Like defer, but the function as first argument must be of the form:
 
@@ -589,7 +592,9 @@ def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; IO[R, E, A]:
     return IO(IOTag.DEFER_READ, (deferred, args, kwargs))
 
 
-def defer_read_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -&gt; IO[R, E, A]:
+def defer_read_io(
+    deferred: Callable[[R, ...], IO[R, E, A]], *args, **kwargs
+) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Like defer, but the function as first argument must be of the form:
 
@@ -731,7 +736,7 @@ other tasks be run on the thread pool until the IO start progressing again.
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="raffiot.io.async_"><code class="name flex">
-<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Perform an Asynchronous call. <code>f</code> is a function of the form:</p>
@@ -773,7 +778,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def async_(
-    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs
 ) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
@@ -927,7 +932,7 @@ RecursionError: maximum recursion depth exceeded
 </details>
 </dd>
 <dt id="raffiot.io.defer_read"><code class="name flex">
-<span>def <span class="ident">defer_read</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer_read</span></span>(<span>deferred: Callable[[R, ...], A], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Like defer, but the function as first argument must be of the form:</p>
@@ -942,7 +947,7 @@ arguments must be the context.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; IO[R, E, A]:
+<pre><code class="python">def defer_read(deferred: Callable[[R, ...], A], *args, **kwargs) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Like defer, but the function as first argument must be of the form:
 
@@ -958,7 +963,7 @@ arguments must be the context.
 </details>
 </dd>
 <dt id="raffiot.io.defer_read_io"><code class="name flex">
-<span>def <span class="ident">defer_read_io</span></span>(<span>deferred: Callable[[], <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer_read_io</span></span>(<span>deferred: Callable[[R, ...], <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Like defer, but the function as first argument must be of the form:</p>
@@ -973,7 +978,9 @@ arguments must be the context.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_read_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -&gt; IO[R, E, A]:
+<pre><code class="python">def defer_read_io(
+    deferred: Callable[[R, ...], IO[R, E, A]], *args, **kwargs
+) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Like defer, but the function as first argument must be of the form:
 
@@ -1005,7 +1012,7 @@ arguments must be the context.
 </details>
 </dd>
 <dt id="raffiot.io.errors"><code class="name flex">
-<span>def <span class="ident">errors</span></span>(<span>*errs: E) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">errors</span></span>(<span>*errs: Union[E, Iterable[E]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Computation that fails on the errors errs.</p></div>
@@ -1013,7 +1020,7 @@ arguments must be the context.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def errors(*errs: E) -&gt; IO[R, E, A]:
+<pre><code class="python">def errors(*errs: Union[E, Iterable[E]]) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails on the errors errs.
     &#34;&#34;&#34;
@@ -1055,7 +1062,7 @@ arguments must be the context.
 </details>
 </dd>
 <dt id="raffiot.io.panic"><code class="name flex">
-<span>def <span class="ident">panic</span></span>(<span>*exceptions: Exception, errors: List[E] = None) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">panic</span></span>(<span>*exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Computation that fails with the panic exceptions.</p></div>
@@ -1063,7 +1070,9 @@ arguments must be the context.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def panic(*exceptions: Exception, errors: List[E] = None) -&gt; IO[R, E, A]:
+<pre><code class="python">def panic(
+    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
+) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails with the panic exceptions.
     &#34;&#34;&#34;
@@ -1158,7 +1167,7 @@ panic instead.</p></div>
 </details>
 </dd>
 <dt id="raffiot.io.sequence"><code class="name flex">
-<span>def <span class="ident">sequence</span></span>(<span>*l: Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
+<span>def <span class="ident">sequence</span></span>(<span>*l: Union[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run these ios in sequence
@@ -1168,7 +1177,7 @@ panic instead.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def sequence(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
+<pre><code class="python">def sequence(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Run these ios in sequence
     :param l:
@@ -1282,7 +1291,7 @@ in the same order.
 </details>
 </dd>
 <dt id="raffiot.io.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*l: Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>*l: Union[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform a list of IO into an IO of list.
@@ -1292,7 +1301,7 @@ in the same order.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip(*l: Iterable[IO[R, E, A]]) -&gt; IO[R, E, Iterable[A]]:
+<pre><code class="python">def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Transform a list of IO into an IO of list.
     :param l:
@@ -1453,7 +1462,7 @@ class IO(Generic[R, E, A]):
             return IO(IOTag.ZIP, list((self, *others[0])))
         return IO(IOTag.ZIP, list((self, *others)))
 
-    def zip_par(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
+    def zip_par(self: IO[R, E, A], *others: IO[R, E, A]) -&gt; IO[R, E, List[A]]:
         &#34;&#34;&#34;
         Pack a list of IO (including self) into an IO computing the list
         of all values in parallel.
@@ -1462,7 +1471,7 @@ class IO(Generic[R, E, A]):
         &#34;&#34;&#34;
         return zip_par(self, *others)
 
-    def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[Fiber]]:
+    def parallel(self: IO[R, E, A], *others: IO[R, E, A]) -&gt; IO[R, E, List[Fiber]]:
         &#34;&#34;&#34;
         Run all these IO (including self) in parallel.
         Return the list of fibers, in the same order.
@@ -1558,7 +1567,7 @@ class IO(Generic[R, E, A]):
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def attempt(self) -&gt; IO[R, E, Result[E, A]]:
         &#34;&#34;&#34;
@@ -1679,6 +1688,7 @@ class IO(Generic[R, E, A]):
             return f&#34;Acquire({self.__fields})&#34;
         if self.__tag == IOTag.RELEASE:
             return f&#34;Release({self.__fields})&#34;
+        raise MatchError(f&#34;{self} should be an IO&#34;)
 
     def __repr__(self):
         return str(self)</code></pre>
@@ -1709,7 +1719,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
     and arg computes a value `x1: X1`,...,`xn: Xn`
     then self.ap(arg) computes `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.IO.attempt"><code class="name flex">
@@ -1944,7 +1954,7 @@ Do nothing if the computation is successful.</p>
 </details>
 </dd>
 <dt id="raffiot.io.IO.parallel"><code class="name flex">
-<span>def <span class="ident">parallel</span></span>(<span>self: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], *others: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, X]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[<a title="raffiot.io.Fiber" href="#raffiot.io.Fiber">Fiber</a>]]</span>
+<span>def <span class="ident">parallel</span></span>(<span>self: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], *others: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.List[<a title="raffiot.io.Fiber" href="#raffiot.io.Fiber">Fiber</a>]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run all these IO (including self) in parallel.
@@ -1959,7 +1969,7 @@ Return the list of fibers, in the same order.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[Fiber]]:
+<pre><code class="python">def parallel(self: IO[R, E, A], *others: IO[R, E, A]) -&gt; IO[R, E, List[Fiber]]:
     &#34;&#34;&#34;
     Run all these IO (including self) in parallel.
     Return the list of fibers, in the same order.
@@ -2106,7 +2116,7 @@ of all values.</p>
 </details>
 </dd>
 <dt id="raffiot.io.IO.zip_par"><code class="name flex">
-<span>def <span class="ident">zip_par</span></span>(<span>self: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], *others: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, X]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
+<span>def <span class="ident">zip_par</span></span>(<span>self: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], *others: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Pack a list of IO (including self) into an IO computing the list
@@ -2116,7 +2126,7 @@ of all values in parallel.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip_par(self: IO[R, E, A], *others: IO[R, E, X]) -&gt; IO[R, E, Iterable[A]]:
+<pre><code class="python">def zip_par(self: IO[R, E, A], *others: IO[R, E, A]) -&gt; IO[R, E, List[A]]:
     &#34;&#34;&#34;
     Pack a list of IO (including self) into an IO computing the list
     of all values in parallel.

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any
+from typing import Generic, TypeVar, Callable, List, Any, Iterable, Union
 
 from typing_extensions import final
 
@@ -77,7 +77,7 @@ class Val(Generic[A]):
         """
         return Val(f(self.value))
 
-    def traverse(self, f: Callable[[A], IO[B]]) -> IO[Val[B]]:
+    def traverse(self, f: Callable[[A], IO[Any, Any, B]]) -> IO[Any, Any, Val[B]]:
         """
         Create a new Val from this one by applying this `IO` function.
 
@@ -96,7 +96,7 @@ class Val(Generic[A]):
         """
         return f(self.value)
 
-    def flatten(self) -> Val[B]:  # A = Val[B]
+    def flatten(self: Val[Val[B]]) -> Val[B]:  # A = Val[B]
         """ "
         Flatten this `Val[Val[A]]` into a `Val[A]`
         """
@@ -104,14 +104,14 @@ class Val(Generic[A]):
         return Val(self.value.value)
 
     @classmethod
-    def zip(cls, *vals: Any) -> Val[List[A]]:
+    def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -> Val[List[A]]:
         """ "
         Group these list of Val into a Val of List
         """
 
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
-        return Val([x.value for x in vals])
+        return Val([x.value for x in vals])  # type: ignore
 
     def zip_with(self, *vals: Any) -> Val[List[A]]:
         """
@@ -135,4 +135,4 @@ class Val(Generic[A]):
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
-        return Val(self.value(*l))
+        return Val(self.value(*l))  # type: ignore

@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any
+from typing import Generic, TypeVar, Callable, List, Any, Iterable, Union
 
 from typing_extensions import final
 
@@ -107,7 +107,7 @@ class Val(Generic[A]):
         &#34;&#34;&#34;
         return Val(f(self.value))
 
-    def traverse(self, f: Callable[[A], IO[B]]) -&gt; IO[Val[B]]:
+    def traverse(self, f: Callable[[A], IO[Any, Any, B]]) -&gt; IO[Any, Any, Val[B]]:
         &#34;&#34;&#34;
         Create a new Val from this one by applying this `IO` function.
 
@@ -126,7 +126,7 @@ class Val(Generic[A]):
         &#34;&#34;&#34;
         return f(self.value)
 
-    def flatten(self) -&gt; Val[B]:  # A = Val[B]
+    def flatten(self: Val[Val[B]]) -&gt; Val[B]:  # A = Val[B]
         &#34;&#34;&#34; &#34;
         Flatten this `Val[Val[A]]` into a `Val[A]`
         &#34;&#34;&#34;
@@ -134,14 +134,14 @@ class Val(Generic[A]):
         return Val(self.value.value)
 
     @classmethod
-    def zip(cls, *vals: Any) -&gt; Val[List[A]]:
+    def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -&gt; Val[List[A]]:
         &#34;&#34;&#34; &#34;
         Group these list of Val into a Val of List
         &#34;&#34;&#34;
 
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
-        return Val([x.value for x in vals])
+        return Val([x.value for x in vals])  # type: ignore
 
     def zip_with(self, *vals: Any) -&gt; Val[List[A]]:
         &#34;&#34;&#34;
@@ -165,7 +165,7 @@ class Val(Generic[A]):
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
-        return Val(self.value(*l))</code></pre>
+        return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 </section>
 <section>
@@ -241,7 +241,7 @@ class Val(Generic[A]):
         &#34;&#34;&#34;
         return Val(f(self.value))
 
-    def traverse(self, f: Callable[[A], IO[B]]) -&gt; IO[Val[B]]:
+    def traverse(self, f: Callable[[A], IO[Any, Any, B]]) -&gt; IO[Any, Any, Val[B]]:
         &#34;&#34;&#34;
         Create a new Val from this one by applying this `IO` function.
 
@@ -260,7 +260,7 @@ class Val(Generic[A]):
         &#34;&#34;&#34;
         return f(self.value)
 
-    def flatten(self) -&gt; Val[B]:  # A = Val[B]
+    def flatten(self: Val[Val[B]]) -&gt; Val[B]:  # A = Val[B]
         &#34;&#34;&#34; &#34;
         Flatten this `Val[Val[A]]` into a `Val[A]`
         &#34;&#34;&#34;
@@ -268,14 +268,14 @@ class Val(Generic[A]):
         return Val(self.value.value)
 
     @classmethod
-    def zip(cls, *vals: Any) -&gt; Val[List[A]]:
+    def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -&gt; Val[List[A]]:
         &#34;&#34;&#34; &#34;
         Group these list of Val into a Val of List
         &#34;&#34;&#34;
 
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
-        return Val([x.value for x in vals])
+        return Val([x.value for x in vals])  # type: ignore
 
     def zip_with(self, *vals: Any) -&gt; Val[List[A]]:
         &#34;&#34;&#34;
@@ -299,7 +299,7 @@ class Val(Generic[A]):
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
-        return Val(self.value(*l))</code></pre>
+        return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -330,7 +330,7 @@ def pure(cls, a: A) -&gt; Val[A]:
 </details>
 </dd>
 <dt id="raffiot.val.Val.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*vals: Any) ‑> <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[typing.List[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>*vals: Union[<a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[A], Iterable[<a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[A]]]) ‑> <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>"
@@ -340,14 +340,14 @@ Group these list of Val into a Val of List</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def zip(cls, *vals: Any) -&gt; Val[List[A]]:
+def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -&gt; Val[List[A]]:
     &#34;&#34;&#34; &#34;
     Group these list of Val into a Val of List
     &#34;&#34;&#34;
 
     if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
         return Val([x.value for x in vals[0]])
-    return Val([x.value for x in vals])</code></pre>
+    return Val([x.value for x in vals])  # type: ignore</code></pre>
 </details>
 </dd>
 </dl>
@@ -383,7 +383,7 @@ def zip(cls, *vals: Any) -&gt; Val[List[A]]:
         l = [x.value for x in arg[0]]
     else:
         l = [x.value for x in arg]
-    return Val(self.value(*l))</code></pre>
+    return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.val.Val.flat_map"><code class="name flex">
@@ -408,7 +408,7 @@ def zip(cls, *vals: Any) -&gt; Val[List[A]]:
 </details>
 </dd>
 <dt id="raffiot.val.Val.flatten"><code class="name flex">
-<span>def <span class="ident">flatten</span></span>(<span>self) ‑> <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[~B]</span>
+<span>def <span class="ident">flatten</span></span>(<span>self: <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[<a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[B]]) ‑> <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[~B]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>"
@@ -417,7 +417,7 @@ Flatten this <code><a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[<a
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def flatten(self) -&gt; Val[B]:  # A = Val[B]
+<pre><code class="python">def flatten(self: Val[Val[B]]) -&gt; Val[B]:  # A = Val[B]
     &#34;&#34;&#34; &#34;
     Flatten this `Val[Val[A]]` into a `Val[A]`
     &#34;&#34;&#34;
@@ -501,7 +501,7 @@ Flatten this <code><a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[<a
 </details>
 </dd>
 <dt id="raffiot.val.Val.traverse"><code class="name flex">
-<span>def <span class="ident">traverse</span></span>(<span>self, f: Callable[[A], IO[B]]) ‑> IO[<a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[B]]</span>
+<span>def <span class="ident">traverse</span></span>(<span>self, f: Callable[[A], IO[Any, Any, B]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, typing.Any, <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[~B]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Create a new Val from this one by applying this <code>IO</code> function.</p>
@@ -511,7 +511,7 @@ Flatten this <code><a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[<a
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def traverse(self, f: Callable[[A], IO[B]]) -&gt; IO[Val[B]]:
+<pre><code class="python">def traverse(self, f: Callable[[A], IO[Any, Any, B]]) -&gt; IO[Any, Any, Val[B]]:
     &#34;&#34;&#34;
     Create a new Val from this one by applying this `IO` function.
 

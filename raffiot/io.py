@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import time
 from collections import abc
-from typing import TypeVar, Generic, Callable, Any, List, Iterable
+from typing import TypeVar, Generic, Callable, Any, List, Iterable, Union
 
 from typing_extensions import final
 
@@ -119,7 +119,7 @@ class IO(Generic[R, E, A]):
             return IO(IOTag.ZIP, list((self, *others[0])))
         return IO(IOTag.ZIP, list((self, *others)))
 
-    def zip_par(self: IO[R, E, A], *others: IO[R, E, X]) -> IO[R, E, Iterable[A]]:
+    def zip_par(self: IO[R, E, A], *others: IO[R, E, A]) -> IO[R, E, List[A]]:
         """
         Pack a list of IO (including self) into an IO computing the list
         of all values in parallel.
@@ -128,7 +128,7 @@ class IO(Generic[R, E, A]):
         """
         return zip_par(self, *others)
 
-    def parallel(self: IO[R, E, A], *others: IO[R, E, X]) -> IO[R, E, Iterable[Fiber]]:
+    def parallel(self: IO[R, E, A], *others: IO[R, E, A]) -> IO[R, E, List[Fiber]]:
         """
         Run all these IO (including self) in parallel.
         Return the list of fibers, in the same order.
@@ -224,7 +224,7 @@ class IO(Generic[R, E, A]):
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         """
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def attempt(self) -> IO[R, E, Result[E, A]]:
         """
@@ -345,6 +345,7 @@ class IO(Generic[R, E, A]):
             return f"Acquire({self.__fields})"
         if self.__tag == IOTag.RELEASE:
             return f"Release({self.__fields})"
+        raise MatchError(f"{self} should be an IO")
 
     def __repr__(self):
         return str(self)
@@ -435,7 +436,7 @@ def error(err: E) -> IO[R, E, A]:
     return IO(IOTag.ERRORS, [err])
 
 
-def errors(*errs: E) -> IO[R, E, A]:
+def errors(*errs: Union[E, Iterable[E]]) -> IO[R, E, A]:
     """
     Computation that fails on the errors errs.
     """
@@ -448,7 +449,9 @@ def errors(*errs: E) -> IO[R, E, A]:
     return IO(IOTag.ERRORS, list(errs))
 
 
-def panic(*exceptions: Exception, errors: List[E] = None) -> IO[R, E, A]:
+def panic(
+    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
+) -> IO[R, E, A]:
     """
     Computation that fails with the panic exceptions.
     """
@@ -473,7 +476,7 @@ def from_result(r: Result[E, A]) -> IO[R, E, A]:
     return panic(MatchError(f"{r} should be a Result"))
 
 
-def zip(*l: Iterable[IO[R, E, A]]) -> IO[R, E, Iterable[A]]:
+def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -> IO[R, E, Iterable[A]]:
     """
     Transform a list of IO into an IO of list.
     :param l:
@@ -484,7 +487,7 @@ def zip(*l: Iterable[IO[R, E, A]]) -> IO[R, E, Iterable[A]]:
     return IO(IOTag.ZIP, list(l))
 
 
-def sequence(*l: Iterable[IO[R, E, A]]) -> IO[R, E, Iterable[A]]:
+def sequence(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -> IO[R, E, Iterable[A]]:
     """
     Run these ios in sequence
     :param l:
@@ -506,7 +509,7 @@ other tasks be run on the thread pool until the IO start progressing again.
 
 
 def async_(
-    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs
 ) -> IO[R, E, A]:
     """
     Perform an Asynchronous call. `f` is a function of the form:
@@ -545,7 +548,7 @@ def async_(
     return IO(IOTag.ASYNC, (f, args, kwargs))
 
 
-def defer_read(deferred: Callable[[], A], *args, **kwargs) -> IO[R, E, A]:
+def defer_read(deferred: Callable[[R, ...], A], *args, **kwargs) -> IO[R, E, A]:
     """
     Like defer, but the function as first argument must be of the form:
 
@@ -560,7 +563,9 @@ def defer_read(deferred: Callable[[], A], *args, **kwargs) -> IO[R, E, A]:
     return IO(IOTag.DEFER_READ, (deferred, args, kwargs))
 
 
-def defer_read_io(deferred: Callable[[], IO[R, E, A]], *args, **kwargs) -> IO[R, E, A]:
+def defer_read_io(
+    deferred: Callable[[R, ...], IO[R, E, A]], *args, **kwargs
+) -> IO[R, E, A]:
     """
     Like defer, but the function as first argument must be of the form:
 

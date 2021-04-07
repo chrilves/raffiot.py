@@ -238,7 +238,7 @@ class IO:
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def attempt(self):
         &#34;&#34;&#34;
@@ -357,6 +357,7 @@ class IO:
             return f&#34;Acquire({self.__fields})&#34;
         if self.__tag == IOTag.RELEASE:
             return f&#34;Release({self.__fields})&#34;
+        raise MatchError(f&#34;{self} should be an IO&#34;)
 
     def __repr__(self):
         return str(self)
@@ -1516,7 +1517,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def attempt(self):
         &#34;&#34;&#34;
@@ -1635,6 +1636,7 @@ use defer and defer_io to avoid stack-overflow.</li>
             return f&#34;Acquire({self.__fields})&#34;
         if self.__tag == IOTag.RELEASE:
             return f&#34;Release({self.__fields})&#34;
+        raise MatchError(f&#34;{self} should be an IO&#34;)
 
     def __repr__(self):
         return str(self)</code></pre>
@@ -1661,7 +1663,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
     and arg computes a value `x1: X1`,...,`xn: Xn`
     then self.ap(arg) computes `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.io.IO.attempt"><code class="name flex">

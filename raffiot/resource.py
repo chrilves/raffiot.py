@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable, Union
 
 from typing_extensions import final
 
@@ -229,7 +229,7 @@ class Resource(Generic[R, E, A]):
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         """
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def flatten(self: Resource[R, E, Resource[R, E, A]]) -> Resource[R, E, A]:
         """
@@ -252,7 +252,9 @@ class Resource(Generic[R, E, A]):
 
     # Errors API
 
-    def catch(self, handler: Callable[[E], Resource[R, E, A]]) -> Resource[R, E, A]:
+    def catch(
+        self, handler: Callable[[List[E]], Resource[R, E, A]]
+    ) -> Resource[R, E, A]:
         """
         React to errors (the except part of a try-except).
 
@@ -265,7 +267,11 @@ class Resource(Generic[R, E, A]):
         Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         """
-        return Resource(self.create.map_error(f))
+        return Resource(
+            self.create.map_error(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+            )
+        )
 
     # Panic
 
@@ -285,7 +291,9 @@ class Resource(Generic[R, E, A]):
         Do nothing otherwise.
         """
         return Resource(
-            self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+            self.create.map_panic(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+            )
         )
 
     def attempt(self) -> Resource[R, Any, Result[E, A]]:
@@ -313,7 +321,9 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    def finally_(self, after: Resource[R, Any, Any]) -> Resource[R, E, A]:
+    def finally_(
+        self, after: Callable[[Result[E, A]], Resource[R, E, Any]]
+    ) -> Resource[R, E, A]:
         """
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -329,8 +339,8 @@ class Resource(Generic[R, E, A]):
         )
 
     def on_failure(
-        self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
-    ) -> IO[R, E, A]:
+        self, handler: Callable[[Result[E, Any]], Resource[R, E, A]]
+    ) -> Resource[R, E, A]:
         """
         Combined form of catch and recover.
         React to any failure of the resource creation.
@@ -364,7 +374,7 @@ def pure(a: A) -> Resource[R, E, A]:
     return Resource(io.pure((a, noop_close)))
 
 
-def defer(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
+def defer(deferred: Callable[..., A], *args, **kwargs) -> Resource[R, E, A]:
     """
     Defer a computation.
 
@@ -376,7 +386,7 @@ def defer(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
 
 
 def defer_resource(
-    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+    deferred: Callable[[R, ...], Resource[R, E, A]], *args, **kwargs
 ) -> Resource[R, E, A]:
     """
     Make a function that returns an `Resource`, a `Resource` itself.
@@ -394,7 +404,7 @@ def defer_resource(
     return Resource(io.defer_io(f, *args, **kwargs))
 
 
-def defer_read(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
+def defer_read(deferred: Callable[[R, ...], A], *args, **kwargs) -> Resource[R, E, A]:
     """
     Similar to io.defer_read but for Resource.
     """
@@ -402,7 +412,7 @@ def defer_read(deferred: Callable[[], A], *args, **kwargs) -> Resource[R, E, A]:
 
 
 def defer_read_resource(
-    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+    deferred: Callable[..., Resource[R, E, A]], *args, **kwargs
 ) -> Resource[R, E, A]:
     """
     Similar to io.defer_read_io but for Resource.
@@ -433,7 +443,7 @@ def error(err: E) -> Resource[R, E, A]:
     return Resource(io.error(err))
 
 
-def errors(*errs: E) -> Resource[R, E, A]:
+def errors(*errs: Union[E, Iterable[E]]) -> Resource[R, E, A]:
     """
     Resource creation that always fails on the errors err.
     """
@@ -446,7 +456,9 @@ def errors(*errs: E) -> Resource[R, E, A]:
     return Resource(io.errors(errs))
 
 
-def panic(*exceptions: Exception, errors: List[E] = None) -> Resource[R, E, A]:
+def panic(
+    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
+) -> Resource[R, E, A]:
     """
     Resource creation that always fails with the panic exceptions.
     """
@@ -525,7 +537,9 @@ def from_with(the_io: IO[R, E, Any]) -> Resource[R, E, A]:
     return Resource(the_io.map(manager_handler))
 
 
-def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
+def zip(
+    *rs: Union[Resource[R, E, A], Iterable[Resource[R, E, A]]]
+) -> Resource[R, E, List[A]]:
     """
     Transform a list of Resource into a Resource creating a list
     of all resources.
@@ -640,7 +654,7 @@ again.
 
 
 def async_(
-    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs
 ) -> Resource[E, R, A]:
     """
     Perform an Asynchronous call. `f` is a function of the form:
@@ -737,5 +751,5 @@ def semaphore(tokens: int) -> IO[Any, None, Resource[Any, None, None]]:
     return io.defer(h)
 
 
-def noop_close(cs: ComputationStatus) -> IO[Any, None, None]:
+def noop_close(cs: ComputationStatus) -> IO[Any, Any, None]:
     return io.pure(None)

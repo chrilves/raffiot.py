@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable, Union
 
 from typing_extensions import final
 
@@ -260,7 +260,7 @@ class Resource(Generic[R, E, A]):
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
@@ -283,7 +283,9 @@ class Resource(Generic[R, E, A]):
 
     # Errors API
 
-    def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+    def catch(
+        self, handler: Callable[[List[E]], Resource[R, E, A]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
@@ -296,7 +298,11 @@ class Resource(Generic[R, E, A]):
         Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return Resource(self.create.map_error(f))
+        return Resource(
+            self.create.map_error(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+            )
+        )
 
     # Panic
 
@@ -316,7 +322,9 @@ class Resource(Generic[R, E, A]):
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
-            self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+            self.create.map_panic(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+            )
         )
 
     def attempt(self) -&gt; Resource[R, Any, Result[E, A]]:
@@ -344,7 +352,9 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    def finally_(self, after: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
+    def finally_(
+        self, after: Callable[[Result[E, A]], Resource[R, E, Any]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -360,8 +370,8 @@ class Resource(Generic[R, E, A]):
         )
 
     def on_failure(
-        self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
-    ) -&gt; IO[R, E, A]:
+        self, handler: Callable[[Result[E, Any]], Resource[R, E, A]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Combined form of catch and recover.
         React to any failure of the resource creation.
@@ -395,7 +405,7 @@ def pure(a: A) -&gt; Resource[R, E, A]:
     return Resource(io.pure((a, noop_close)))
 
 
-def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
+def defer(deferred: Callable[..., A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -407,7 +417,7 @@ def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
 
 
 def defer_resource(
-    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+    deferred: Callable[[R, ...], Resource[R, E, A]], *args, **kwargs
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
@@ -425,7 +435,7 @@ def defer_resource(
     return Resource(io.defer_io(f, *args, **kwargs))
 
 
-def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
+def defer_read(deferred: Callable[[R, ...], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read but for Resource.
     &#34;&#34;&#34;
@@ -433,7 +443,7 @@ def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, 
 
 
 def defer_read_resource(
-    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+    deferred: Callable[..., Resource[R, E, A]], *args, **kwargs
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read_io but for Resource.
@@ -464,7 +474,7 @@ def error(err: E) -&gt; Resource[R, E, A]:
     return Resource(io.error(err))
 
 
-def errors(*errs: E) -&gt; Resource[R, E, A]:
+def errors(*errs: Union[E, Iterable[E]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails on the errors err.
     &#34;&#34;&#34;
@@ -477,7 +487,9 @@ def errors(*errs: E) -&gt; Resource[R, E, A]:
     return Resource(io.errors(errs))
 
 
-def panic(*exceptions: Exception, errors: List[E] = None) -&gt; Resource[R, E, A]:
+def panic(
+    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails with the panic exceptions.
     &#34;&#34;&#34;
@@ -556,7 +568,9 @@ def from_with(the_io: IO[R, E, Any]) -&gt; Resource[R, E, A]:
     return Resource(the_io.map(manager_handler))
 
 
-def zip(*rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
+def zip(
+    *rs: Union[Resource[R, E, A], Iterable[Resource[R, E, A]]]
+) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Transform a list of Resource into a Resource creating a list
     of all resources.
@@ -671,7 +685,7 @@ again.
 
 
 def async_(
-    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs
 ) -&gt; Resource[E, R, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
@@ -768,7 +782,7 @@ def semaphore(tokens: int) -&gt; IO[Any, None, Resource[Any, None, None]]:
     return io.defer(h)
 
 
-def noop_close(cs: ComputationStatus) -&gt; IO[Any, None, None]:
+def noop_close(cs: ComputationStatus) -&gt; IO[Any, Any, None]:
     return io.pure(None)</code></pre>
 </details>
 </section>
@@ -807,7 +821,7 @@ again.
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="raffiot.resource.async_"><code class="name flex">
-<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~E, ~R, ~A]</span>
+<span>def <span class="ident">async_</span></span>(<span>f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~E, ~R, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Perform an Asynchronous call. <code>f</code> is a function of the form:</p>
@@ -846,7 +860,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def async_(
-    f: Callable[[R, Callable[[Result[E, A]], None]], None], *args, **kwargs
+    f: Callable[[R, Callable[[Result[E, A], ...], None]], None], *args, **kwargs
 ) -&gt; Resource[E, R, A]:
     &#34;&#34;&#34;
     Perform an Asynchronous call. `f` is a function of the form:
@@ -882,7 +896,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.resource.defer"><code class="name flex">
-<span>def <span class="ident">defer</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer</span></span>(<span>deferred: Callable[..., A], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Defer a computation.</p>
@@ -892,7 +906,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
+<pre><code class="python">def defer(deferred: Callable[..., A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Defer a computation.
 
@@ -904,7 +918,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.resource.defer_read"><code class="name flex">
-<span>def <span class="ident">defer_read</span></span>(<span>deferred: Callable[[], A], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer_read</span></span>(<span>deferred: Callable[[R, ...], A], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Similar to io.defer_read but for Resource.</p></div>
@@ -912,7 +926,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def defer_read(deferred: Callable[[], A], *args, **kwargs) -&gt; Resource[R, E, A]:
+<pre><code class="python">def defer_read(deferred: Callable[[R, ...], A], *args, **kwargs) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read but for Resource.
     &#34;&#34;&#34;
@@ -920,7 +934,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.resource.defer_read_resource"><code class="name flex">
-<span>def <span class="ident">defer_read_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer_read_resource</span></span>(<span>deferred: Callable[..., <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Similar to io.defer_read_io but for Resource.</p></div>
@@ -929,7 +943,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def defer_read_resource(
-    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+    deferred: Callable[..., Resource[R, E, A]], *args, **kwargs
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Similar to io.defer_read_io but for Resource.
@@ -942,7 +956,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 </details>
 </dd>
 <dt id="raffiot.resource.defer_resource"><code class="name flex">
-<span>def <span class="ident">defer_resource</span></span>(<span>deferred: Callable[[], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">defer_resource</span></span>(<span>deferred: Callable[[R, ...], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]], *args, **kwargs) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Make a function that returns an <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code>, a <code><a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a></code> itself.</p>
@@ -955,7 +969,7 @@ eliminates stack overflow.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def defer_resource(
-    deferred: Callable[[], Resource[R, E, A]], *args, **kwargs
+    deferred: Callable[[R, ...], Resource[R, E, A]], *args, **kwargs
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Make a function that returns an `Resource`, a `Resource` itself.
@@ -990,7 +1004,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.resource.errors"><code class="name flex">
-<span>def <span class="ident">errors</span></span>(<span>*errs: E) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">errors</span></span>(<span>*errs: Union[E, Iterable[E]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that always fails on the errors err.</p></div>
@@ -998,7 +1012,7 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def errors(*errs: E) -&gt; Resource[R, E, A]:
+<pre><code class="python">def errors(*errs: Union[E, Iterable[E]]) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails on the errors err.
     &#34;&#34;&#34;
@@ -1156,7 +1170,7 @@ The releasing IO does nothing.</p></div>
 </details>
 </dd>
 <dt id="raffiot.resource.noop_close"><code class="name flex">
-<span>def <span class="ident">noop_close</span></span>(<span>cs: ComputationStatus) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, NoneType]</span>
+<span>def <span class="ident">noop_close</span></span>(<span>cs: ComputationStatus) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, typing.Any, NoneType]</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -1164,12 +1178,12 @@ The releasing IO does nothing.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def noop_close(cs: ComputationStatus) -&gt; IO[Any, None, None]:
+<pre><code class="python">def noop_close(cs: ComputationStatus) -&gt; IO[Any, Any, None]:
     return io.pure(None)</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.panic"><code class="name flex">
-<span>def <span class="ident">panic</span></span>(<span>*exceptions: Exception, errors: List[E] = None) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">panic</span></span>(<span>*exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that always fails with the panic exceptions.</p></div>
@@ -1177,7 +1191,9 @@ The releasing IO does nothing.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def panic(*exceptions: Exception, errors: List[E] = None) -&gt; Resource[R, E, A]:
+<pre><code class="python">def panic(
+    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails with the panic exceptions.
     &#34;&#34;&#34;
@@ -1325,7 +1341,7 @@ The resulting Resource creates the list of all the resources.</p>
 </details>
 </dd>
 <dt id="raffiot.resource.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*rs: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>*rs: Union[<a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A], Iterable[<a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform a list of Resource into a Resource creating a list
@@ -1338,7 +1354,9 @@ The resources opened are then released.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip(*rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
+<pre><code class="python">def zip(
+    *rs: Union[Resource[R, E, A], Iterable[Resource[R, E, A]]]
+) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Transform a list of Resource into a Resource creating a list
     of all resources.
@@ -1607,7 +1625,7 @@ class Resource(Generic[R, E, A]):
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def flatten(self: Resource[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
@@ -1630,7 +1648,9 @@ class Resource(Generic[R, E, A]):
 
     # Errors API
 
-    def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+    def catch(
+        self, handler: Callable[[List[E]], Resource[R, E, A]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to errors (the except part of a try-except).
 
@@ -1643,7 +1663,11 @@ class Resource(Generic[R, E, A]):
         Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return Resource(self.create.map_error(f))
+        return Resource(
+            self.create.map_error(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+            )
+        )
 
     # Panic
 
@@ -1663,7 +1687,9 @@ class Resource(Generic[R, E, A]):
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
-            self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+            self.create.map_panic(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+            )
         )
 
     def attempt(self) -&gt; Resource[R, Any, Result[E, A]]:
@@ -1691,7 +1717,9 @@ class Resource(Generic[R, E, A]):
             )
         )
 
-    def finally_(self, after: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
+    def finally_(
+        self, after: Callable[[Result[E, A]], Resource[R, E, Any]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         After having computed self, but before returning its result,
         execute the rs Resource creation.
@@ -1707,8 +1735,8 @@ class Resource(Generic[R, E, A]):
         )
 
     def on_failure(
-        self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
-    ) -&gt; IO[R, E, A]:
+        self, handler: Callable[[Result[E, Any]], Resource[R, E, A]]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Combined form of catch and recover.
         React to any failure of the resource creation.
@@ -1771,7 +1799,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
     and arg computes a value `x1: X1`,...,`xn: Xn`
     then self.ap(arg) computes `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.attempt"><code class="name flex">
@@ -1821,7 +1849,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.catch"><code class="name flex">
-<span>def <span class="ident">catch</span></span>(<span>self, handler: Callable[[E], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">catch</span></span>(<span>self, handler: Callable[[List[E]], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>React to errors (the except part of a try-except).</p>
@@ -1830,7 +1858,9 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def catch(self, handler: Callable[[E], Resource[R, E, A]]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def catch(
+    self, handler: Callable[[List[E]], Resource[R, E, A]]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     React to errors (the except part of a try-except).
 
@@ -1862,7 +1892,7 @@ Note that f is not from R to R2 but from R2 to R!</p></div>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.finally_"><code class="name flex">
-<span>def <span class="ident">finally_</span></span>(<span>self, after: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, Any, Any]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">finally_</span></span>(<span>self, after: Callable[[Result[E, A]], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, Any]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>After having computed self, but before returning its result,
@@ -1874,7 +1904,9 @@ its result, like executing a lifted IO.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def finally_(self, after: Resource[R, Any, Any]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def finally_(
+    self, after: Callable[[Result[E, A]], Resource[R, E, Any]]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     After having computed self, but before returning its result,
     execute the rs Resource creation.
@@ -2000,7 +2032,11 @@ Do nothing otherwise.</p></div>
     Transform the stored errors if the resource creation fails on an errors.
     Do nothing otherwise.
     &#34;&#34;&#34;
-    return Resource(self.create.map_error(f))</code></pre>
+    return Resource(
+        self.create.map_error(f).map(
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+        )
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.map_panic"><code class="name flex">
@@ -2019,12 +2055,14 @@ Do nothing otherwise.</p></div>
     Do nothing otherwise.
     &#34;&#34;&#34;
     return Resource(
-        self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+        self.create.map_panic(f).map(
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+        )
     )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.on_failure"><code class="name flex">
-<span>def <span class="ident">on_failure</span></span>(<span>self, handler: Callable[[Result[E, Any]], IO[R, E, A]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">on_failure</span></span>(<span>self, handler: Callable[[Result[E, Any]], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Combined form of catch and recover.
@@ -2040,8 +2078,8 @@ Do nothing if the resource creation is successful.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def on_failure(
-    self, handler: Callable[[Result[E, Any]], IO[R, E, A]]
-) -&gt; IO[R, E, A]:
+    self, handler: Callable[[Result[E, Any]], Resource[R, E, A]]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Combined form of catch and recover.
     React to any failure of the resource creation.

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any, Tuple
+from typing import Generic, TypeVar, Callable, List, Any, Tuple, Iterable, Union
 
 from typing_extensions import final
 
@@ -184,7 +184,7 @@ class Var(Generic[A]):
     #    UPDATE   #
     ###############
 
-    def update(self, f: Callable[[A], Tuple[A, B]]) -> IO[UpdateResult[A, B]]:
+    def update(self, f: Callable[[A], Tuple[A, B]]) -> IO[Any, Any, UpdateResult[A, B]]:
         """
         Update the value contained in this variable.
 
@@ -260,7 +260,7 @@ class Var(Generic[A]):
         return self._lock.with_(io.defer_io(h))
 
     @classmethod
-    def zip(cls, *vars: Var[A]) -> IO[Any, None, List[A]]:
+    def zip(cls, *vars: Union[Var[A], Iterable[Var[A]]]) -> IO[Any, None, List[A]]:
         """ "
         Group these variables current values into a list.
         """
@@ -289,4 +289,4 @@ class Var(Generic[A]):
         :param arg:
         :return:
         """
-        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore

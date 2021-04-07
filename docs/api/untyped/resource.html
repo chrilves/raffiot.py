@@ -234,7 +234,7 @@ class Resource:
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -270,7 +270,11 @@ class Resource:
         Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return Resource(self.create.map_error(f))
+        return Resource(
+            self.create.map_error(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+            )
+        )
 
     # Panic
 
@@ -288,7 +292,9 @@ class Resource:
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
-            self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+            self.create.map_panic(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+            )
         )
 
     def attempt(self):
@@ -1536,7 +1542,7 @@ class Resource:
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -1572,7 +1578,11 @@ class Resource:
         Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return Resource(self.create.map_error(f))
+        return Resource(
+            self.create.map_error(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+            )
+        )
 
     # Panic
 
@@ -1590,7 +1600,9 @@ class Resource:
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
-            self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+            self.create.map_panic(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+            )
         )
 
     def attempt(self):
@@ -1690,7 +1702,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
     and arg computes a value `x1: X1`,...,`xn: Xn`
     then self.ap(arg) computes `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.attempt"><code class="name flex">
@@ -1913,7 +1925,11 @@ Do nothing otherwise.</p></div>
     Transform the stored errors if the resource creation fails on an errors.
     Do nothing otherwise.
     &#34;&#34;&#34;
-    return Resource(self.create.map_error(f))</code></pre>
+    return Resource(
+        self.create.map_error(f).map(
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+        )
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.Resource.map_panic"><code class="name flex">
@@ -1932,7 +1948,9 @@ Do nothing otherwise.</p></div>
     Do nothing otherwise.
     &#34;&#34;&#34;
     return Resource(
-        self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+        self.create.map_panic(f).map(
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+        )
     )</code></pre>
 </details>
 </dd>

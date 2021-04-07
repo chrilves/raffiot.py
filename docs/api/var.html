@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any, Tuple
+from typing import Generic, TypeVar, Callable, List, Any, Tuple, Iterable, Union
 
 from typing_extensions import final
 
@@ -214,7 +214,7 @@ class Var(Generic[A]):
     #    UPDATE   #
     ###############
 
-    def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+    def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[Any, Any, UpdateResult[A, B]]:
         &#34;&#34;&#34;
         Update the value contained in this variable.
 
@@ -290,7 +290,7 @@ class Var(Generic[A]):
         return self._lock.with_(io.defer_io(h))
 
     @classmethod
-    def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+    def zip(cls, *vars: Union[Var[A], Iterable[Var[A]]]) -&gt; IO[Any, None, List[A]]:
         &#34;&#34;&#34; &#34;
         Group these variables current values into a list.
         &#34;&#34;&#34;
@@ -319,7 +319,7 @@ class Var(Generic[A]):
         :param arg:
         :return:
         &#34;&#34;&#34;
-        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </section>
 <section>
@@ -531,7 +531,7 @@ class Var(Generic[A]):
     #    UPDATE   #
     ###############
 
-    def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+    def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[Any, Any, UpdateResult[A, B]]:
         &#34;&#34;&#34;
         Update the value contained in this variable.
 
@@ -607,7 +607,7 @@ class Var(Generic[A]):
         return self._lock.with_(io.defer_io(h))
 
     @classmethod
-    def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+    def zip(cls, *vars: Union[Var[A], Iterable[Var[A]]]) -&gt; IO[Any, None, List[A]]:
         &#34;&#34;&#34; &#34;
         Group these variables current values into a list.
         &#34;&#34;&#34;
@@ -636,7 +636,7 @@ class Var(Generic[A]):
         :param arg:
         :return:
         &#34;&#34;&#34;
-        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -689,7 +689,7 @@ def create_rs(cls, a: A) -&gt; Resource[Any, None, Var[A]]:
 </details>
 </dd>
 <dt id="raffiot.var.Var.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*vars: <a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[A]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, typing.List[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>*vars: Union[<a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[A], Iterable[<a title="raffiot.var.Var" href="#raffiot.var.Var">Var</a>[A]]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, NoneType, typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>"
@@ -699,7 +699,7 @@ Group these variables current values into a list.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
+def zip(cls, *vars: Union[Var[A], Iterable[Var[A]]]) -&gt; IO[Any, None, List[A]]:
     &#34;&#34;&#34; &#34;
     Group these variables current values into a list.
     &#34;&#34;&#34;
@@ -734,7 +734,7 @@ def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
     :param arg:
     :return:
     &#34;&#34;&#34;
-    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.var.Var.get"><code class="name flex">
@@ -919,7 +919,7 @@ def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
 </details>
 </dd>
 <dt id="raffiot.var.Var.update"><code class="name flex">
-<span>def <span class="ident">update</span></span>(<span>self, f: Callable[[A], Tuple[A, B]]) ‑> IO[<a title="raffiot.var.UpdateResult" href="#raffiot.var.UpdateResult">UpdateResult</a>[A, B]]</span>
+<span>def <span class="ident">update</span></span>(<span>self, f: Callable[[A], Tuple[A, B]]) ‑> <a title="raffiot.io.IO" href="io.html#raffiot.io.IO">IO</a>[typing.Any, typing.Any, <a title="raffiot.var.UpdateResult" href="#raffiot.var.UpdateResult">UpdateResult</a>[~A, ~B]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Update the value contained in this variable.</p>
@@ -929,7 +929,7 @@ def zip(cls, *vars: Var[A]) -&gt; IO[Any, None, List[A]]:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[UpdateResult[A, B]]:
+<pre><code class="python">def update(self, f: Callable[[A], Tuple[A, B]]) -&gt; IO[Any, Any, UpdateResult[A, B]]:
     &#34;&#34;&#34;
     Update the value contained in this variable.
 

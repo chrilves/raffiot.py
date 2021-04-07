@@ -110,7 +110,7 @@ Ensure that create resources are always nicely released after use.</p></div>
     :return:
     &#34;&#34;&#34;
     if len(a) == 1 and isinstance(a[0], abc.Iterable):
-        return a[0][-1]
+        return a[0][-1]  # type: ignore
     return a[-1]</code></pre>
 </details>
 </dd>
@@ -399,7 +399,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def attempt(self):
         &#34;&#34;&#34;
@@ -518,6 +518,7 @@ use defer and defer_io to avoid stack-overflow.</li>
             return f&#34;Acquire({self.__fields})&#34;
         if self.__tag == IOTag.RELEASE:
             return f&#34;Release({self.__fields})&#34;
+        raise MatchError(f&#34;{self} should be an IO&#34;)
 
     def __repr__(self):
         return str(self)</code></pre>
@@ -544,7 +545,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
     and arg computes a value `x1: X1`,...,`xn: Xn`
     then self.ap(arg) computes `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.IO.attempt"><code class="name flex">
@@ -1389,7 +1390,7 @@ class Resource:
         and arg computes a value `x1: X1`,...,`xn: Xn`
         then self.ap(arg) computes `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.zip(*arg).map(lambda l: l[0](*l[1:]))
+        return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -1425,7 +1426,11 @@ class Resource:
         Transform the stored errors if the resource creation fails on an errors.
         Do nothing otherwise.
         &#34;&#34;&#34;
-        return Resource(self.create.map_error(f))
+        return Resource(
+            self.create.map_error(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+            )
+        )
 
     # Panic
 
@@ -1443,7 +1448,9 @@ class Resource:
         Do nothing otherwise.
         &#34;&#34;&#34;
         return Resource(
-            self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+            self.create.map_panic(f).map(
+                lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+            )
         )
 
     def attempt(self):
@@ -1543,7 +1550,7 @@ then self.ap(arg) computes <code>f(x1,...,xn): A</code>.</p></div>
     and arg computes a value `x1: X1`,...,`xn: Xn`
     then self.ap(arg) computes `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return self.zip(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Resource.attempt"><code class="name flex">
@@ -1766,7 +1773,11 @@ Do nothing otherwise.</p></div>
     Transform the stored errors if the resource creation fails on an errors.
     Do nothing otherwise.
     &#34;&#34;&#34;
-    return Resource(self.create.map_error(f))</code></pre>
+    return Resource(
+        self.create.map_error(f).map(
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_error(f))
+        )
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Resource.map_panic"><code class="name flex">
@@ -1785,7 +1796,9 @@ Do nothing otherwise.</p></div>
     Do nothing otherwise.
     &#34;&#34;&#34;
     return Resource(
-        self.create.map_panic(f).map(lambda x: (x[0], x[1].map_panic(f)))
+        self.create.map_panic(f).map(
+            lambda x: (x[0], lambda cs: io.defer_io(x[1], cs).map_panic(f))
+        )
     )</code></pre>
 </details>
 </dd>
@@ -2052,7 +2065,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
             return on_error(self.errors)
         if isinstance(self, Panic):
             return on_panic(self.exceptions, self.errors)
-        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])
+        raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)], [])
 
     @safe
     def fold(
@@ -2118,7 +2131,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return f(self.success)
-        return self
+        return self  # type: ignore
 
     @safe
     def flat_map(self, f):
@@ -2197,7 +2210,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return Ok(f(self.success))
-        return self
+        return self  # type: ignore
 
     @safe
     def map(self, f):
@@ -2216,7 +2229,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         Is Errors some are Ok, but at least one is an errors but no panics.
         Is Panic is there is at least one panic.
         &#34;&#34;&#34;
-        return zip((self, *arg))
+        return zip((self, *arg))  # type: ignore
 
     def unsafe_ap(self, *arg):
         &#34;&#34;&#34;
@@ -2226,7 +2239,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))  # type: ignore
 
     @safe
     def ap(self, *arg):
@@ -2237,7 +2250,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         &#34;&#34;&#34;
-        return self.unsafe_ap(*arg)
+        return self.unsafe_ap(*arg)  # type: ignore
 
     def flatten(self):
         &#34;&#34;&#34;
@@ -2245,7 +2258,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         if isinstance(self, Ok):
             return self.success
-        return self
+        return self  # type: ignore
 
     def unsafe_map_error(self, f):
         &#34;&#34;&#34;
@@ -2429,7 +2442,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return self.success
-    return self</code></pre>
+    return self  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.fold"><code class="name flex">
@@ -2655,7 +2668,7 @@ and arg represent a computation returning a value <code>x1: X1</code>,&hellip;,<
     and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
     `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
     &#34;&#34;&#34;
-    return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))</code></pre>
+    return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_catch"><code class="name flex">
@@ -2712,7 +2725,7 @@ Otherwise, do nothing.</p></div>
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return f(self.success)
-    return self</code></pre>
+    return self  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_fold"><code class="name flex">
@@ -2747,7 +2760,7 @@ Otherwise, do nothing.</p></div>
         return on_error(self.errors)
     if isinstance(self, Panic):
         return on_panic(self.exceptions, self.errors)
-    raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)])</code></pre>
+    raise on_panic([MatchError(f&#34;{self} should be a Result&#34;)], [])</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_fold_raise"><code class="name flex">
@@ -2830,7 +2843,7 @@ If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">
     &#34;&#34;&#34;
     if isinstance(self, Ok):
         return Ok(f(self.success))
-    return self</code></pre>
+    return self  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_map_error"><code class="name flex">
@@ -2949,7 +2962,7 @@ Is Panic is there is at least one panic.</p></div>
     Is Errors some are Ok, but at least one is an errors but no panics.
     Is Panic is there is at least one panic.
     &#34;&#34;&#34;
-    return zip((self, *arg))</code></pre>
+    return zip((self, *arg))  # type: ignore</code></pre>
 </details>
 </dd>
 </dl>
@@ -3104,7 +3117,7 @@ class Val:
 
         if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
             return Val([x.value for x in vals[0]])
-        return Val([x.value for x in vals])
+        return Val([x.value for x in vals])  # type: ignore
 
     def zip_with(self, *vals):
         &#34;&#34;&#34;
@@ -3128,7 +3141,7 @@ class Val:
             l = [x.value for x in arg[0]]
         else:
             l = [x.value for x in arg]
-        return Val(self.value(*l))</code></pre>
+        return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 <h3>Static methods</h3>
 <dl>
@@ -3172,7 +3185,7 @@ def zip(cls, *vals):
 
     if len(vals) == 1 and isinstance(vals[0], abc.Iterable):
         return Val([x.value for x in vals[0]])
-    return Val([x.value for x in vals])</code></pre>
+    return Val([x.value for x in vals])  # type: ignore</code></pre>
 </details>
 </dd>
 </dl>
@@ -3208,7 +3221,7 @@ def zip(cls, *vals):
         l = [x.value for x in arg[0]]
     else:
         l = [x.value for x in arg]
-    return Val(self.value(*l))</code></pre>
+    return Val(self.value(*l))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Val.flat_map"><code class="name flex">
@@ -3613,7 +3626,7 @@ Flatten this <code><a title="raffiot.untyped.Val" href="#raffiot.untyped.Val">Va
         :param arg:
         :return:
         &#34;&#34;&#34;
-        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 <h3>Static methods</h3>
 <dl>
@@ -3707,7 +3720,7 @@ def zip(cls, *vars):
     :param arg:
     :return:
     &#34;&#34;&#34;
-    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Var.get"><code class="name flex">

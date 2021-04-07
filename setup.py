@@ -1,6 +1,7 @@
+#! env python3
 from setuptools import setup
 
-version = "0.5.1"
+version = "0.5.2"
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -37,4 +38,6 @@ setup(
     ],
     install_requires=["typing-extensions"],
     python_requires=">=3.7",
+    zip_safe=False,
+    package_data={"raffiot": ["py.typed"]},
 )

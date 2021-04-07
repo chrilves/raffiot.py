@@ -125,7 +125,7 @@ def seq(*a):
     :return:
     &#34;&#34;&#34;
     if len(a) == 1 and isinstance(a[0], abc.Iterable):
-        return a[0][-1]
+        return a[0][-1]  # type: ignore
     return a[-1]</code></pre>
 </details>
 </section>
@@ -157,7 +157,7 @@ def seq(*a):
     :return:
     &#34;&#34;&#34;
     if len(a) == 1 and isinstance(a[0], abc.Iterable):
-        return a[0][-1]
+        return a[0][-1]  # type: ignore
     return a[-1]</code></pre>
 </details>
 </dd>

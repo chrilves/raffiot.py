@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, List, Iterable, Tuple
+from typing import TypeVar, Generic, Callable, Any, List, Iterable, Union
 
 from typing_extensions import final
 
@@ -117,7 +117,7 @@ class Result(Generic[E, A]):
             return on_error(self.errors)
         if isinstance(self, Panic):
             return on_panic(self.exceptions, self.errors)
-        raise on_panic([MatchError(f"{self} should be a Result")])
+        raise on_panic([MatchError(f"{self} should be a Result")], [])
 
     @final
     @safe
@@ -191,7 +191,7 @@ class Result(Generic[E, A]):
         """
         if isinstance(self, Ok):
             return f(self.success)
-        return self
+        return self  # type: ignore
 
     @final
     @safe
@@ -277,7 +277,7 @@ class Result(Generic[E, A]):
         """
         if isinstance(self, Ok):
             return Ok(f(self.success))
-        return self
+        return self  # type: ignore
 
     @final
     @safe
@@ -290,7 +290,7 @@ class Result(Generic[E, A]):
         return self.unsafe_map(f)
 
     @final
-    def zip(self: Result[E, A], *arg: Result[E, X]) -> Result[E, List[A]]:
+    def zip(self: Result[E, A], *arg: Result[E, A]) -> Result[E, List[A]]:
         """
         Transform a list of Result (including self) into a Result of list.
 
@@ -298,7 +298,7 @@ class Result(Generic[E, A]):
         Is Errors some are Ok, but at least one is an errors but no panics.
         Is Panic is there is at least one panic.
         """
-        return zip((self, *arg))
+        return zip((self, *arg))  # type: ignore
 
     @final
     def unsafe_ap(
@@ -311,7 +311,7 @@ class Result(Generic[E, A]):
         and arg represent a computation returning a value `x1: X1`,...,`xn: Xn`, then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         """
-        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))
+        return zip((self, *arg)).unsafe_map(lambda l: l[0](*l[1:]))  # type: ignore
 
     @final
     @safe
@@ -323,7 +323,7 @@ class Result(Generic[E, A]):
         and arg represent computations returning values `x1: X1`,...,`xn: Xn` then
         `self.ap(arg)` represents the computation returning `f(x1,...,xn): A`.
         """
-        return self.unsafe_ap(*arg)
+        return self.unsafe_ap(*arg)  # type: ignore
 
     @final
     def flatten(self: Result[E, Result[E, A]]) -> Result[E, A]:
@@ -332,7 +332,7 @@ class Result(Generic[E, A]):
         """
         if isinstance(self, Ok):
             return self.success
-        return self
+        return self  # type: ignore
 
     @final
     def unsafe_map_error(self, f: Callable[[E], E2]) -> Result[E2, A]:
@@ -369,7 +369,7 @@ class Result(Generic[E, A]):
 
     @final
     @safe
-    def catch(self, handler: Callable[[E], Result[List[E], A]]) -> Result[E, A]:
+    def catch(self, handler: Callable[[List[E]], Result[E, A]]) -> Result[E, A]:
         """
         React to errors (the except part of a try-except).
 
@@ -550,7 +550,7 @@ def panic(*exceptions: Exception, errors=None) -> Result[Any, Any]:
     return Panic(exceptions=list(exceptions), errors=list(errors) if errors else [])
 
 
-def zip(*l: Iterable[Result[E, A]]) -> Result[E, List[A]]:
+def zip(*l: Result[E, A]) -> Result[E, List[A]]:
     """
     Combine a list of `Result`.
 
@@ -589,7 +589,7 @@ def zip(*l: Iterable[Result[E, A]]) -> Result[E, List[A]]:
     return Ok(values)
 
 
-def sequence(*l: Iterable[Result[E, A]]) -> Result[List[E], A]:
+def sequence(*l: Union[Iterable[Result[E, A]], Result[E, A]]) -> Result[E, A]:
     """
     Combine a list of `Result`.
 
@@ -603,7 +603,7 @@ def sequence(*l: Iterable[Result[E, A]]) -> Result[List[E], A]:
     else:
         args = l
 
-    value = None
+    value: A = None
     errs = []
     exceptions = []
 

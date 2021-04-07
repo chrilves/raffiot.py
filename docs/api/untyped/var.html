@@ -307,7 +307,7 @@ class Var:
         :param arg:
         :return:
         &#34;&#34;&#34;
-        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </section>
 <section>
@@ -614,7 +614,7 @@ class UpdateResult:
         :param arg:
         :return:
         &#34;&#34;&#34;
-        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+        return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 <h3>Static methods</h3>
 <dl>
@@ -708,7 +708,7 @@ def zip(cls, *vars):
     :param arg:
     :return:
     &#34;&#34;&#34;
-    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))</code></pre>
+    return self.zip_with(*arg).map(lambda l: l[0](*l[1:]))  # type: ignore</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.var.Var.get"><code class="name flex">

@@ -104,5 +104,5 @@ def seq(*a: Any) -> Any:
     :return:
     """
     if len(a) == 1 and isinstance(a[0], abc.Iterable):
-        return a[0][-1]
+        return a[0][-1]  # type: ignore
     return a[-1]

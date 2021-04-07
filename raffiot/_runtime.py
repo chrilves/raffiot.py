@@ -16,7 +16,7 @@ from functools import total_ordering
 from queue import Queue
 from random import randint
 from threading import Thread
-from typing import Any, List, TypeVar, Generic, Callable
+from typing import Any, List, TypeVar, Generic, Callable, Optional, Tuple
 
 from typing_extensions import final
 
@@ -90,7 +90,7 @@ class SharedState:
             self.pool[i + 1].join()
         return fiber.result
 
-    def sleeping_time(self) -> float:
+    def sleeping_time(self) -> Optional[float]:
         for runner in self.pool:
             if (
                 runner.state == RunnerState.ACTIVE
@@ -144,17 +144,17 @@ class Fiber(Generic[R, E, A]):
     )
 
     def __init__(self, io: IO[R, E, A], context: R) -> None:
-        self._context = context
-        self._cont = [ContTag.ID, io, ContTag.START]
-        self._arg_tag = None
-        self._arg_value = None
+        self._context: E = context
+        self._cont: List[Any] = [ContTag.ID, io, ContTag.START]
+        self._arg_tag: ResultTag = None
+        self._arg_value: Any = None
 
-        self.result = None
+        self.result: Result[E, A] = None
 
         self._state_lock = threading.Lock()
         self._state = FiberState.ACTIVE
         self._timestamp = 0.0
-        self._callbacks = []
+        self._callbacks: List[Tuple[Fiber[Any, Any, Any], int]] = []
         self._nb_waiting = 0
         self._paused = False
         self._runner: Runner = None
@@ -401,7 +401,9 @@ class Runner(Thread):
                             arg_value = Panic(arg_value[0], arg_value[1])
                             continue
                         arg_tag = ResultTag.OK
-                        arg_value = Panic(MatchError(f"Wrong result tag {arg_tag}"))
+                        arg_value = Panic(
+                            [MatchError(f"Wrong result tag {arg_tag}")], []
+                        )
                         continue
                     if tag == ContTag.CATCH:
                         context = cont.pop()
