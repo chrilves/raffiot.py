@@ -5,7 +5,7 @@ import hypothesis.strategies as st
 from hypothesis import given
 
 from raffiot.result import *
-from raffiot.utils import MatchError, ComputationStatus, MultipleExceptions
+from raffiot.utils import MatchError, ComputationStatus, TracedException
 
 
 class TestResult(TestCase):
@@ -43,13 +43,13 @@ class TestResult(TestCase):
                 return pure(i)
             if i % 3 == 1:
                 return error(i)
-            return panic(MatchError(f"{i}"))
+            return panic(TracedException(MatchError(f"{i}"), ""))
 
         results = [int_to_result(i) for i in l]
 
         oks = [i for i in l if i % 3 == 0]
         errs = [i for i in l if i % 3 == 1]
-        panics = [MatchError(f"{i}") for i in l if i % 3 == 2]
+        panics = [TracedException(MatchError(f"{i}"), "") for i in l if i % 3 == 2]
 
         assert zip(results) == (
             Panic(exceptions=panics, errors=errs)
@@ -64,13 +64,13 @@ class TestResult(TestCase):
                 return ok(i)
             if i % 3 == 1:
                 return error(i)
-            return panic(MatchError(f"{i}"))
+            return panic(TracedException(MatchError(f"{i}"), ""))
 
         results = [int_to_result(i) for i in l]
 
         oks = l[-1] if l and l[-1] % 3 == 0 else None
         errs = [i for i in l if i % 3 == 1]
-        panics = [MatchError(f"{i}") for i in l if i % 3 == 2]
+        panics = [TracedException(MatchError(f"{i}"), "") for i in l if i % 3 == 2]
 
         assert sequence(results) == (
             Panic(exceptions=panics, errors=errs)

@@ -6,14 +6,14 @@ from __future__ import annotations
 
 import time
 from collections import abc
-from typing import TypeVar, Generic, Callable, Any, List, Iterable, Union
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
 
 from typing_extensions import final
 
+from raffiot import result
 from raffiot._internal import IOTag
 from raffiot.result import Result, Ok, Errors, Panic
-from raffiot.utils import MatchError
-from raffiot import result
+from raffiot.utils import MatchError, TracedException
 
 __all__ = [
     "Fiber",
@@ -182,7 +182,7 @@ class IO(Generic[R, E, A]):
     # Panic
 
     def recover(
-        self, handler: Callable[[List[Exception], List[E]], IO[R, E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], IO[R, E, A]]
     ) -> IO[R, E, A]:
         """
         React to panics (the except part of a try-except).
@@ -191,7 +191,7 @@ class IO(Generic[R, E, A]):
         """
         return IO(IOTag.RECOVER, (self, handler))
 
-    def map_panic(self, f: Callable[[Exception], Exception]) -> IO[R, E, A]:
+    def map_panic(self, f: Callable[[TracedException], TracedException]) -> IO[R, E, A]:
         """
         Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -233,7 +233,7 @@ class IO(Generic[R, E, A]):
 
         - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
         - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
-        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+        - If `self` fails on traced exceptions p and errors e, then `self.attempt()` successfully computes `Panic(p,e)`.
 
         Note that errors and panics stop the computation, unless a catch or
         recover reacts to such failures. But using map, flat_map, flatten and
@@ -267,7 +267,7 @@ class IO(Generic[R, E, A]):
         Do nothing if the computation is successful.
 
         - The handler will be called on `Errors(e)` if the computation fails with errors e.
-        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will be called on `Panic(p,e)` if the computation fails with panic p and errors e.
         - The handler will never be called on `Ok(a)`.
         """
 
@@ -436,7 +436,7 @@ def error(err: E) -> IO[R, E, A]:
     return IO(IOTag.ERRORS, [err])
 
 
-def errors(*errs: Union[E, Iterable[E]]) -> IO[R, E, A]:
+def errors(*errs: E) -> IO[R, E, A]:
     """
     Computation that fails on the errors errs.
     """
@@ -449,15 +449,25 @@ def errors(*errs: Union[E, Iterable[E]]) -> IO[R, E, A]:
     return IO(IOTag.ERRORS, list(errs))
 
 
-def panic(
-    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
-) -> IO[R, E, A]:
+def panic(*exceptions: TracedException, errors: List[E] = None) -> IO[R, E, A]:
     """
-    Computation that fails with the panic exceptions.
+    Computation that fails with the panic traced exceptions.
     """
     if len(exceptions) == 1 and isinstance(exceptions[0], abc.Iterable):
-        return IO(IOTag.PANIC, (list(exceptions[0]), list(errors) if errors else []))
-    return IO(IOTag.PANIC, (list(exceptions), list(errors) if errors else []))
+        return IO(
+            IOTag.PANIC,
+            (
+                TracedException.ensure_list_traced(exceptions[0]),
+                list(errors) if errors else [],
+            ),
+        )
+    return IO(
+        IOTag.PANIC,
+        (
+            TracedException.ensure_list_traced(exceptions),
+            list(errors) if errors else [],
+        ),
+    )
 
 
 def from_result(r: Result[E, A]) -> IO[R, E, A]:
@@ -473,10 +483,12 @@ def from_result(r: Result[E, A]) -> IO[R, E, A]:
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f"{r} should be a Result"))
+    return panic(
+        TracedException.with_stack_trace(MatchError(f"{r} should be a Result"))
+    )
 
 
-def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -> IO[R, E, Iterable[A]]:
+def zip(*l: IO[R, E, A]) -> IO[R, E, Iterable[A]]:
     """
     Transform a list of IO into an IO of list.
     :param l:
@@ -487,7 +499,7 @@ def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -> IO[R, E, Iterable[A]]:
     return IO(IOTag.ZIP, list(l))
 
 
-def sequence(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -> IO[R, E, Iterable[A]]:
+def sequence(*l: IO[R, E, A]) -> IO[R, E, Iterable[A]]:
     """
     Run these ios in sequence
     :param l:
@@ -530,7 +542,7 @@ def async_(
 
         - `Ok(value)` if the call was successful and returned `value`.
         - `Errors(errors)` if the call failed on errors `errors`.
-        - `Panic(exceptions)` if the failed unexpectedly on exceptions `exceptions`.
+        - `Panic(traced_exceptions, errors)` if the failed unexpectedly on exceptions `exceptions`.
 
     For example:
 
@@ -594,7 +606,7 @@ def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -> IO[R, E, Iterabl
     return zip([defer_io(f, a) for a in l])
 
 
-def parallel(*l: Iterable[IO[R, E, A]]) -> IO[E, E, Iterable[Fiber[R, E, A]]]:
+def parallel(*l: IO[R, E, A]) -> IO[E, E, Iterable[Fiber[R, E, A]]]:
     """
     Run all these IO in parallel.
     Return the list of fibers, in the same order.
@@ -612,7 +624,7 @@ def parallel(*l: Iterable[IO[R, E, A]]) -> IO[E, E, Iterable[Fiber[R, E, A]]]:
     return IO(IOTag.PARALLEL, list(l))
 
 
-def wait(*l: Iterable[Fiber[Any, Any, Any]]) -> IO[R, E, List[Result[R, A]]]:
+def wait(*l: Fiber[Any, Any, Any]) -> IO[R, E, List[Result[R, A]]]:
     """
     Wait until these Fibers finish. Return the list of Result
     in the same order.

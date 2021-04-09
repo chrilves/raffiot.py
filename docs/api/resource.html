@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable, Union
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 
 from typing_extensions import final
 
@@ -48,7 +48,7 @@ from raffiot import result
 from raffiot._internal import IOTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Errors, Panic
-from raffiot.utils import ComputationStatus, MatchError
+from raffiot.utils import ComputationStatus, MatchError, TracedException
 
 __all__ = [
     &#34;Resource&#34;,
@@ -178,7 +178,11 @@ class Resource(Generic[R, E, A]):
                 return io.pure((f(a), close))
             except Exception as exception:
                 return close_and_merge_failure(
-                    close, Panic(exceptions=[exception], errors=[])
+                    close,
+                    Panic(
+                        exceptions=[TracedException.in_except_clause(exception)],
+                        errors=[],
+                    ),
                 )
 
         return Resource(self.create.flat_map(safe_map))
@@ -307,7 +311,7 @@ class Resource(Generic[R, E, A]):
     # Panic
 
     def recover(
-        self, handler: Callable[[List[Exception], List[E]], Resource[R, E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], Resource[R, E, A]]
     ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
@@ -316,7 +320,9 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return Resource(self.create.recover(lambda p, e: handler(p, e).create))
 
-    def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Resource[R, E, A]:
+    def map_panic(
+        self, f: Callable[[TracedException], TracedException]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -474,7 +480,7 @@ def error(err: E) -&gt; Resource[R, E, A]:
     return Resource(io.error(err))
 
 
-def errors(*errs: Union[E, Iterable[E]]) -&gt; Resource[R, E, A]:
+def errors(*errs: E) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails on the errors err.
     &#34;&#34;&#34;
@@ -487,9 +493,7 @@ def errors(*errs: Union[E, Iterable[E]]) -&gt; Resource[R, E, A]:
     return Resource(io.errors(errs))
 
 
-def panic(
-    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
-) -&gt; Resource[R, E, A]:
+def panic(*exceptions: TracedException, errors: List[E] = None) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails with the panic exceptions.
     &#34;&#34;&#34;
@@ -515,7 +519,9 @@ def from_result(r: Result[E, A]) -&gt; Resource[R, E, A]:
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f&#34;{r} should be a Result&#34;))
+    return panic(
+        TracedException.with_stack_trace(MatchError(f&#34;{r} should be a Result&#34;))
+    )
 
 
 def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -&gt; Resource[R, E, A]:
@@ -568,9 +574,7 @@ def from_with(the_io: IO[R, E, Any]) -&gt; Resource[R, E, A]:
     return Resource(the_io.map(manager_handler))
 
 
-def zip(
-    *rs: Union[Resource[R, E, A], Iterable[Resource[R, E, A]]]
-) -&gt; Resource[R, E, List[A]]:
+def zip(*rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Transform a list of Resource into a Resource creating a list
     of all resources.
@@ -1004,7 +1008,7 @@ eliminates stack overflow.</p>
 </details>
 </dd>
 <dt id="raffiot.resource.errors"><code class="name flex">
-<span>def <span class="ident">errors</span></span>(<span>*errs: Union[E, Iterable[E]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">errors</span></span>(<span>*errs: E) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that always fails on the errors err.</p></div>
@@ -1012,7 +1016,7 @@ eliminates stack overflow.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def errors(*errs: Union[E, Iterable[E]]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def errors(*errs: E) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails on the errors err.
     &#34;&#34;&#34;
@@ -1104,7 +1108,9 @@ eliminates stack overflow.</p>
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f&#34;{r} should be a Result&#34;))</code></pre>
+    return panic(
+        TracedException.with_stack_trace(MatchError(f&#34;{r} should be a Result&#34;))
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.resource.from_with"><code class="name flex">
@@ -1183,7 +1189,7 @@ The releasing IO does nothing.</p></div>
 </details>
 </dd>
 <dt id="raffiot.resource.panic"><code class="name flex">
-<span>def <span class="ident">panic</span></span>(<span>*exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">panic</span></span>(<span>*exceptions: TracedException, errors: List[E] = None) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Resource creation that always fails with the panic exceptions.</p></div>
@@ -1191,9 +1197,7 @@ The releasing IO does nothing.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def panic(
-    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
-) -&gt; Resource[R, E, A]:
+<pre><code class="python">def panic(*exceptions: TracedException, errors: List[E] = None) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Resource creation that always fails with the panic exceptions.
     &#34;&#34;&#34;
@@ -1341,7 +1345,7 @@ The resulting Resource creates the list of all the resources.</p>
 </details>
 </dd>
 <dt id="raffiot.resource.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*rs: Union[<a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A], Iterable[<a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>*rs: <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform a list of Resource into a Resource creating a list
@@ -1354,9 +1358,7 @@ The resources opened are then released.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip(
-    *rs: Union[Resource[R, E, A], Iterable[Resource[R, E, A]]]
-) -&gt; Resource[R, E, List[A]]:
+<pre><code class="python">def zip(*rs: Resource[R, E, A]) -&gt; Resource[R, E, List[A]]:
     &#34;&#34;&#34;
     Transform a list of Resource into a Resource creating a list
     of all resources.
@@ -1543,7 +1545,11 @@ class Resource(Generic[R, E, A]):
                 return io.pure((f(a), close))
             except Exception as exception:
                 return close_and_merge_failure(
-                    close, Panic(exceptions=[exception], errors=[])
+                    close,
+                    Panic(
+                        exceptions=[TracedException.in_except_clause(exception)],
+                        errors=[],
+                    ),
                 )
 
         return Resource(self.create.flat_map(safe_map))
@@ -1672,7 +1678,7 @@ class Resource(Generic[R, E, A]):
     # Panic
 
     def recover(
-        self, handler: Callable[[List[Exception], List[E]], Resource[R, E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], Resource[R, E, A]]
     ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
@@ -1681,7 +1687,9 @@ class Resource(Generic[R, E, A]):
         &#34;&#34;&#34;
         return Resource(self.create.recover(lambda p, e: handler(p, e).create))
 
-    def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Resource[R, E, A]:
+    def map_panic(
+        self, f: Callable[[TracedException], TracedException]
+    ) -&gt; Resource[R, E, A]:
         &#34;&#34;&#34;
         Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -2011,7 +2019,11 @@ Do nothing otherwise.</p></div>
             return io.pure((f(a), close))
         except Exception as exception:
             return close_and_merge_failure(
-                close, Panic(exceptions=[exception], errors=[])
+                close,
+                Panic(
+                    exceptions=[TracedException.in_except_clause(exception)],
+                    errors=[],
+                ),
             )
 
     return Resource(self.create.flat_map(safe_map))</code></pre>
@@ -2040,7 +2052,7 @@ Do nothing otherwise.</p></div>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.map_panic"><code class="name flex">
-<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[Exception], Exception]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[TracedException], TracedException]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform the exceptions stored if the computation fails on a panic.
@@ -2049,7 +2061,9 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def map_panic(self, f: Callable[[Exception], Exception]) -&gt; Resource[R, E, A]:
+<pre><code class="python">def map_panic(
+    self, f: Callable[[TracedException], TracedException]
+) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     Transform the exceptions stored if the computation fails on a panic.
     Do nothing otherwise.
@@ -2099,7 +2113,7 @@ Do nothing if the resource creation is successful.</p>
 </details>
 </dd>
 <dt id="raffiot.resource.Resource.recover"><code class="name flex">
-<span>def <span class="ident">recover</span></span>(<span>self, handler: Callable[[List[Exception], List[E]], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">recover</span></span>(<span>self, handler: Callable[[List[TracedException], List[E]], <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[R, E, A]]) ‑> <a title="raffiot.resource.Resource" href="#raffiot.resource.Resource">Resource</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
@@ -2109,7 +2123,7 @@ Do nothing if the resource creation is successful.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def recover(
-    self, handler: Callable[[List[Exception], List[E]], Resource[R, E, A]]
+    self, handler: Callable[[List[TracedException], List[E]], Resource[R, E, A]]
 ) -&gt; Resource[R, E, A]:
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).

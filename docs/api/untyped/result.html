@@ -42,6 +42,7 @@ from raffiot.untyped.utils import (
     MatchError,
     MultipleExceptions,
     DomainErrors,
+    TracedException,
 )
 
 __all__ = [
@@ -78,7 +79,9 @@ def safe(f):
         try:
             return f(*args, **kwargs)
         except Exception as exception:
-            return Panic(exceptions=[exception], errors=[])
+            return Panic(
+                exceptions=[TracedException.in_except_clause(exception)], errors=[]
+            )
 
     return wrapper
 
@@ -94,7 +97,7 @@ class Result:
     - *Errors(some_errors: List[E])*
             The computation failed with an expected errors.
             The errors some_errors, of type List[E], is the expected errors encountered.
-    - *Panic(some_exceptions: List[Exception], errors: List[E])*
+    - *Panic(some_exceptions: List[TracedException], errors: List[E])*
             The computation failed on an unexpected errors.
             The exceptions some_exceptions is the unexpected errors encountered.
 
@@ -109,7 +112,7 @@ class Result:
     Panics, on the contrary, are failures you never expected. Your computation
     can not progress further. All you can do when panics occur, is stopping your
     computation gracefully (like releasing resources before dying). The panic type
-    is always Exception.
+    is always TracedException.
 
     As an example, if your program is an HTTP server. Errors are bad requests
     (errors code 400) while panics are internal server errors (errors code 500).
@@ -235,8 +238,8 @@ class Result:
         &#34;&#34;&#34;
         return self.unsafe_fold(
             lambda x: Ok(f(x)),
-            lambda x: Errors(list(map(g, x))),
-            lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
+            lambda x: Errors([g(y) for y in x]),
+            lambda x, y: Panic(exceptions=[h(z) for z in x], errors=[g(z) for z in y]),
         )
 
     @safe
@@ -338,7 +341,7 @@ class Result:
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Errors):
-            return Errors(list(map(f, self.errors)))
+            return Errors([f(e) for e in self.errors])
         return self  # type: ignore
 
     @safe
@@ -376,7 +379,9 @@ class Result:
         Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return Panic(list(map(f, self.exceptions)), self.errors)
+            return Panic(
+                exceptions=[f(exn) for exn in self.exceptions], errors=self.errors
+            )
         return self
 
     @safe
@@ -516,7 +521,7 @@ def errors(*errs):
 
 def panic(*exceptions, errors=None):
     &#34;&#34;&#34;
-    Alias for `Panic(exceptions)`.
+    Alias for `Panic(traced_exceptions)`.
     &#34;&#34;&#34;
     if (
         len(exceptions) == 1
@@ -524,9 +529,13 @@ def panic(*exceptions, errors=None):
         and not isinstance(exceptions[0], str)
     ):
         return Panic(
-            exceptions=list(exceptions[0]), errors=list(errors) if errors else []
+            exceptions=TracedException.ensure_list_traced(exceptions[0]),
+            errors=list(errors) if errors else [],
         )
-    return Panic(exceptions=list(exceptions), errors=list(errors) if errors else [])
+    return Panic(
+        exceptions=TracedException.ensure_list_traced(exceptions),
+        errors=list(errors) if errors else [],
+    )
 
 
 def zip(*l):
@@ -620,7 +629,7 @@ def traverse(l, f):
         try:
             return f(i)
         except Exception as exception:
-            return Panic([exception], [])
+            return Panic([TracedException.in_except_clause(exception)], [])
 
     return zip([g(i) for i in l])
 
@@ -637,7 +646,7 @@ def returns_result(f):
         try:
             return Ok(f(*args, **kwargs))
         except Exception as exception:
-            return panic(exception)
+            return panic(TracedException.in_except_clause(exception))
 
     return wrapper</code></pre>
 </details>
@@ -707,14 +716,14 @@ def returns_result(f):
 <span>def <span class="ident">panic</span></span>(<span>*exceptions, errors=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Alias for <code><a title="raffiot.untyped.result.Panic" href="#raffiot.untyped.result.Panic">Panic</a>(exceptions)</code>.</p></div>
+<div class="desc"><p>Alias for <code><a title="raffiot.untyped.result.Panic" href="#raffiot.untyped.result.Panic">Panic</a>(traced_exceptions)</code>.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def panic(*exceptions, errors=None):
     &#34;&#34;&#34;
-    Alias for `Panic(exceptions)`.
+    Alias for `Panic(traced_exceptions)`.
     &#34;&#34;&#34;
     if (
         len(exceptions) == 1
@@ -722,9 +731,13 @@ def returns_result(f):
         and not isinstance(exceptions[0], str)
     ):
         return Panic(
-            exceptions=list(exceptions[0]), errors=list(errors) if errors else []
+            exceptions=TracedException.ensure_list_traced(exceptions[0]),
+            errors=list(errors) if errors else [],
         )
-    return Panic(exceptions=list(exceptions), errors=list(errors) if errors else [])</code></pre>
+    return Panic(
+        exceptions=TracedException.ensure_list_traced(exceptions),
+        errors=list(errors) if errors else [],
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.pure"><code class="name flex">
@@ -766,7 +779,7 @@ into a function f returning <code><a title="raffiot.untyped.result.Result" href=
         try:
             return Ok(f(*args, **kwargs))
         except Exception as exception:
-            return panic(exception)
+            return panic(TracedException.in_except_clause(exception))
 
     return wrapper</code></pre>
 </details>
@@ -801,7 +814,9 @@ instead return a panic. This decorator make sure of it.</p>
         try:
             return f(*args, **kwargs)
         except Exception as exception:
-            return Panic(exceptions=[exception], errors=[])
+            return Panic(
+                exceptions=[TracedException.in_except_clause(exception)], errors=[]
+            )
 
     return wrapper</code></pre>
 </details>
@@ -885,7 +900,7 @@ The resulting Result is Ok if all results are Ok.</p>
         try:
             return f(i)
         except Exception as exception:
-            return Panic([exception], [])
+            return Panic([TracedException.in_except_clause(exception)], [])
 
     return zip([g(i) for i in l])</code></pre>
 </details>
@@ -1143,7 +1158,7 @@ The value some_value, of type A, is the result of the computation</li>
 <li><em>Errors(some_errors: List[E])</em>
 The computation failed with an expected errors.
 The errors some_errors, of type List[E], is the expected errors encountered.</li>
-<li><em>Panic(some_exceptions: List[Exception], errors: List[E])</em>
+<li><em>Panic(some_exceptions: List[TracedException], errors: List[E])</em>
 The computation failed on an unexpected errors.
 The exceptions some_exceptions is the unexpected errors encountered.</li>
 </ul>
@@ -1156,7 +1171,7 @@ your business domain. You can take any type as E.</p>
 <p>Panics, on the contrary, are failures you never expected. Your computation
 can not progress further. All you can do when panics occur, is stopping your
 computation gracefully (like releasing resources before dying). The panic type
-is always Exception.</p>
+is always TracedException.</p>
 <p>As an example, if your program is an HTTP server. Errors are bad requests
 (errors code 400) while panics are internal server errors (errors code 500).
 Receiving bad request is part of the normal life of any HTTP server, it must
@@ -1176,7 +1191,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     - *Errors(some_errors: List[E])*
             The computation failed with an expected errors.
             The errors some_errors, of type List[E], is the expected errors encountered.
-    - *Panic(some_exceptions: List[Exception], errors: List[E])*
+    - *Panic(some_exceptions: List[TracedException], errors: List[E])*
             The computation failed on an unexpected errors.
             The exceptions some_exceptions is the unexpected errors encountered.
 
@@ -1191,7 +1206,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     Panics, on the contrary, are failures you never expected. Your computation
     can not progress further. All you can do when panics occur, is stopping your
     computation gracefully (like releasing resources before dying). The panic type
-    is always Exception.
+    is always TracedException.
 
     As an example, if your program is an HTTP server. Errors are bad requests
     (errors code 400) while panics are internal server errors (errors code 500).
@@ -1317,8 +1332,8 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         return self.unsafe_fold(
             lambda x: Ok(f(x)),
-            lambda x: Errors(list(map(g, x))),
-            lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
+            lambda x: Errors([g(y) for y in x]),
+            lambda x, y: Panic(exceptions=[h(z) for z in x], errors=[g(z) for z in y]),
         )
 
     @safe
@@ -1420,7 +1435,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Errors):
-            return Errors(list(map(f, self.errors)))
+            return Errors([f(e) for e in self.errors])
         return self  # type: ignore
 
     @safe
@@ -1458,7 +1473,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return Panic(list(map(f, self.exceptions)), self.errors)
+            return Panic(
+                exceptions=[f(exn) for exn in self.exceptions], errors=self.errors
+            )
         return self
 
     @safe
@@ -1545,7 +1562,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.catch"><code class="name flex">
@@ -1561,7 +1580,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.flat_map"><code class="name flex">
@@ -1577,7 +1598,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.flatten"><code class="name flex">
@@ -1611,7 +1634,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.fold_raise"><code class="name flex">
@@ -1627,7 +1652,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.is_error"><code class="name flex">
@@ -1691,7 +1718,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.map_error"><code class="name flex">
@@ -1707,7 +1736,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.map_panic"><code class="name flex">
@@ -1723,7 +1754,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.raise_on_panic"><code class="name flex">
@@ -1762,7 +1795,9 @@ If it is a <code><a title="raffiot.untyped.result.Panic" href="#raffiot.untyped.
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.to_computation_status"><code class="name flex">
@@ -1798,7 +1833,9 @@ If it is a <code><a title="raffiot.untyped.result.Panic" href="#raffiot.untyped.
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.result.Result.unsafe_ap"><code class="name flex">
@@ -2017,7 +2054,7 @@ If it is a <code><a title="raffiot.untyped.result.Panic" href="#raffiot.untyped.
     :return:
     &#34;&#34;&#34;
     if isinstance(self, Errors):
-        return Errors(list(map(f, self.errors)))
+        return Errors([f(e) for e in self.errors])
     return self  # type: ignore</code></pre>
 </details>
 </dd>
@@ -2035,7 +2072,9 @@ If it is a <code><a title="raffiot.untyped.result.Panic" href="#raffiot.untyped.
     Transform the exceptions stored if this result is a `Panic(some_exception)`.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        return Panic(list(map(f, self.exceptions)), self.errors)
+        return Panic(
+            exceptions=[f(exn) for exn in self.exceptions], errors=self.errors
+        )
     return self</code></pre>
 </details>
 </dd>
@@ -2090,8 +2129,8 @@ Otherwise do nothing.</p></div>
     &#34;&#34;&#34;
     return self.unsafe_fold(
         lambda x: Ok(f(x)),
-        lambda x: Errors(list(map(g, x))),
-        lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
+        lambda x: Errors([g(y) for y in x]),
+        lambda x, y: Panic(exceptions=[h(z) for z in x], errors=[g(z) for z in y]),
     )</code></pre>
 </details>
 </dd>

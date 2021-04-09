@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any, Iterable, Union
+from typing import Generic, TypeVar, Callable, List, Any
 
 from typing_extensions import final
 
@@ -104,7 +104,7 @@ class Val(Generic[A]):
         return Val(self.value.value)
 
     @classmethod
-    def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -> Val[List[A]]:
+    def zip(cls, *vals: Val[A]) -> Val[List[A]]:
         """ "
         Group these list of Val into a Val of List
         """

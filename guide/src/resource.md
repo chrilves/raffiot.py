@@ -157,9 +157,10 @@ If the inner `IO` fails, the string is still released!
 ```python
 >>> io_panic : IO[None,None,None] = rs.use(lambda s: io.panic(Exception("BOOM!")))
 >>> io_panic.run(None)
-Opening PSUNW6M5
-Closing PSUNW6M5
-Panic(exception=Exception('BOOM!'))
+Opening N1H4A63V
+Closing N1H4A63V
+Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+  stack_trace='...')], errors=[])
 ```
 
 If the inner `IO` panics, the string is still released too!
@@ -293,7 +294,8 @@ Errors(errors=['Oups!'])
 ...   )
 ... )
 >>> io_panic.run(None)
-Opening R1V3A0SO
-Closing R1V3A0SO
-Panic(exceptions=[Exception('BOOM!')], errors=[])
+Opening 5YZ02058
+Closing 5YZ02058
+Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+  stack_trace='...')], errors=[])
 ```

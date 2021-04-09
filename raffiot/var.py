@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any, Tuple, Iterable, Union
+from typing import Generic, TypeVar, Callable, List, Any, Tuple
 
 from typing_extensions import final
 
@@ -260,7 +260,7 @@ class Var(Generic[A]):
         return self._lock.with_(io.defer_io(h))
 
     @classmethod
-    def zip(cls, *vars: Union[Var[A], Iterable[Var[A]]]) -> IO[Any, None, List[A]]:
+    def zip(cls, *vars: Var[A]) -> IO[Any, None, List[A]]:
         """ "
         Group these variables current values into a list.
         """

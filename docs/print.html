@@ -456,7 +456,9 @@ it doing as little damage as possible.</p>
 <p><em>Raffiot</em> is designed to <strong>report all encountered failures</strong>. Failures are
 never silently ignored but exposed via the <code>Result</code> type. This is why the
 <code>Result</code> type works with lists of domain failures (<em>errors</em>) and unexpected
-failures (<em>panics</em>).</p>
+failures (<em>panics</em>). In addition, <em>Raffiot</em> saves the stack trace of every
+exception encountered so that you always know where the exception was risen,
+even with multiprocessing!</p>
 <p>For the rest of this section, you will need these imports.</p>
 <pre><code class="language-python">&gt;&gt;&gt; from raffiot import *
 </code></pre>
@@ -490,19 +492,57 @@ Errors(errors=[5])
 &gt;&gt;&gt; result.errors(5, 2)
 Errors(errors=[5, 2])
 </code></pre>
-<h3 id="panicexceptions-listexception-errors-liste--some-unexpected-failures"><a class="header" href="#panicexceptions-listexception-errors-liste--some-unexpected-failures"><code>Panic(exceptions: List[Exception], errors: List[E])</code> : Some Unexpected Failures</a></h3>
-<p>When a computation fail because of an unexpected failure,
-it actually return a value <code>Panic(exceptions=[p],errors=[])</code> of type <code>Result[Any,Any]</code>
-where <code>p</code> is the exception encountered.
-The exception type is always the Python exception type <code>Exception</code>.
-The exceptions encountered can be obtained by <code>Panic([p],[]).exceptions</code>.</p>
-<pre><code class="language-python">&gt;&gt;&gt; r : Result[Any,Any] = Panic(exceptions=[Exception(&quot;BOOM!&quot;)], errors=[])
+<h3 id="traced-exceptions-never-lose-a-stack-trace"><a class="header" href="#traced-exceptions-never-lose-a-stack-trace">Traced Exceptions: Never lose a stack trace!</a></h3>
+<p><em>Raffiot</em> lift every exception encountered during a computation into a
+<code>TracedException</code>. This is a very simple type:</p>
+<pre><code class="language-python">@dataclass
+class TracedException(Exception):
+    exception: Exception
+    stack_trace: str
+</code></pre>
+<p>It packs an exception with its stack trace. To the best of our knowledge, Python
+does not seem to store the stack trace with the exception but only keep the stack
+trace of the last one encountered. This is a huge problem because in a parallel
+or concurrent computation, many exception can be raised. If you use
+multiprocessing, they can even be raises on a different process!</p>
+<p>When you have an exception <code>exn</code>, there are two ways to build a <code>TracedException</code>:</p>
+<ul>
+<li>If you are in the <code>except</code> clause of the <code>try-except</code> block that caught the
+exception <code>exn</code>, you can call the static method
+<code>TracedException.in_except_clause(exn)</code> to capture the stack trace of the
+exception. <strong>Note that it only works in the except clause!</strong></li>
+<li>If you are not in the <code>except</code> clause of the <code>try-except</code> block that caught the
+exception <code>exn</code>, you can call the static method
+<code>TracedException.with_stack_trace(exn)</code> to capture the current stack trace.</li>
+</ul>
+<h3 id="panicexceptions-listtracedexception-errors-liste--some-unexpected-failures"><a class="header" href="#panicexceptions-listtracedexception-errors-liste--some-unexpected-failures"><code>Panic(exceptions: List[TracedException], errors: List[E])</code> : Some Unexpected Failures</a></h3>
+<p>When a computation fail because of a exception <code>exn</code>,
+it actually return a value
+<code>Panic(exceptions=[TracedException(exception=exn, stack_trace=&quot;...&quot;)],errors=[])</code>
+of type <code>Result[Any,Any]</code>.
+Note that a <code>Panic</code> stores a list of traced exceptions and not a single one.
+The original exception <code>exn</code> can be obtained by
+<code>Panic([TracedException(exn)],[]).exceptions[0].exception</code> and its stack trace
+by <code>Panic([TracedException(exn)],[]).exceptions[0].stack_trace</code>.</p>
+<pre><code class="language-python">&gt;&gt;&gt; r : Result[Any,Any] = Panic(
+...   exceptions=[TracedException.with_stack_trace(Exception(&quot;BOOM!&quot;))],
+...   errors=[]
+... )
 &gt;&gt;&gt; r
-Panic(exceptions=[Exception('BOOM!')], errors=[])
+Panic(
+  exceptions=[TracedException(exception=Exception('BOOM!'), stack_trace='...')],
+  errors=[]
+)
 &gt;&gt;&gt; r.exceptions
-[Exception('BOOM!')]
+[TracedException(exception=Exception('BOOM!'), stack_trace='...')]
 &gt;&gt;&gt; r.errors
 []
+&gt;&gt;&gt; r.exceptions[0].exception
+Exception('BOOM!')
+&gt;&gt;&gt; print(r.exceptions[0].stack_trace)
+  File &quot;&lt;stdin&gt;&quot;, line 2, in &lt;module&gt;
+  File &quot;/raffiot.py/raffiot/utils.py&quot;, line 63, in with_stack_trace
+    return TracedException(exception=exn, stack_trace=&quot;&quot;.join(format_stack()))
 </code></pre>
 <p>When an unexpected failures happen, there may have already been some expected
 failures. This is why the <code>Panic</code> case have a list of errors slot. The list
@@ -511,37 +551,50 @@ Using the <code>Panic</code> constructor is error-prone as you <strong>must alwa
 for the <code>exceptions</code>and <code>errors</code>field. Instead you can use the helper function
 <code>result.panic</code>:</p>
 <pre><code class="language-python">&gt;&gt;&gt; result.panic(Exception(&quot;BOOM&quot;))
-Panic(exceptions=[Exception('BOOM')], errors=[])
+Panic(exceptions=[TracedException(exception=Exception('BOOM'), stack_trace='...')], errors=[])
 &gt;&gt;&gt; result.panic(Exception(&quot;BOOM 1&quot;), Exception(&quot;BOOM 2&quot;))
-Panic(exceptions=[Exception('BOOM 1'), Exception('BOOM 2')], errors=[])
+Panic(exceptions=[
+    TracedException(exception=Exception('BOOM 1'), stack_trace='...'),
+    TracedException(exception=Exception('BOOM 2'), stack_trace='...')
+  ],
+  errors=[])
 &gt;&gt;&gt; result.panic(Exception(&quot;BOOM 1&quot;), Exception(&quot;BOOM 2&quot;), errors=[5,2])
-Panic(exceptions=[Exception('BOOM 1'), Exception('BOOM 2')], errors=[5, 2])
+Panic(exceptions=[
+    TracedException(exception=Exception('BOOM 1'), stack_trace='...'),
+    TracedException(exception=Exception('BOOM 2'), stack_trace='...')
+  ],
+  errors=[5, 2]
+)
 </code></pre>
 <h3 id="fold--transforming-a-resultea"><a class="header" href="#fold--transforming-a-resultea"><code>fold</code> : transforming a <code>Result[E,A]</code></a></h3>
 <p>To transform a <code>Result[E,A]</code>, use the method <code>fold</code>. It takes
 as argument three functions. The first one is called when the
 result is an <code>Ok</code>. The second is called when it are some <code>Errors</code>.
 The third is called on <code>Panic</code>. When called, each of
-these function receive as argument the value/list of errors/list exceptions and
-errors (depending on the case) stored in the result:</p>
+these function receive as argument the value/list of errors/list of traced
+exceptions and errors (depending on the case) stored in the result:</p>
 <pre><code class="language-python">&gt;&gt;&gt; Ok(5).fold(
 ...   lambda s: f&quot;success: {s}&quot;,
 ...   lambda e: f&quot;errors: {e}&quot;,
-...   lambda p,e: f&quot;exeptions: {p}, errors: {e}&quot;
+...   lambda p,e: f&quot;traced exeptions: {p}, errors: {e}&quot;
 ... )
 'success: 5'
 &gt;&gt;&gt; result.errors(7,5).fold(
 ...   lambda s: f&quot;success: {s}&quot;,
 ...   lambda e: f&quot;errors: {e}&quot;,
-...   lambda p,e: f&quot;exeptions: {p}, errors: {e}&quot;
+...   lambda p,e: f&quot;traced exeptions: {p}, errors: {e}&quot;
 ... )
 'error: [7,5]'
 &gt;&gt;&gt; result.panic(Exception(&quot;BOOM 1&quot;), Exception(&quot;BOOM 2&quot;), errors=[5,2]).fold(
 ...   lambda s: f&quot;success: {s}&quot;,
 ...   lambda e: f&quot;errors: {e}&quot;,
-...   lambda p,e: f&quot;exeptions: {p}, errors: {e}&quot;
+...   lambda p,e: f&quot;traced exeptions: {p}, errors: {e}&quot;
 ... )
-&quot;exeptions: [Exception('BOOM 1'), Exception('BOOM 2')], errors: [5, 2]&quot;
+'traced exeptions: [
+    TracedException(exception=Exception(\'BOOM 1\'), stack_trace=\'...\'),
+    TracedException(exception=Exception(\'BOOM 2\'), stack_trace=\'...\')
+  ],
+  errors: [5, 2]'
 </code></pre>
 <h3 id="raise_on_panic--reporting-panics-as-exceptions"><a class="header" href="#raise_on_panic--reporting-panics-as-exceptions"><code>raise_on_panic</code> : reporting panics as exceptions</a></h3>
 <p><em>Raffiot</em>'s functions and methods never raise exception
@@ -555,22 +608,47 @@ Errors(errors=[7])
 &gt;&gt;&gt; result.panic(Exception(&quot;BOOM!&quot;)).raise_on_panic()
 Traceback (most recent call last):
   File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;
-  File &quot;/home/tof/dev/raffiot.py/raffiot/result.py&quot;, line 434, in raise_on_panic
+  File &quot;/dev/raffiot.py/raffiot/result.py&quot;, line 441, in raise_on_panic
     raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
-Exception: BOOM!
+raffiot.utils.TracedException: BOOM!
+  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;
+  File &quot;/dev/raffiot.py/raffiot/result.py&quot;, line 559, in panic
+    exceptions=TracedException.ensure_list_traced(exceptions),
+  File &quot;/dev/raffiot.py/raffiot/utils.py&quot;, line 76, in ensure_list_traced
+    return [cls.ensure_traced(exn) for exn in exceptions]
+  File &quot;/dev/raffiot.py/raffiot/utils.py&quot;, line 76, in &lt;listcomp&gt;
+    return [cls.ensure_traced(exn) for exn in exceptions]
+  File &quot;/dev/raffiot.py/raffiot/utils.py&quot;, line 70, in ensure_traced
+    return cls.with_stack_trace(exception)
+  File &quot;/dev/raffiot.py/raffiot/utils.py&quot;, line 66, in with_stack_trace
+    return TracedException(exception=exn, stack_trace=&quot;&quot;.join(format_stack()))
 </code></pre>
-<p><code>raise_on_panic</code> is <strong>the only function/method raising exceptions</strong>.
+<p><code>raise_on_panic</code> and <code>unsafe_get</code> are
+<strong>the only functions/methods raising exceptions</strong>.
 Never expect other functions to raise exception on failures, they
 will return an <code>Errors</code> or <code>Panic</code> instead:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,None] = io.panic(Exception(&quot;BOOM!&quot;))
 &gt;&gt;&gt; main.run(None)
-Panic(exceptions=[Exception('BOOM!')], errors=[])
+Panic(exceptions=[
+  TracedException(exception=Exception('BOOM!'), stack_trace='...')
+  ], errors=[])
 &gt;&gt;&gt; main.run(None).raise_on_panic()
 Traceback (most recent call last):
   File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;
-  File &quot;/home/tof/dev/raffiot.py/raffiot/result.py&quot;, line 434, in raise_on_panic
+  File &quot;/raffiot.py/raffiot/result.py&quot;, line 441, in raise_on_panic
     raise MultipleExceptions.merge(*self.exceptions, errors=self.errors)
-Exception: BOOM!
+raffiot.utils.TracedException: BOOM!
+  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;
+  File &quot;/raffiot.py/raffiot/io.py&quot;, line 467, in panic
+    TracedException.ensure_list_traced(exceptions),
+  File &quot;raffiot.py/raffiot/utils.py&quot;, line 76, in ensure_list_traced
+    return [cls.ensure_traced(exn) for exn in exceptions]
+  File &quot;raffiot.py/raffiot/utils.py&quot;, line 76, in &lt;listcomp&gt;
+    return [cls.ensure_traced(exn) for exn in exceptions]
+  File &quot;raffiot.py/raffiot/utils.py&quot;, line 70, in ensure_traced
+    return cls.with_stack_trace(exception)
+  File &quot;/raffiot.py/raffiot/utils.py&quot;, line 66, in with_stack_trace
+    return TracedException(exception=exn, stack_trace=&quot;&quot;.join(format_stack()))
 </code></pre>
 <h2 id="errors-expected-failures-in-io"><a class="header" href="#errors-expected-failures-in-io">Errors: Expected failures in IO</a></h2>
 <p><code>IO</code> has built-in support errors. Remember that we call error the
@@ -662,7 +740,10 @@ run them inside a <code>try-except</code> block to catch every raised exception.
 All exception caught this way are transformed into panics:</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,float] = io.pure(0).map(lambda x: 1/x)
 &gt;&gt;&gt; main.run(None)
-Panic(exceptions=[ZeroDivisionError('division by zero')], errors=[])
+Panic(exceptions=[TracedException(
+    exception=ZeroDivisionError('division by zero'),
+    stack_trace='...')
+  ], errors=[])
 </code></pre>
 <p>Remember that panics are unexpected failures and unexpected failures
 should never happen. In an ideal world you should never give to
@@ -677,7 +758,10 @@ but still did happen. If your program is not designed to handle this
 situation, you should raise a panic.</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,Any] = io.panic(Exception(&quot;BOOM!&quot;))
 &gt;&gt;&gt; main.run(None)
-Panic(exceptions=[Exception('BOOM!')], errors=[])
+Panic(exceptions=[TracedException(
+    exception=Exception('BOOM!'),
+    stack_trace='...')
+  ], errors=[])
 </code></pre>
 <p>The function <code>io.panic</code> accepts several exceptions as arguments and even
 domain errors with the <code>errors</code> keyword argument.</p>
@@ -687,18 +771,22 @@ actions to recover. For example, you may want to restart the computation
 on panics. To react to panics, just call <code>recover</code>.
 It is very similar to a <code>try-exept</code> block.
 It takes as argument a function, called the <em>panic handler</em>.
-If the computation fails because of a panic with exceptions <code>lexn: List[Exception]</code>,
+If the computation fails because of a panic with exceptions
+<code>lexn: List[TracedException]</code>,
 and errors <code>lerr: List[E]</code>, then the panic handler is called with <code>lexn</code> as
 first argument and <code>lerr</code>as its second argument.
 The result is then the the handler's result.</p>
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None,None,Any] = (
 ...   io.panic(Exception(&quot;BOOM!&quot;))
-...   .recover(lambda lexn, lerr: io.pure(f&quot;Recovered from exceptions: {lexn} and errors {lerr}&quot;))
+...   .recover(lambda lexn, lerr: io.pure(
+...     f&quot;Recovered from traced exceptions: {lexn} and errors {lerr}&quot;)
+...   )
 ... )
 &gt;&gt;&gt; main.run(None)
-Ok(success=&quot;Recovered from exceptions: [Exception('BOOM!')] and errors []&quot;)
+Ok(success='Recovered from traced exceptions:[TracedException('
+  'exception=Exception(\'BOOM!\'), stack_trace=\'...')] and errors []')
 </code></pre>
-<h3 id="map_panic--transforming-exceptions"><a class="header" href="#map_panic--transforming-exceptions"><code>map_panic</code> : transforming exceptions.</a></h3>
+<h3 id="map_panic--transforming-traced-exceptions"><a class="header" href="#map_panic--transforming-traced-exceptions"><code>map_panic</code> : transforming traced exceptions.</a></h3>
 <p>It is often useful to transform a panic. For example you may
 want to add some useful information about the context: what
 was the request that led to this error, what were the arguments
@@ -708,10 +796,16 @@ It behaves like <code>map</code>, but on exceptions contained in <code>Panic</co
 <pre><code class="language-python">&gt;&gt;&gt; main : IO[None, None, None] = (
 ...   io.pure(0)
 ...   .map(lambda x: 1/x)
-...   .map_panic(lambda exception: Exception(&quot;BOOM&quot;))
+...   .map_panic(lambda traced_exception:
+...     TracedException(
+...       exception=Exception(&quot;BOOM&quot;),
+...       stack_trace=traced_exception.stack_trace
+...     )
+...   )
 ... )
 &gt;&gt;&gt; main.run(None)
-Panic(exceptions=[Exception('BOOM')], errors=[])
+Panic(exceptions=[TracedException(exception=Exception('BOOM'),
+ stack_trace='...')], errors=[])
 </code></pre>
 <h3 id="more-tools"><a class="header" href="#more-tools">More tools</a></h3>
 <p>Here are some very useful functions. They can all be expressed using the
@@ -730,7 +824,8 @@ Ok(success=Ok(success=5))
 Ok(success=Errors(errors=[7]))
 &gt;&gt;&gt; io_panic : IO[None,None,Result[None,None]] = io.panic(Exception(&quot;BOOM!&quot;)).attempt()
 &gt;&gt;&gt; io_panic.run(None)
-Ok(success=Panic(exceptions=[Exception('BOOM!')], errors=[]))
+Ok(success=Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+ stack_trace='...')], errors=[]))
 </code></pre>
 <p>It is hugely useful when you want to do different actions depending
 on the result of a computation. Calling <code>attempt</code> and <code>flat_map</code> is
@@ -743,9 +838,11 @@ It transform a <code>Result[E,A]</code> into the corresponding <code>IO[None,E,A
 &gt;&gt;&gt; io_error : IO[None,int,None] = io.from_result(result.error(5))
 &gt;&gt;&gt; io_error.run(None)
 Errors(errors=[5])
-&gt;&gt;&gt; io_panic : IO[None,None,None] = io.from_result(result.panic(Exception(&quot;BOOM!&quot;)))
+&gt;&gt;&gt; io_panic : IO[None,None,None] = io.from_result(result.panic(
+...   TracedException(Exception(&quot;BOOM!&quot;),&quot;&quot;)))
 &gt;&gt;&gt; io_panic.run(None)
-Panic(exceptions=[Exception('BOOM!')], errors=[])
+Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+  stack_trace='')], errors=[])
 </code></pre>
 <p><code>from_result</code> is often useful after an <code>attempt</code> to restore the state
 of the computation.</p>
@@ -763,8 +860,10 @@ Ok(success=5)
 Hello, result is Errors(errors=[7])
 Errors(errors=[7])
 &gt;&gt;&gt; io.panic(Exception(&quot;BOOM!&quot;)).finally_(lambda r: io.defer(print, f&quot;Hello, result is {r}&quot;)).run(None)
-Hello, result is Panic(exceptions=[Exception('BOOM!')], errors=[])
-Panic(exceptions=[Exception('BOOM!')], errors=[])
+Hello, result is Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+  stack_trace='...')], errors=[])
+Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+  stack_trace='...')], errors=[])
 </code></pre>
 <h3 id="on_failure--reaction-to-both-errors-and-panics"><a class="header" href="#on_failure--reaction-to-both-errors-and-panics"><code>on_failure</code> : reaction to both errors and panics.</a></h3>
 <p>Calling both methods <code>catch</code> and <code>recover</code> is sometimes annoying.
@@ -1492,9 +1591,10 @@ Error(error='Oups!')
 <p>If the inner <code>IO</code> fails, the string is still released!</p>
 <pre><code class="language-python">&gt;&gt;&gt; io_panic : IO[None,None,None] = rs.use(lambda s: io.panic(Exception(&quot;BOOM!&quot;)))
 &gt;&gt;&gt; io_panic.run(None)
-Opening PSUNW6M5
-Closing PSUNW6M5
-Panic(exception=Exception('BOOM!'))
+Opening N1H4A63V
+Closing N1H4A63V
+Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+  stack_trace='...')], errors=[])
 </code></pre>
 <p>If the inner <code>IO</code> panics, the string is still released too!</p>
 <p>Note: the <code>with_(an_io)</code> method is a nice alias for <code>use(lambda _: an_io)</code>.</p>
@@ -1600,9 +1700,10 @@ Errors(errors=['Oups!'])
 ...   )
 ... )
 &gt;&gt;&gt; io_panic.run(None)
-Opening R1V3A0SO
-Closing R1V3A0SO
-Panic(exceptions=[Exception('BOOM!')], errors=[])
+Opening 5YZ02058
+Closing 5YZ02058
+Panic(exceptions=[TracedException(exception=Exception('BOOM!'),
+  stack_trace='...')], errors=[])
 </code></pre>
 <h1 id="variables"><a class="header" href="#variables">Variables</a></h1>
 <p><code>IO</code> is heavily expression based but <em>Python</em> does not allow to define local

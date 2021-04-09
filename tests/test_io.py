@@ -6,10 +6,10 @@ from unittest import TestCase
 import hypothesis.strategies as st
 from hypothesis import given
 
-from raffiot.io import *
-from raffiot.result import Result, ok
-from raffiot.utils import MatchError
 from raffiot import result
+from raffiot.io import *
+from raffiot.result import Result
+from raffiot.utils import MatchError, TracedException
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)
@@ -39,9 +39,10 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_ap_panic(self, u: str, v: str) -> None:
-        assert pure(lambda x, y: x + y).ap(pure(u), panic(MatchError(v))).run(
+        exn = TracedException.with_stack_trace(MatchError(v))
+        assert pure(lambda x, y: x + y).ap(pure(u), panic(exn)).run(
             None
-        ) == result.panic(MatchError(v))
+        ) == result.panic(exn)
 
     @given(st.lists(st.text()))
     def test_zip(self, l: List[str]) -> None:
@@ -53,9 +54,9 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_zip_panic(self, u: str, v: str) -> None:
-        assert zip(pure(u), panic(MatchError(v))).run(None) == result.panic(
-            MatchError(v)
-        )
+        assert zip(pure(u), panic(TracedException(MatchError(v), ""))).run(
+            None
+        ) == result.panic(TracedException(MatchError(v), ""))
 
     @given(st.integers(), st.integers(), st.integers(), st.lists(st.text()))
     def test_sequence(self, x: int, y: int, z: int, l: List[str]) -> None:
@@ -91,9 +92,9 @@ class TestIO(TestCase):
         def f(i):
             state[i] = arr[i]
 
-        assert sequence(defer(f, 0), panic(MatchError(w)), defer(f, 1)).run(
-            None
-        ) == result.panic(MatchError(w))
+        assert sequence(
+            defer(f, 0), panic(TracedException(MatchError(w), "")), defer(f, 1)
+        ).run(None) == result.panic(TracedException(MatchError(w), ""))
         assert state == [u, None]
 
     @given(st.text())
@@ -114,26 +115,26 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_not_catch_panic(self, u: str, v: str) -> None:
-        pan = MatchError(u)
+        pan = TracedException.with_stack_trace(MatchError(u))
         assert panic(pan).catch(lambda x: pure(x + v)).run(None) == result.panic(pan)
 
     @given(st.text())
     def test_panic(self, err: str) -> None:
-        pan = MatchError(err)
+        pan = TracedException(MatchError(err), "")
         assert panic(pan).run(None) == result.panic(pan)
 
     @given(st.text(), st.text())
     def test_map_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
-        puv = MatchError(u + v)
-        assert panic(pu).map_panic(lambda x: MatchError(x.message + v)).run(
-            None
-        ) == result.panic(puv)
+        pu = TracedException(MatchError(u), "")
+        puv = TracedException(MatchError(u + v), "")
+        assert panic(pu).map_panic(
+            lambda x: TracedException(MatchError(x.exception.message + v), "")
+        ).run(None) == result.panic(puv)
 
     @given(st.text(), st.text())
     def test_recover_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
-        assert panic(pu).recover(lambda x, e: pure(x[0].message + v)).run(
+        pu = TracedException(MatchError(u), "")
+        assert panic(pu).recover(lambda x, e: pure(x[0].exception.message + v)).run(
             None
         ) == result.ok(u + v)
 
@@ -144,10 +145,6 @@ class TestIO(TestCase):
     @given(st.text(), st.text())
     def test_not_catch_error(self, u: str, v: str) -> None:
         assert error(u).catch(lambda x: pure(v)).run(None) == result.ok(v)
-
-    @given(st.text())
-    def test_panic(self, pan: str) -> None:
-        assert panic(MatchError(pan)).run(None) == result.panic(MatchError(pan))
 
     @given(st.text(), st.text())
     def test_on_failure_ok(self, u: str, v: str) -> None:
@@ -161,7 +158,7 @@ class TestIO(TestCase):
 
     @given(st.text(), st.text())
     def test_on_failure_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
+        pu = TracedException.with_stack_trace(MatchError(u))
         assert panic(pu).map(lambda _: v).on_failure(pure).run(None) == result.ok(
             result.panic(pu)
         )
@@ -184,7 +181,7 @@ class TestIO(TestCase):
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:
-        pu = MatchError(u)
+        pu = TracedException.with_stack_trace(MatchError(u))
         assert panic(pu).attempt().run(None) == result.ok(result.panic(pu))
 
     @given(st.text())
@@ -219,7 +216,7 @@ class TestIO(TestCase):
                 return result.ok(j)
             if j % 3 == 1:
                 return result.error(j)
-            return result.panic(MatchError(j))
+            return result.panic(TracedException(MatchError(j), ""))
 
         def f(context: R, j: int) -> Result[E, A]:
             return g(j + k)
@@ -267,10 +264,12 @@ class TestIO(TestCase):
 
         assert sequence(ios).run(None) == result.ok(x)
 
-    @given(st.text(), st.lists(st.text()))
-    def test_async(self, s: str, l: List[str]) -> None:
-        l = l[0:2]
-
+    @given(
+        st.text(),
+        st.lists(st.text(), min_size=0, max_size=3),
+        st.floats(min_value=0, max_value=0.01),
+    )
+    def test_async(self, s: str, l: List[str], sleeping_time: float) -> None:
         with ThreadPoolExecutor() as pool:
             expected = s
             for u in l:
@@ -279,7 +278,7 @@ class TestIO(TestCase):
             def get_async(v, u):
                 def f(r, k):
                     def h():
-                        time.sleep(0.01)
+                        time.sleep(sleeping_time)
                         k(result.ok(v + u))
 
                     pool.submit(h)
@@ -300,12 +299,12 @@ class TestIO(TestCase):
             if j % 5 == 1:
                 return error(j)
             if j % 5 == 2:
-                return panic(MatchError(j))
+                return panic(TracedException(MatchError(j), ""))
             if j % 5 == 3:
                 return defer(print, j)
 
             def h():
-                raise MatchError(j)
+                raise TracedException(MatchError(j), "")
 
             return defer(h)
 
@@ -315,10 +314,10 @@ class TestIO(TestCase):
             if j % 5 == 1:
                 return result.error(j)
             if j % 5 == 2:
-                return result.panic(MatchError(j))
+                return result.panic(TracedException(MatchError(j), ""))
             if j % 5 == 3:
                 return result.ok(None)
-            return result.panic(MatchError(j))
+            return result.panic(TracedException(MatchError(j), ""))
 
         assert parallel([f(s) for s in l]).flat_map(wait).run(None) == result.ok(
             [g(s) for s in l]

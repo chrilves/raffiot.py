@@ -26,14 +26,18 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">from collections import abc
-from dataclasses import dataclass
-from typing import Any, List, Generic, TypeVar
-from enum import IntEnum
-from typing_extensions import final
+<pre><code class="python">from __future__ import annotations
+
 from collections import abc
+from dataclasses import dataclass
+from enum import IntEnum
+from traceback import format_exc, format_stack
+from typing import Any, List, Generic, TypeVar, Iterable
+
+from typing_extensions import final
 
 __all__ = [
+    &#34;TracedException&#34;,
     &#34;MatchError&#34;,
     &#34;MultipleExceptions&#34;,
     &#34;ComputationStatus&#34;,
@@ -42,6 +46,62 @@ __all__ = [
 ]
 
 E = TypeVar(&#34;E&#34;, covariant=True)
+
+
+@final
+@dataclass
+class TracedException(Exception):
+    __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
+
+    exception: Exception
+    &#34;&#34;&#34;
+    The exception that was raised.
+    &#34;&#34;&#34;
+
+    stack_trace: str
+    &#34;&#34;&#34;
+    Its stack trace.
+    &#34;&#34;&#34;
+
+    def __str__(self):
+        return f&#34;{self.exception}\n{self.stack_trace}&#34;
+
+    @classmethod
+    def in_except_clause(cls, exn: Exception) -&gt; TracedException:
+        &#34;&#34;&#34;
+        Collect the stack trace of the exception.
+
+        BEWARE: this method should only be used in the except clause
+        of a try-except block and called with the caught exception!
+
+        :param exn:
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace=format_exc())
+
+    @classmethod
+    def with_stack_trace(cls, exn: Exception) -&gt; TracedException:
+        &#34;&#34;&#34;
+        Collect the stack trace at the current position.
+
+        :param exn:
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace=&#34;&#34;.join(format_stack()))
+
+    @classmethod
+    def ensure_traced(cls, exception: Exception) -&gt; TracedException:
+        return cls.with_stack_trace(exception)
+
+    @classmethod
+    def ensure_list_traced(
+        cls, exceptions: Iterable[Exception]
+    ) -&gt; List[TracedException]:
+        return [cls.ensure_traced(exn) for exn in exceptions]
 
 
 @dataclass
@@ -64,7 +124,7 @@ class MultipleExceptions(Exception, Generic[E]):
 
     __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
-    exceptions: List[Exception]
+    exceptions: List[TracedException]
     &#34;&#34;&#34;
     The list exceptions encountered
     &#34;&#34;&#34;
@@ -75,7 +135,7 @@ class MultipleExceptions(Exception, Generic[E]):
     &#34;&#34;&#34;
 
     @classmethod
-    def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
+    def merge(cls, *exceptions: TracedException, errors: List[E] = None) -&gt; Exception:
         &#34;&#34;&#34;
         Merge some exceptions, retuning the exceptions if there is only one
         or a  `MultipleExceptions` otherwise.
@@ -103,6 +163,14 @@ class MultipleExceptions(Exception, Generic[E]):
             return base_exceptions[0]
         base_exceptions.reverse()
         return MultipleExceptions(base_exceptions, errs)
+
+    def __str__(self):
+        msg = &#34;&#34;
+        for traced in self.exceptions:
+            msg += f&#34;\nException: {traced.exception}\n{traced.stack_trace}&#34;
+        for err in self.errors:
+            msg += f&#34;\nError: {err}&#34;
+        return msg
 
 
 @final
@@ -208,7 +276,7 @@ class ComputationStatus(IntEnum):
 </dd>
 <dt id="raffiot.utils.DomainErrors"><code class="flex name class">
 <span>class <span class="ident">DomainErrors</span></span>
-<span>(</span><span>errors: List[+E])</span>
+<span>(</span><span>errors: List[E])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Errors from the business domain</p></div>
@@ -283,7 +351,7 @@ class MatchError(Exception):
 </dd>
 <dt id="raffiot.utils.MultipleExceptions"><code class="flex name class">
 <span>class <span class="ident">MultipleExceptions</span></span>
-<span>(</span><span>exceptions: List[Exception], errors: List[+E])</span>
+<span>(</span><span>exceptions: List[<a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a>], errors: List[E])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Represents</p></div>
@@ -300,7 +368,7 @@ class MultipleExceptions(Exception, Generic[E]):
 
     __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
-    exceptions: List[Exception]
+    exceptions: List[TracedException]
     &#34;&#34;&#34;
     The list exceptions encountered
     &#34;&#34;&#34;
@@ -311,7 +379,7 @@ class MultipleExceptions(Exception, Generic[E]):
     &#34;&#34;&#34;
 
     @classmethod
-    def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
+    def merge(cls, *exceptions: TracedException, errors: List[E] = None) -&gt; Exception:
         &#34;&#34;&#34;
         Merge some exceptions, retuning the exceptions if there is only one
         or a  `MultipleExceptions` otherwise.
@@ -338,7 +406,15 @@ class MultipleExceptions(Exception, Generic[E]):
         if len(base_exceptions) == 1:
             return base_exceptions[0]
         base_exceptions.reverse()
-        return MultipleExceptions(base_exceptions, errs)</code></pre>
+        return MultipleExceptions(base_exceptions, errs)
+
+    def __str__(self):
+        msg = &#34;&#34;
+        for traced in self.exceptions:
+            msg += f&#34;\nException: {traced.exception}\n{traced.stack_trace}&#34;
+        for err in self.errors:
+            msg += f&#34;\nError: {err}&#34;
+        return msg</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -349,7 +425,7 @@ class MultipleExceptions(Exception, Generic[E]):
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.utils.MultipleExceptions.merge"><code class="name flex">
-<span>def <span class="ident">merge</span></span>(<span>*exceptions: Exception, errors: List[+E] = None) ‑> Exception</span>
+<span>def <span class="ident">merge</span></span>(<span>*exceptions: <a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a>, errors: List[E] = None) ‑> Exception</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Merge some exceptions, retuning the exceptions if there is only one
@@ -363,7 +439,7 @@ or a
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
+def merge(cls, *exceptions: TracedException, errors: List[E] = None) -&gt; Exception:
     &#34;&#34;&#34;
     Merge some exceptions, retuning the exceptions if there is only one
     or a  `MultipleExceptions` otherwise.
@@ -400,9 +476,177 @@ def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
 <dd>
 <div class="desc"><p>The list of errors encountered</p></div>
 </dd>
-<dt id="raffiot.utils.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[Exception]</code></dt>
+<dt id="raffiot.utils.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[<a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a>]</code></dt>
 <dd>
 <div class="desc"><p>The list exceptions encountered</p></div>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.utils.TracedException"><code class="flex name class">
+<span>class <span class="ident">TracedException</span></span>
+<span>(</span><span>exception: Exception, stack_trace: str)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>TracedException(exception: 'Exception', stack_trace: 'str')</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@final
+@dataclass
+class TracedException(Exception):
+    __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
+
+    exception: Exception
+    &#34;&#34;&#34;
+    The exception that was raised.
+    &#34;&#34;&#34;
+
+    stack_trace: str
+    &#34;&#34;&#34;
+    Its stack trace.
+    &#34;&#34;&#34;
+
+    def __str__(self):
+        return f&#34;{self.exception}\n{self.stack_trace}&#34;
+
+    @classmethod
+    def in_except_clause(cls, exn: Exception) -&gt; TracedException:
+        &#34;&#34;&#34;
+        Collect the stack trace of the exception.
+
+        BEWARE: this method should only be used in the except clause
+        of a try-except block and called with the caught exception!
+
+        :param exn:
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace=format_exc())
+
+    @classmethod
+    def with_stack_trace(cls, exn: Exception) -&gt; TracedException:
+        &#34;&#34;&#34;
+        Collect the stack trace at the current position.
+
+        :param exn:
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace=&#34;&#34;.join(format_stack()))
+
+    @classmethod
+    def ensure_traced(cls, exception: Exception) -&gt; TracedException:
+        return cls.with_stack_trace(exception)
+
+    @classmethod
+    def ensure_list_traced(
+        cls, exceptions: Iterable[Exception]
+    ) -&gt; List[TracedException]:
+        return [cls.ensure_traced(exn) for exn in exceptions]</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="raffiot.utils.TracedException.ensure_list_traced"><code class="name flex">
+<span>def <span class="ident">ensure_list_traced</span></span>(<span>exceptions: Iterable[Exception]) ‑> List[<a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a>]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def ensure_list_traced(
+    cls, exceptions: Iterable[Exception]
+) -&gt; List[TracedException]:
+    return [cls.ensure_traced(exn) for exn in exceptions]</code></pre>
+</details>
+</dd>
+<dt id="raffiot.utils.TracedException.ensure_traced"><code class="name flex">
+<span>def <span class="ident">ensure_traced</span></span>(<span>exception: Exception) ‑> <a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a></span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def ensure_traced(cls, exception: Exception) -&gt; TracedException:
+    return cls.with_stack_trace(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.utils.TracedException.in_except_clause"><code class="name flex">
+<span>def <span class="ident">in_except_clause</span></span>(<span>exn: Exception) ‑> <a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Collect the stack trace of the exception.</p>
+<p>BEWARE: this method should only be used in the except clause
+of a try-except block and called with the caught exception!</p>
+<p>:param exn:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def in_except_clause(cls, exn: Exception) -&gt; TracedException:
+    &#34;&#34;&#34;
+    Collect the stack trace of the exception.
+
+    BEWARE: this method should only be used in the except clause
+    of a try-except block and called with the caught exception!
+
+    :param exn:
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(exn, TracedException):
+        return exn
+    return TracedException(exception=exn, stack_trace=format_exc())</code></pre>
+</details>
+</dd>
+<dt id="raffiot.utils.TracedException.with_stack_trace"><code class="name flex">
+<span>def <span class="ident">with_stack_trace</span></span>(<span>exn: Exception) ‑> <a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a></span>
+</code></dt>
+<dd>
+<div class="desc"><p>Collect the stack trace at the current position.</p>
+<p>:param exn:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def with_stack_trace(cls, exn: Exception) -&gt; TracedException:
+    &#34;&#34;&#34;
+    Collect the stack trace at the current position.
+
+    :param exn:
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(exn, TracedException):
+        return exn
+    return TracedException(exception=exn, stack_trace=&#34;&#34;.join(format_stack()))</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.utils.TracedException.exception"><code class="name">var <span class="ident">exception</span> : Exception</code></dt>
+<dd>
+<div class="desc"><p>The exception that was raised.</p></div>
+</dd>
+<dt id="raffiot.utils.TracedException.stack_trace"><code class="name">var <span class="ident">stack_trace</span> : str</code></dt>
+<dd>
+<div class="desc"><p>Its stack trace.</p></div>
 </dd>
 </dl>
 </dd>
@@ -453,6 +697,17 @@ def merge(cls, *exceptions: Exception, errors: List[E] = None) -&gt; Exception:
 <li><code><a title="raffiot.utils.MultipleExceptions.errors" href="#raffiot.utils.MultipleExceptions.errors">errors</a></code></li>
 <li><code><a title="raffiot.utils.MultipleExceptions.exceptions" href="#raffiot.utils.MultipleExceptions.exceptions">exceptions</a></code></li>
 <li><code><a title="raffiot.utils.MultipleExceptions.merge" href="#raffiot.utils.MultipleExceptions.merge">merge</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.utils.TracedException.ensure_list_traced" href="#raffiot.utils.TracedException.ensure_list_traced">ensure_list_traced</a></code></li>
+<li><code><a title="raffiot.utils.TracedException.ensure_traced" href="#raffiot.utils.TracedException.ensure_traced">ensure_traced</a></code></li>
+<li><code><a title="raffiot.utils.TracedException.exception" href="#raffiot.utils.TracedException.exception">exception</a></code></li>
+<li><code><a title="raffiot.utils.TracedException.in_except_clause" href="#raffiot.utils.TracedException.in_except_clause">in_except_clause</a></code></li>
+<li><code><a title="raffiot.utils.TracedException.stack_trace" href="#raffiot.utils.TracedException.stack_trace">stack_trace</a></code></li>
+<li><code><a title="raffiot.utils.TracedException.with_stack_trace" href="#raffiot.utils.TracedException.with_stack_trace">with_stack_trace</a></code></li>
 </ul>
 </li>
 </ul>

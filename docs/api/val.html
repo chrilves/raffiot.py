@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any, Iterable, Union
+from typing import Generic, TypeVar, Callable, List, Any
 
 from typing_extensions import final
 
@@ -134,7 +134,7 @@ class Val(Generic[A]):
         return Val(self.value.value)
 
     @classmethod
-    def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -&gt; Val[List[A]]:
+    def zip(cls, *vals: Val[A]) -&gt; Val[List[A]]:
         &#34;&#34;&#34; &#34;
         Group these list of Val into a Val of List
         &#34;&#34;&#34;
@@ -268,7 +268,7 @@ class Val(Generic[A]):
         return Val(self.value.value)
 
     @classmethod
-    def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -&gt; Val[List[A]]:
+    def zip(cls, *vals: Val[A]) -&gt; Val[List[A]]:
         &#34;&#34;&#34; &#34;
         Group these list of Val into a Val of List
         &#34;&#34;&#34;
@@ -330,7 +330,7 @@ def pure(cls, a: A) -&gt; Val[A]:
 </details>
 </dd>
 <dt id="raffiot.val.Val.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*vals: Union[<a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[A], Iterable[<a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[A]]]) ‑> <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[typing.List[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>*vals: <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[A]) ‑> <a title="raffiot.val.Val" href="#raffiot.val.Val">Val</a>[typing.List[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>"
@@ -340,7 +340,7 @@ Group these list of Val into a Val of List</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@classmethod
-def zip(cls, *vals: Union[Val[A], Iterable[Val[A]]]) -&gt; Val[List[A]]:
+def zip(cls, *vals: Val[A]) -&gt; Val[List[A]]:
     &#34;&#34;&#34; &#34;
     Group these list of Val into a Val of List
     &#34;&#34;&#34;

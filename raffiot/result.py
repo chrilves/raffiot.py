@@ -15,6 +15,7 @@ from raffiot.utils import (
     MatchError,
     MultipleExceptions,
     DomainErrors,
+    TracedException,
 )
 
 __all__ = [
@@ -58,7 +59,9 @@ def safe(f: Callable[..., Result[E, A]]) -> Callable[..., Result[E, A]]:
         try:
             return f(*args, **kwargs)
         except Exception as exception:
-            return Panic(exceptions=[exception], errors=[])
+            return Panic(
+                exceptions=[TracedException.in_except_clause(exception)], errors=[]
+            )
 
     return wrapper
 
@@ -74,7 +77,7 @@ class Result(Generic[E, A]):
     - *Errors(some_errors: List[E])*
             The computation failed with an expected errors.
             The errors some_errors, of type List[E], is the expected errors encountered.
-    - *Panic(some_exceptions: List[Exception], errors: List[E])*
+    - *Panic(some_exceptions: List[TracedException], errors: List[E])*
             The computation failed on an unexpected errors.
             The exceptions some_exceptions is the unexpected errors encountered.
 
@@ -89,7 +92,7 @@ class Result(Generic[E, A]):
     Panics, on the contrary, are failures you never expected. Your computation
     can not progress further. All you can do when panics occur, is stopping your
     computation gracefully (like releasing resources before dying). The panic type
-    is always Exception.
+    is always TracedException.
 
     As an example, if your program is an HTTP server. Errors are bad requests
     (errors code 400) while panics are internal server errors (errors code 500).
@@ -102,7 +105,7 @@ class Result(Generic[E, A]):
         self,
         on_success: Callable[[A], X],
         on_error: Callable[[List[E]], X],
-        on_panic: Callable[[List[Exception], List[E]], X],
+        on_panic: Callable[[List[TracedException], List[E]], X],
     ) -> X:
         """
         Transform this Result[E,A] into X.
@@ -125,7 +128,7 @@ class Result(Generic[E, A]):
         self,
         on_success: Callable[[A], X],
         on_error: Callable[[List[E]], X],
-        on_panic: Callable[[List[Exception], List[E]], X],
+        on_panic: Callable[[List[TracedException], List[E]], X],
     ) -> X:
         """
         Transform this Result[E,A] into X.
@@ -215,7 +218,7 @@ class Result(Generic[E, A]):
         self,
         f: Callable[[A], A2],
         g: Callable[[E], E2],
-        h: Callable[[Exception], Exception],
+        h: Callable[[TracedException], TracedException],
     ) -> Result[E2, A2]:
         """
         Transform the value/errors/exceptions stored in this result.
@@ -226,8 +229,8 @@ class Result(Generic[E, A]):
         """
         return self.unsafe_fold(
             lambda x: Ok(f(x)),
-            lambda x: Errors(list(map(g, x))),
-            lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
+            lambda x: Errors([g(y) for y in x]),
+            lambda x, y: Panic(exceptions=[h(z) for z in x], errors=[g(z) for z in y]),
         )
 
     @final
@@ -236,7 +239,7 @@ class Result(Generic[E, A]):
         self,
         f: Callable[[A], A2],
         g: Callable[[E], E2],
-        h: Callable[[Exception], Exception],
+        h: Callable[[TracedException], TracedException],
     ) -> Result[E2, A2]:
         """
         Transform the value/errors/exceptions stored in this result.
@@ -342,7 +345,7 @@ class Result(Generic[E, A]):
         :return:
         """
         if isinstance(self, Errors):
-            return Errors(list(map(f, self.errors)))
+            return Errors([f(e) for e in self.errors])
         return self  # type: ignore
 
     @final
@@ -379,17 +382,23 @@ class Result(Generic[E, A]):
         return self.unsafe_catch(handler)
 
     @final
-    def unsafe_map_panic(self, f: Callable[[Exception], Exception]) -> Result[E, A]:
+    def unsafe_map_panic(
+        self, f: Callable[[TracedException], TracedException]
+    ) -> Result[E, A]:
         """
         Transform the exceptions stored if this result is a `Panic(some_exception)`.
         """
         if isinstance(self, Panic):
-            return Panic(list(map(f, self.exceptions)), self.errors)
+            return Panic(
+                exceptions=[f(exn) for exn in self.exceptions], errors=self.errors
+            )
         return self
 
     @final
     @safe
-    def map_panic(self, f: Callable[[Exception], Exception]) -> Result[E, A]:
+    def map_panic(
+        self, f: Callable[[TracedException], TracedException]
+    ) -> Result[E, A]:
         """
         Transform the exceptions stored if this result is a `Panic(some_exception)`.
         """
@@ -397,7 +406,7 @@ class Result(Generic[E, A]):
 
     @final
     def unsafe_recover(
-        self, handler: Callable[[List[Exception], List[E]], Result[E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], Result[E, A]]
     ) -> Result[E, A]:
         """
         React to panics (the except part of a try-except).
@@ -412,7 +421,7 @@ class Result(Generic[E, A]):
     @final
     @safe
     def recover(
-        self, handler: Callable[[List[Exception], List[E]], Result[E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], Result[E, A]]
     ) -> Result[E, A]:
         """
         React to panics (the except part of a try-except).
@@ -496,7 +505,7 @@ class Panic(Result[E, A]):
 
     __slots__ = "exceptions", "errors"
 
-    exceptions: List[Exception]
+    exceptions: List[TracedException]
 
     errors: List[E]
 
@@ -522,7 +531,7 @@ def error(err: E) -> Result[E, Any]:
     return Errors([err])
 
 
-def errors(*errs: E) -> Result[E, Any]:
+def errors(*errs: Union[E, Iterable[E]]) -> Result[E, Any]:
     """
     Alias for `Errors(errs)`.
     """
@@ -535,9 +544,9 @@ def errors(*errs: E) -> Result[E, Any]:
     return Errors(list(errs))
 
 
-def panic(*exceptions: Exception, errors=None) -> Result[Any, Any]:
+def panic(*exceptions: TracedException, errors=None) -> Result[Any, Any]:
     """
-    Alias for `Panic(exceptions)`.
+    Alias for `Panic(traced_exceptions)`.
     """
     if (
         len(exceptions) == 1
@@ -545,9 +554,13 @@ def panic(*exceptions: Exception, errors=None) -> Result[Any, Any]:
         and not isinstance(exceptions[0], str)
     ):
         return Panic(
-            exceptions=list(exceptions[0]), errors=list(errors) if errors else []
+            exceptions=TracedException.ensure_list_traced(exceptions[0]),
+            errors=list(errors) if errors else [],
         )
-    return Panic(exceptions=list(exceptions), errors=list(errors) if errors else [])
+    return Panic(
+        exceptions=TracedException.ensure_list_traced(exceptions),
+        errors=list(errors) if errors else [],
+    )
 
 
 def zip(*l: Result[E, A]) -> Result[E, List[A]]:
@@ -643,7 +656,7 @@ def traverse(
         try:
             return f(i)
         except Exception as exception:
-            return Panic([exception], [])
+            return Panic([TracedException.in_except_clause(exception)], [])
 
     return zip([g(i) for i in l])
 
@@ -660,6 +673,6 @@ def returns_result(f: Callable[..., Result[E, A]]) -> Callable[..., Result[E, A]
         try:
             return Ok(f(*args, **kwargs))
         except Exception as exception:
-            return panic(exception)
+            return panic(TracedException.in_except_clause(exception))
 
     return wrapper

@@ -35,14 +35,14 @@ from __future__ import annotations
 
 import time
 from collections import abc
-from typing import TypeVar, Generic, Callable, Any, List, Iterable, Union
+from typing import TypeVar, Generic, Callable, Any, List, Iterable
 
 from typing_extensions import final
 
+from raffiot import result
 from raffiot._internal import IOTag
 from raffiot.result import Result, Ok, Errors, Panic
-from raffiot.utils import MatchError
-from raffiot import result
+from raffiot.utils import MatchError, TracedException
 
 __all__ = [
     &#34;Fiber&#34;,
@@ -211,7 +211,7 @@ class IO(Generic[R, E, A]):
     # Panic
 
     def recover(
-        self, handler: Callable[[List[Exception], List[E]], IO[R, E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], IO[R, E, A]]
     ) -&gt; IO[R, E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
@@ -220,7 +220,7 @@ class IO(Generic[R, E, A]):
         &#34;&#34;&#34;
         return IO(IOTag.RECOVER, (self, handler))
 
-    def map_panic(self, f: Callable[[Exception], Exception]) -&gt; IO[R, E, A]:
+    def map_panic(self, f: Callable[[TracedException], TracedException]) -&gt; IO[R, E, A]:
         &#34;&#34;&#34;
         Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -262,7 +262,7 @@ class IO(Generic[R, E, A]):
 
         - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
         - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
-        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+        - If `self` fails on traced exceptions p and errors e, then `self.attempt()` successfully computes `Panic(p,e)`.
 
         Note that errors and panics stop the computation, unless a catch or
         recover reacts to such failures. But using map, flat_map, flatten and
@@ -296,7 +296,7 @@ class IO(Generic[R, E, A]):
         Do nothing if the computation is successful.
 
         - The handler will be called on `Errors(e)` if the computation fails with errors e.
-        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will be called on `Panic(p,e)` if the computation fails with panic p and errors e.
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
 
@@ -465,7 +465,7 @@ def error(err: E) -&gt; IO[R, E, A]:
     return IO(IOTag.ERRORS, [err])
 
 
-def errors(*errs: Union[E, Iterable[E]]) -&gt; IO[R, E, A]:
+def errors(*errs: E) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails on the errors errs.
     &#34;&#34;&#34;
@@ -478,15 +478,25 @@ def errors(*errs: Union[E, Iterable[E]]) -&gt; IO[R, E, A]:
     return IO(IOTag.ERRORS, list(errs))
 
 
-def panic(
-    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
-) -&gt; IO[R, E, A]:
+def panic(*exceptions: TracedException, errors: List[E] = None) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
-    Computation that fails with the panic exceptions.
+    Computation that fails with the panic traced exceptions.
     &#34;&#34;&#34;
     if len(exceptions) == 1 and isinstance(exceptions[0], abc.Iterable):
-        return IO(IOTag.PANIC, (list(exceptions[0]), list(errors) if errors else []))
-    return IO(IOTag.PANIC, (list(exceptions), list(errors) if errors else []))
+        return IO(
+            IOTag.PANIC,
+            (
+                TracedException.ensure_list_traced(exceptions[0]),
+                list(errors) if errors else [],
+            ),
+        )
+    return IO(
+        IOTag.PANIC,
+        (
+            TracedException.ensure_list_traced(exceptions),
+            list(errors) if errors else [],
+        ),
+    )
 
 
 def from_result(r: Result[E, A]) -&gt; IO[R, E, A]:
@@ -502,10 +512,12 @@ def from_result(r: Result[E, A]) -&gt; IO[R, E, A]:
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f&#34;{r} should be a Result&#34;))
+    return panic(
+        TracedException.with_stack_trace(MatchError(f&#34;{r} should be a Result&#34;))
+    )
 
 
-def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
+def zip(*l: IO[R, E, A]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Transform a list of IO into an IO of list.
     :param l:
@@ -516,7 +528,7 @@ def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A
     return IO(IOTag.ZIP, list(l))
 
 
-def sequence(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
+def sequence(*l: IO[R, E, A]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Run these ios in sequence
     :param l:
@@ -559,7 +571,7 @@ def async_(
 
         - `Ok(value)` if the call was successful and returned `value`.
         - `Errors(errors)` if the call failed on errors `errors`.
-        - `Panic(exceptions)` if the failed unexpectedly on exceptions `exceptions`.
+        - `Panic(traced_exceptions, errors)` if the failed unexpectedly on exceptions `exceptions`.
 
     For example:
 
@@ -623,7 +635,7 @@ def traverse(l: Iterable[A], f: Callable[[A], IO[R, E, A2]]) -&gt; IO[R, E, Iter
     return zip([defer_io(f, a) for a in l])
 
 
-def parallel(*l: Iterable[IO[R, E, A]]) -&gt; IO[E, E, Iterable[Fiber[R, E, A]]]:
+def parallel(*l: IO[R, E, A]) -&gt; IO[E, E, Iterable[Fiber[R, E, A]]]:
     &#34;&#34;&#34;
     Run all these IO in parallel.
     Return the list of fibers, in the same order.
@@ -641,7 +653,7 @@ def parallel(*l: Iterable[IO[R, E, A]]) -&gt; IO[E, E, Iterable[Fiber[R, E, A]]]
     return IO(IOTag.PARALLEL, list(l))
 
 
-def wait(*l: Iterable[Fiber[Any, Any, Any]]) -&gt; IO[R, E, List[Result[R, A]]]:
+def wait(*l: Fiber[Any, Any, Any]) -&gt; IO[R, E, List[Result[R, A]]]:
     &#34;&#34;&#34;
     Wait until these Fibers finish. Return the list of Result
     in the same order.
@@ -758,7 +770,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 <ul>
 <li><code>Ok(value)</code> if the call was successful and returned <code>value</code>.</li>
 <li><code>Errors(<a title="raffiot.io.errors" href="#raffiot.io.errors">errors()</a>)</code> if the call failed on errors <code><a title="raffiot.io.errors" href="#raffiot.io.errors">errors()</a></code>.</li>
-<li><code>Panic(exceptions)</code> if the failed unexpectedly on exceptions <code>exceptions</code>.</li>
+<li><code>Panic(traced_exceptions, <a title="raffiot.io.errors" href="#raffiot.io.errors">errors()</a>)</code> if the failed unexpectedly on exceptions <code>exceptions</code>.</li>
 </ul>
 </li>
 </ul>
@@ -799,7 +811,7 @@ The value passed to <code>callback</code> must be the result of the asynchonous 
 
         - `Ok(value)` if the call was successful and returned `value`.
         - `Errors(errors)` if the call failed on errors `errors`.
-        - `Panic(exceptions)` if the failed unexpectedly on exceptions `exceptions`.
+        - `Panic(traced_exceptions, errors)` if the failed unexpectedly on exceptions `exceptions`.
 
     For example:
 
@@ -1012,7 +1024,7 @@ arguments must be the context.
 </details>
 </dd>
 <dt id="raffiot.io.errors"><code class="name flex">
-<span>def <span class="ident">errors</span></span>(<span>*errs: Union[E, Iterable[E]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">errors</span></span>(<span>*errs: E) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Computation that fails on the errors errs.</p></div>
@@ -1020,7 +1032,7 @@ arguments must be the context.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def errors(*errs: Union[E, Iterable[E]]) -&gt; IO[R, E, A]:
+<pre><code class="python">def errors(*errs: E) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Computation that fails on the errors errs.
     &#34;&#34;&#34;
@@ -1058,31 +1070,43 @@ arguments must be the context.
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f&#34;{r} should be a Result&#34;))</code></pre>
+    return panic(
+        TracedException.with_stack_trace(MatchError(f&#34;{r} should be a Result&#34;))
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.panic"><code class="name flex">
-<span>def <span class="ident">panic</span></span>(<span>*exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">panic</span></span>(<span>*exceptions: TracedException, errors: List[E] = None) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Computation that fails with the panic exceptions.</p></div>
+<div class="desc"><p>Computation that fails with the panic traced exceptions.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def panic(
-    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
-) -&gt; IO[R, E, A]:
+<pre><code class="python">def panic(*exceptions: TracedException, errors: List[E] = None) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
-    Computation that fails with the panic exceptions.
+    Computation that fails with the panic traced exceptions.
     &#34;&#34;&#34;
     if len(exceptions) == 1 and isinstance(exceptions[0], abc.Iterable):
-        return IO(IOTag.PANIC, (list(exceptions[0]), list(errors) if errors else []))
-    return IO(IOTag.PANIC, (list(exceptions), list(errors) if errors else []))</code></pre>
+        return IO(
+            IOTag.PANIC,
+            (
+                TracedException.ensure_list_traced(exceptions[0]),
+                list(errors) if errors else [],
+            ),
+        )
+    return IO(
+        IOTag.PANIC,
+        (
+            TracedException.ensure_list_traced(exceptions),
+            list(errors) if errors else [],
+        ),
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.io.parallel"><code class="name flex">
-<span>def <span class="ident">parallel</span></span>(<span>*l: Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~E, ~E, typing.Iterable[<a title="raffiot.io.Fiber" href="#raffiot.io.Fiber">Fiber</a>[~R, ~E, ~A]]]</span>
+<span>def <span class="ident">parallel</span></span>(<span>*l: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~E, ~E, typing.Iterable[<a title="raffiot.io.Fiber" href="#raffiot.io.Fiber">Fiber</a>[~R, ~E, ~A]]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run all these IO in parallel.
@@ -1097,7 +1121,7 @@ Return the list of fibers, in the same order.</p>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def parallel(*l: Iterable[IO[R, E, A]]) -&gt; IO[E, E, Iterable[Fiber[R, E, A]]]:
+<pre><code class="python">def parallel(*l: IO[R, E, A]) -&gt; IO[E, E, Iterable[Fiber[R, E, A]]]:
     &#34;&#34;&#34;
     Run all these IO in parallel.
     Return the list of fibers, in the same order.
@@ -1167,7 +1191,7 @@ panic instead.</p></div>
 </details>
 </dd>
 <dt id="raffiot.io.sequence"><code class="name flex">
-<span>def <span class="ident">sequence</span></span>(<span>*l: Union[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
+<span>def <span class="ident">sequence</span></span>(<span>*l: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run these ios in sequence
@@ -1177,7 +1201,7 @@ panic instead.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def sequence(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
+<pre><code class="python">def sequence(*l: IO[R, E, A]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Run these ios in sequence
     :param l:
@@ -1267,7 +1291,7 @@ The resulting IO computes the list of results.</p>
 </details>
 </dd>
 <dt id="raffiot.io.wait"><code class="name flex">
-<span>def <span class="ident">wait</span></span>(<span>*l: Iterable[<a title="raffiot.io.Fiber" href="#raffiot.io.Fiber">Fiber</a>[Any, Any, Any]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.List[<a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~R, ~A]]]</span>
+<span>def <span class="ident">wait</span></span>(<span>*l: <a title="raffiot.io.Fiber" href="#raffiot.io.Fiber">Fiber</a>[Any, Any, Any]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.List[<a title="raffiot.result.Result" href="result.html#raffiot.result.Result">Result</a>[~R, ~A]]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Wait until these Fibers finish. Return the list of Result
@@ -1278,7 +1302,7 @@ in the same order.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def wait(*l: Iterable[Fiber[Any, Any, Any]]) -&gt; IO[R, E, List[Result[R, A]]]:
+<pre><code class="python">def wait(*l: Fiber[Any, Any, Any]) -&gt; IO[R, E, List[Result[R, A]]]:
     &#34;&#34;&#34;
     Wait until these Fibers finish. Return the list of Result
     in the same order.
@@ -1291,7 +1315,7 @@ in the same order.
 </details>
 </dd>
 <dt id="raffiot.io.zip"><code class="name flex">
-<span>def <span class="ident">zip</span></span>(<span>*l: Union[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A], Iterable[<a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
+<span>def <span class="ident">zip</span></span>(<span>*l: <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, typing.Iterable[~A]]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform a list of IO into an IO of list.
@@ -1301,7 +1325,7 @@ in the same order.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def zip(*l: Union[IO[R, E, A], Iterable[IO[R, E, A]]]) -&gt; IO[R, E, Iterable[A]]:
+<pre><code class="python">def zip(*l: IO[R, E, A]) -&gt; IO[R, E, Iterable[A]]:
     &#34;&#34;&#34;
     Transform a list of IO into an IO of list.
     :param l:
@@ -1525,7 +1549,7 @@ class IO(Generic[R, E, A]):
     # Panic
 
     def recover(
-        self, handler: Callable[[List[Exception], List[E]], IO[R, E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], IO[R, E, A]]
     ) -&gt; IO[R, E, A]:
         &#34;&#34;&#34;
         React to panics (the except part of a try-except).
@@ -1534,7 +1558,7 @@ class IO(Generic[R, E, A]):
         &#34;&#34;&#34;
         return IO(IOTag.RECOVER, (self, handler))
 
-    def map_panic(self, f: Callable[[Exception], Exception]) -&gt; IO[R, E, A]:
+    def map_panic(self, f: Callable[[TracedException], TracedException]) -&gt; IO[R, E, A]:
         &#34;&#34;&#34;
         Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -1576,7 +1600,7 @@ class IO(Generic[R, E, A]):
 
         - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
         - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
-        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+        - If `self` fails on traced exceptions p and errors e, then `self.attempt()` successfully computes `Panic(p,e)`.
 
         Note that errors and panics stop the computation, unless a catch or
         recover reacts to such failures. But using map, flat_map, flatten and
@@ -1610,7 +1634,7 @@ class IO(Generic[R, E, A]):
         Do nothing if the computation is successful.
 
         - The handler will be called on `Errors(e)` if the computation fails with errors e.
-        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will be called on `Panic(p,e)` if the computation fails with panic p and errors e.
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
 
@@ -1731,7 +1755,7 @@ that never fails but returns a Result[E,A].</p>
 <ul>
 <li>If <code>self</code> successfully computes a, then <code>self.attempt()</code> successfully computes <code>Ok(a)</code>.</li>
 <li>If <code>self</code> fails on errors e, then <code>self.attempt()</code> successfully computes <code>Errors(e)</code>.</li>
-<li>If <code>self</code> fails on panic p, then <code>self.attempt()</code> successfully computes <code>Panic(p)</code>.</li>
+<li>If <code>self</code> fails on traced exceptions p and errors e, then <code>self.attempt()</code> successfully computes <code>Panic(p,e)</code>.</li>
 </ul>
 <p>Note that errors and panics stop the computation, unless a catch or
 recover reacts to such failures. But using map, flat_map, flatten and
@@ -1749,7 +1773,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 
     - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
     - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
-    - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+    - If `self` fails on traced exceptions p and errors e, then `self.attempt()` successfully computes `Panic(p,e)`.
 
     Note that errors and panics stop the computation, unless a catch or
     recover reacts to such failures. But using map, flat_map, flatten and
@@ -1899,7 +1923,7 @@ Do nothing otherwise.</p></div>
 </details>
 </dd>
 <dt id="raffiot.io.IO.map_panic"><code class="name flex">
-<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[Exception], Exception]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">map_panic</span></span>(<span>self, f: Callable[[TracedException], TracedException]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform the exceptions stored if the computation fails on a panic.
@@ -1908,7 +1932,7 @@ Do nothing otherwise.</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def map_panic(self, f: Callable[[Exception], Exception]) -&gt; IO[R, E, A]:
+<pre><code class="python">def map_panic(self, f: Callable[[TracedException], TracedException]) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     Transform the exceptions stored if the computation fails on a panic.
     Do nothing otherwise.
@@ -1925,7 +1949,7 @@ React to any failure of the computation.
 Do nothing if the computation is successful.</p>
 <ul>
 <li>The handler will be called on <code>Errors(e)</code> if the computation fails with errors e.</li>
-<li>The handler will be called on <code>Panic(p)</code> if the computation fails with panic p.</li>
+<li>The handler will be called on <code>Panic(p,e)</code> if the computation fails with panic p and errors e.</li>
 <li>The handler will never be called on <code>Ok(a)</code>.</li>
 </ul></div>
 <details class="source">
@@ -1941,7 +1965,7 @@ Do nothing if the computation is successful.</p>
     Do nothing if the computation is successful.
 
     - The handler will be called on `Errors(e)` if the computation fails with errors e.
-    - The handler will be called on `Panic(p)` if the computation fails with panic p.
+    - The handler will be called on `Panic(p,e)` if the computation fails with panic p and errors e.
     - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
 
@@ -1988,7 +2012,7 @@ Return the list of fibers, in the same order.</p>
 </details>
 </dd>
 <dt id="raffiot.io.IO.recover"><code class="name flex">
-<span>def <span class="ident">recover</span></span>(<span>self, handler: Callable[[List[Exception], List[E]], <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
+<span>def <span class="ident">recover</span></span>(<span>self, handler: Callable[[List[TracedException], List[E]], <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[R, E, A]]) ‑> <a title="raffiot.io.IO" href="#raffiot.io.IO">IO</a>[~R, ~E, ~A]</span>
 </code></dt>
 <dd>
 <div class="desc"><p>React to panics (the except part of a try-except).</p>
@@ -1998,7 +2022,7 @@ Return the list of fibers, in the same order.</p>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def recover(
-    self, handler: Callable[[List[Exception], List[E]], IO[R, E, A]]
+    self, handler: Callable[[List[TracedException], List[E]], IO[R, E, A]]
 ) -&gt; IO[R, E, A]:
     &#34;&#34;&#34;
     React to panics (the except part of a try-except).

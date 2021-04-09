@@ -30,3 +30,17 @@ class TestMultipleExceptions(TestCase):
         assert MultipleExceptions.merge(
             MultipleExceptions([exn_x], []), exn_y, MultipleExceptions([exn_z], [])
         ) == MultipleExceptions([exn_x, exn_y, exn_z], [])
+
+
+class TestTracedException(TestCase):
+    def test_in_except_clause_itempotence(self):
+        exn = TracedException(MatchError(""), "")
+        assert isinstance(TracedException.in_except_clause(exn).exception, MatchError)
+
+    def test_in_with_stack_trace_itempotence(self):
+        exn = TracedException(MatchError(""), "")
+        assert isinstance(TracedException.with_stack_trace(exn).exception, MatchError)
+
+    def test_in_with_ensure_traced_itempotence(self):
+        exn = TracedException(MatchError(""), "")
+        assert isinstance(TracedException.ensure_traced(exn).exception, MatchError)

@@ -1,6 +1,7 @@
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from typing import List, Any, TypeVar
 from unittest import TestCase
 
@@ -11,8 +12,7 @@ from raffiot import io, result
 from raffiot.io import IO
 from raffiot.resource import *
 from raffiot.result import Result
-from raffiot.utils import MatchError, ComputationStatus
-from contextlib import contextmanager
+from raffiot.utils import MatchError, ComputationStatus, TracedException
 
 R = TypeVar("R", contravariant=True)
 E = TypeVar("E", covariant=True)
@@ -58,30 +58,30 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_not_catch_panic(self, u: str, v: str) -> None:
-        pan = MatchError(u)
+        pan = TracedException(MatchError(u), "")
         assert panic(pan).catch(lambda x: pure(x + v)).use(io.pure).run(
             None
         ) == result.panic(pan)
 
     @given(st.text())
     def test_panic(self, err: str) -> None:
-        pan = MatchError(err)
+        pan = TracedException(MatchError(err), "")
         assert panic(pan).use(io.pure).run(None) == result.panic(pan)
 
     @given(st.text(), st.text())
     def test_map_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
-        puv = MatchError(u + v)
-        assert panic(pu).map_panic(lambda x: MatchError(x.message + v)).use(
-            io.pure
-        ).run(None) == result.panic(puv)
+        pu = TracedException(MatchError(u), "")
+        puv = TracedException(MatchError(u + v), "")
+        assert panic(pu).map_panic(
+            lambda x: TracedException(MatchError(x.exception.message + v), "")
+        ).use(io.pure).run(None) == result.panic(puv)
 
     @given(st.text(), st.text())
     def test_recover_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
-        assert panic(pu).recover(lambda x, e: pure(x[0].message + v)).use(io.pure).run(
-            None
-        ) == result.ok(u + v)
+        pu = TracedException(MatchError(u), "")
+        assert panic(pu).recover(lambda x, e: pure(x[0].exception.message + v)).use(
+            io.pure
+        ).run(None) == result.ok(u + v)
 
     @given(st.text(), st.text())
     def test_not_recover_ok(self, u: str, v: str) -> None:
@@ -90,12 +90,6 @@ class TestResource(TestCase):
     @given(st.text(), st.text())
     def test_not_catch_error(self, u: str, v: str) -> None:
         assert errors(u).catch(lambda x: pure(v)).use(io.pure).run(None) == result.ok(v)
-
-    @given(st.text())
-    def test_panic(self, pan: str) -> None:
-        assert panic(MatchError(pan)).use(io.pure).run(None) == result.panic(
-            MatchError(pan)
-        )
 
     @given(st.text(), st.text())
     def test_on_failure_ok(self, u: str, v: str) -> None:
@@ -111,7 +105,7 @@ class TestResource(TestCase):
 
     @given(st.text(), st.text())
     def test_on_failure_panic(self, u: str, v: str) -> None:
-        pu = MatchError(u)
+        pu = TracedException(MatchError(u), "")
         assert panic(pu).map(lambda _: v).on_failure(pure).use(io.pure).run(
             None
         ) == result.ok(result.panic(pu))
@@ -136,7 +130,7 @@ class TestResource(TestCase):
 
     @given(st.text())
     def test_attempt_panic(self, u: str) -> None:
-        pu = MatchError(u)
+        pu = TracedException(MatchError(u), "")
         assert panic(pu).attempt().use(io.pure).run(None).raise_on_panic() == result.ok(
             result.panic(pu)
         )
@@ -256,7 +250,7 @@ class TestResource(TestCase):
                 return result.ok(j)
             if j % 3 == 1:
                 return result.error(j)
-            return result.panic(MatchError(j))
+            return result.panic(TracedException(MatchError(j), ""))
 
         def f(context: R, j: int) -> Result[E, A]:
             return g(j + k)

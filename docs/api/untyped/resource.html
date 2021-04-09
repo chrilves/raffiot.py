@@ -46,7 +46,7 @@ from raffiot.untyped import result
 from raffiot.untyped._internal import IOTag
 from raffiot.untyped.io import IO
 from raffiot.untyped.result import Result, Ok, Errors, Panic
-from raffiot.untyped.utils import ComputationStatus, MatchError
+from raffiot.untyped.utils import ComputationStatus, MatchError, TracedException
 
 __all__ = [
     &#34;Resource&#34;,
@@ -160,7 +160,11 @@ class Resource:
                 return io.pure((f(a), close))
             except Exception as exception:
                 return close_and_merge_failure(
-                    close, Panic(exceptions=[exception], errors=[])
+                    close,
+                    Panic(
+                        exceptions=[TracedException.in_except_clause(exception)],
+                        errors=[],
+                    ),
                 )
 
         return Resource(self.create.flat_map(safe_map))
@@ -475,7 +479,9 @@ def from_result(r):
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f&#34;{r} should be a Result&#34;))
+    return panic(
+        TracedException.with_stack_trace(MatchError(f&#34;{r} should be a Result&#34;))
+    )
 
 
 def from_io_resource(mio):
@@ -1042,7 +1048,9 @@ eliminates stack overflow.</p>
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f&#34;{r} should be a Result&#34;))</code></pre>
+    return panic(
+        TracedException.with_stack_trace(MatchError(f&#34;{r} should be a Result&#34;))
+    )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.resource.from_with"><code class="name flex">
@@ -1468,7 +1476,11 @@ class Resource:
                 return io.pure((f(a), close))
             except Exception as exception:
                 return close_and_merge_failure(
-                    close, Panic(exceptions=[exception], errors=[])
+                    close,
+                    Panic(
+                        exceptions=[TracedException.in_except_clause(exception)],
+                        errors=[],
+                    ),
                 )
 
         return Resource(self.create.flat_map(safe_map))
@@ -1904,7 +1916,11 @@ Do nothing otherwise.</p></div>
             return io.pure((f(a), close))
         except Exception as exception:
             return close_and_merge_failure(
-                close, Panic(exceptions=[exception], errors=[])
+                close,
+                Panic(
+                    exceptions=[TracedException.in_except_clause(exception)],
+                    errors=[],
+                ),
             )
 
     return Resource(self.create.flat_map(safe_map))</code></pre>

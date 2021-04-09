@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from collections import abc
 from dataclasses import dataclass
-from typing import Any, List, Generic, TypeVar
 from enum import IntEnum
+from traceback import format_exc, format_stack
+from typing import Any, List, Generic, TypeVar, Iterable
+
 from typing_extensions import final
-from collections import abc
 
 __all__ = [
+    "TracedException",
     "MatchError",
     "MultipleExceptions",
     "ComputationStatus",
@@ -14,6 +18,62 @@ __all__ = [
 ]
 
 E = TypeVar("E", covariant=True)
+
+
+@final
+@dataclass
+class TracedException(Exception):
+    __slots__ = ["exception", "stack_trace"]
+
+    exception: Exception
+    """
+    The exception that was raised.
+    """
+
+    stack_trace: str
+    """
+    Its stack trace.
+    """
+
+    def __str__(self):
+        return f"{self.exception}\n{self.stack_trace}"
+
+    @classmethod
+    def in_except_clause(cls, exn: Exception) -> TracedException:
+        """
+        Collect the stack trace of the exception.
+
+        BEWARE: this method should only be used in the except clause
+        of a try-except block and called with the caught exception!
+
+        :param exn:
+        :return:
+        """
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace=format_exc())
+
+    @classmethod
+    def with_stack_trace(cls, exn: Exception) -> TracedException:
+        """
+        Collect the stack trace at the current position.
+
+        :param exn:
+        :return:
+        """
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace="".join(format_stack()))
+
+    @classmethod
+    def ensure_traced(cls, exception: Exception) -> TracedException:
+        return cls.with_stack_trace(exception)
+
+    @classmethod
+    def ensure_list_traced(
+        cls, exceptions: Iterable[Exception]
+    ) -> List[TracedException]:
+        return [cls.ensure_traced(exn) for exn in exceptions]
 
 
 @dataclass
@@ -36,7 +96,7 @@ class MultipleExceptions(Exception, Generic[E]):
 
     __slots__ = "exceptions", "errors"
 
-    exceptions: List[Exception]
+    exceptions: List[TracedException]
     """
     The list exceptions encountered
     """
@@ -47,7 +107,7 @@ class MultipleExceptions(Exception, Generic[E]):
     """
 
     @classmethod
-    def merge(cls, *exceptions: Exception, errors: List[E] = None) -> Exception:
+    def merge(cls, *exceptions: TracedException, errors: List[E] = None) -> Exception:
         """
         Merge some exceptions, retuning the exceptions if there is only one
         or a  `MultipleExceptions` otherwise.
@@ -75,6 +135,14 @@ class MultipleExceptions(Exception, Generic[E]):
             return base_exceptions[0]
         base_exceptions.reverse()
         return MultipleExceptions(base_exceptions, errs)
+
+    def __str__(self):
+        msg = ""
+        for traced in self.exceptions:
+            msg += f"\nException: {traced.exception}\n{traced.stack_trace}"
+        for err in self.errors:
+            msg += f"\nError: {err}"
+        return msg
 
 
 @final

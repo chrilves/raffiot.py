@@ -27,10 +27,16 @@
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">from raffiot.untyped import io, resource, result
-from raffiot.untyped.utils import MatchError, MultipleExceptions, ComputationStatus, seq
-from raffiot.untyped.result import Result, Ok, Errors, Panic
 from raffiot.untyped.io import IO
 from raffiot.untyped.resource import Resource
+from raffiot.untyped.result import Result, Ok, Errors, Panic
+from raffiot.untyped.utils import (
+    MatchError,
+    MultipleExceptions,
+    ComputationStatus,
+    seq,
+    TracedException,
+)
 from raffiot.untyped.val import Val
 from raffiot.untyped.var import Var, UpdateResult
 
@@ -38,6 +44,7 @@ __all__ = [
     &#34;io&#34;,
     &#34;resource&#34;,
     &#34;result&#34;,
+    &#34;TracedException&#34;,
     &#34;MatchError&#34;,
     &#34;MultipleExceptions&#34;,
     &#34;ComputationStatus&#34;,
@@ -408,7 +415,7 @@ use defer and defer_io to avoid stack-overflow.</li>
 
         - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
         - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
-        - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+        - If `self` fails on traced exceptions p and errors e, then `self.attempt()` successfully computes `Panic(p,e)`.
 
         Note that errors and panics stop the computation, unless a catch or
         recover reacts to such failures. But using map, flat_map, flatten and
@@ -440,7 +447,7 @@ use defer and defer_io to avoid stack-overflow.</li>
         Do nothing if the computation is successful.
 
         - The handler will be called on `Errors(e)` if the computation fails with errors e.
-        - The handler will be called on `Panic(p)` if the computation fails with panic p.
+        - The handler will be called on `Panic(p,e)` if the computation fails with panic p and errors e.
         - The handler will never be called on `Ok(a)`.
         &#34;&#34;&#34;
 
@@ -557,7 +564,7 @@ that never fails but returns a Result.</p>
 <ul>
 <li>If <code>self</code> successfully computes a, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a>(a)</code>.</li>
 <li>If <code>self</code> fails on errors e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(e)</code>.</li>
-<li>If <code>self</code> fails on panic p, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code>.</li>
+<li>If <code>self</code> fails on traced exceptions p and errors e, then <code>self.attempt()</code> successfully computes <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p,e)</code>.</li>
 </ul>
 <p>Note that errors and panics stop the computation, unless a catch or
 recover reacts to such failures. But using map, flat_map, flatten and
@@ -575,7 +582,7 @@ thus enabling you to use map, flat_map, &hellip; to deal with errors.</p></div>
 
     - If `self` successfully computes a, then `self.attempt()` successfully computes `Ok(a)`.
     - If `self` fails on errors e, then `self.attempt()` successfully computes `Errors(e)`.
-    - If `self` fails on panic p, then `self.attempt()` successfully computes `Panic(p)`.
+    - If `self` fails on traced exceptions p and errors e, then `self.attempt()` successfully computes `Panic(p,e)`.
 
     Note that errors and panics stop the computation, unless a catch or
     recover reacts to such failures. But using map, flat_map, flatten and
@@ -751,7 +758,7 @@ React to any failure of the computation.
 Do nothing if the computation is successful.</p>
 <ul>
 <li>The handler will be called on <code><a title="raffiot.untyped.Errors" href="#raffiot.untyped.Errors">Errors</a>(e)</code> if the computation fails with errors e.</li>
-<li>The handler will be called on <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p)</code> if the computation fails with panic p.</li>
+<li>The handler will be called on <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">Panic</a>(p,e)</code> if the computation fails with panic p and errors e.</li>
 <li>The handler will never be called on <code><a title="raffiot.untyped.Ok" href="#raffiot.untyped.Ok">Ok</a>(a)</code>.</li>
 </ul></div>
 <details class="source">
@@ -765,7 +772,7 @@ Do nothing if the computation is successful.</p>
     Do nothing if the computation is successful.
 
     - The handler will be called on `Errors(e)` if the computation fails with errors e.
-    - The handler will be called on `Panic(p)` if the computation fails with panic p.
+    - The handler will be called on `Panic(p,e)` if the computation fails with panic p and errors e.
     - The handler will never be called on `Ok(a)`.
     &#34;&#34;&#34;
 
@@ -1049,7 +1056,15 @@ class MultipleExceptions(Exception):
         if len(base_exceptions) == 1:
             return base_exceptions[0]
         base_exceptions.reverse()
-        return MultipleExceptions(base_exceptions, errs)</code></pre>
+        return MultipleExceptions(base_exceptions, errs)
+
+    def __str__(self):
+        msg = &#34;&#34;
+        for traced in self.exceptions:
+            msg += f&#34;\nException: {traced.exception}\n{traced.stack_trace}&#34;
+        for err in self.errors:
+            msg += f&#34;\nError: {err}&#34;
+        return msg</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -1316,7 +1331,11 @@ class Resource:
                 return io.pure((f(a), close))
             except Exception as exception:
                 return close_and_merge_failure(
-                    close, Panic(exceptions=[exception], errors=[])
+                    close,
+                    Panic(
+                        exceptions=[TracedException.in_except_clause(exception)],
+                        errors=[],
+                    ),
                 )
 
         return Resource(self.create.flat_map(safe_map))
@@ -1752,7 +1771,11 @@ Do nothing otherwise.</p></div>
             return io.pure((f(a), close))
         except Exception as exception:
             return close_and_merge_failure(
-                close, Panic(exceptions=[exception], errors=[])
+                close,
+                Panic(
+                    exceptions=[TracedException.in_except_clause(exception)],
+                    errors=[],
+                ),
             )
 
     return Resource(self.create.flat_map(safe_map))</code></pre>
@@ -1990,7 +2013,7 @@ The value some_value, of type A, is the result of the computation</li>
 <li><em>Errors(some_errors: List[E])</em>
 The computation failed with an expected errors.
 The errors some_errors, of type List[E], is the expected errors encountered.</li>
-<li><em>Panic(some_exceptions: List[Exception], errors: List[E])</em>
+<li><em>Panic(some_exceptions: List[TracedException], errors: List[E])</em>
 The computation failed on an unexpected errors.
 The exceptions some_exceptions is the unexpected errors encountered.</li>
 </ul>
@@ -2003,7 +2026,7 @@ your business domain. You can take any type as E.</p>
 <p>Panics, on the contrary, are failures you never expected. Your computation
 can not progress further. All you can do when panics occur, is stopping your
 computation gracefully (like releasing resources before dying). The panic type
-is always Exception.</p>
+is always TracedException.</p>
 <p>As an example, if your program is an HTTP server. Errors are bad requests
 (errors code 400) while panics are internal server errors (errors code 500).
 Receiving bad request is part of the normal life of any HTTP server, it must
@@ -2023,7 +2046,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     - *Errors(some_errors: List[E])*
             The computation failed with an expected errors.
             The errors some_errors, of type List[E], is the expected errors encountered.
-    - *Panic(some_exceptions: List[Exception], errors: List[E])*
+    - *Panic(some_exceptions: List[TracedException], errors: List[E])*
             The computation failed on an unexpected errors.
             The exceptions some_exceptions is the unexpected errors encountered.
 
@@ -2038,7 +2061,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     Panics, on the contrary, are failures you never expected. Your computation
     can not progress further. All you can do when panics occur, is stopping your
     computation gracefully (like releasing resources before dying). The panic type
-    is always Exception.
+    is always TracedException.
 
     As an example, if your program is an HTTP server. Errors are bad requests
     (errors code 400) while panics are internal server errors (errors code 500).
@@ -2164,8 +2187,8 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         &#34;&#34;&#34;
         return self.unsafe_fold(
             lambda x: Ok(f(x)),
-            lambda x: Errors(list(map(g, x))),
-            lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
+            lambda x: Errors([g(y) for y in x]),
+            lambda x, y: Panic(exceptions=[h(z) for z in x], errors=[g(z) for z in y]),
         )
 
     @safe
@@ -2267,7 +2290,7 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         :return:
         &#34;&#34;&#34;
         if isinstance(self, Errors):
-            return Errors(list(map(f, self.errors)))
+            return Errors([f(e) for e in self.errors])
         return self  # type: ignore
 
     @safe
@@ -2305,7 +2328,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
         Transform the exceptions stored if this result is a `Panic(some_exception)`.
         &#34;&#34;&#34;
         if isinstance(self, Panic):
-            return Panic(list(map(f, self.exceptions)), self.errors)
+            return Panic(
+                exceptions=[f(exn) for exn in self.exceptions], errors=self.errors
+            )
         return self
 
     @safe
@@ -2392,7 +2417,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.catch"><code class="name flex">
@@ -2408,7 +2435,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.flat_map"><code class="name flex">
@@ -2424,7 +2453,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.flatten"><code class="name flex">
@@ -2458,7 +2489,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.fold_raise"><code class="name flex">
@@ -2474,7 +2507,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.is_error"><code class="name flex">
@@ -2538,7 +2573,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.map_error"><code class="name flex">
@@ -2554,7 +2591,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.map_panic"><code class="name flex">
@@ -2570,7 +2609,9 @@ know how to reply nicely. But internal server errors are bugs.</p></div>
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.raise_on_panic"><code class="name flex">
@@ -2609,7 +2650,9 @@ If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.to_computation_status"><code class="name flex">
@@ -2645,7 +2688,9 @@ If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">
     try:
         return f(*args, **kwargs)
     except Exception as exception:
-        return Panic(exceptions=[exception], errors=[])</code></pre>
+        return Panic(
+            exceptions=[TracedException.in_except_clause(exception)], errors=[]
+        )</code></pre>
 </details>
 </dd>
 <dt id="raffiot.untyped.Result.unsafe_ap"><code class="name flex">
@@ -2864,7 +2909,7 @@ If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">
     :return:
     &#34;&#34;&#34;
     if isinstance(self, Errors):
-        return Errors(list(map(f, self.errors)))
+        return Errors([f(e) for e in self.errors])
     return self  # type: ignore</code></pre>
 </details>
 </dd>
@@ -2882,7 +2927,9 @@ If it is a <code><a title="raffiot.untyped.Panic" href="#raffiot.untyped.Panic">
     Transform the exceptions stored if this result is a `Panic(some_exception)`.
     &#34;&#34;&#34;
     if isinstance(self, Panic):
-        return Panic(list(map(f, self.exceptions)), self.errors)
+        return Panic(
+            exceptions=[f(exn) for exn in self.exceptions], errors=self.errors
+        )
     return self</code></pre>
 </details>
 </dd>
@@ -2937,8 +2984,8 @@ Otherwise do nothing.</p></div>
     &#34;&#34;&#34;
     return self.unsafe_fold(
         lambda x: Ok(f(x)),
-        lambda x: Errors(list(map(g, x))),
-        lambda x, y: Panic(exceptions=list(map(h, x)), errors=list(map(g, y))),
+        lambda x: Errors([g(y) for y in x]),
+        lambda x, y: Panic(exceptions=[h(z) for z in x], errors=[g(z) for z in y]),
     )</code></pre>
 </details>
 </dd>
@@ -2964,6 +3011,169 @@ Is Panic is there is at least one panic.</p></div>
     &#34;&#34;&#34;
     return zip((self, *arg))  # type: ignore</code></pre>
 </details>
+</dd>
+</dl>
+</dd>
+<dt id="raffiot.untyped.TracedException"><code class="flex name class">
+<span>class <span class="ident">TracedException</span></span>
+<span>(</span><span>exception: None, stack_trace: None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>TracedException(exception: 'None', stack_trace: 'None')</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@dataclass
+class TracedException(Exception):
+    __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
+
+    exception: None
+    &#34;&#34;&#34;
+    The exception that was raised.
+    &#34;&#34;&#34;
+
+    stack_trace: None
+    &#34;&#34;&#34;
+    Its stack trace.
+    &#34;&#34;&#34;
+
+    def __str__(self):
+        return f&#34;{self.exception}\n{self.stack_trace}&#34;
+
+    @classmethod
+    def in_except_clause(cls, exn):
+        &#34;&#34;&#34;
+        Collect the stack trace of the exception.
+
+        BEWARE: this method should only be used in the except clause
+        of a try-except block and called with the caught exception!
+
+        :param exn:
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace=format_exc())
+
+    @classmethod
+    def with_stack_trace(cls, exn):
+        &#34;&#34;&#34;
+        Collect the stack trace at the current position.
+
+        :param exn:
+        :return:
+        &#34;&#34;&#34;
+        if isinstance(exn, TracedException):
+            return exn
+        return TracedException(exception=exn, stack_trace=&#34;&#34;.join(format_stack()))
+
+    @classmethod
+    def ensure_traced(cls, exception):
+        return cls.with_stack_trace(exception)
+
+    @classmethod
+    def ensure_list_traced(cls, exceptions):
+        return [cls.ensure_traced(exn) for exn in exceptions]</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="raffiot.untyped.TracedException.ensure_list_traced"><code class="name flex">
+<span>def <span class="ident">ensure_list_traced</span></span>(<span>exceptions)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def ensure_list_traced(cls, exceptions):
+    return [cls.ensure_traced(exn) for exn in exceptions]</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.TracedException.ensure_traced"><code class="name flex">
+<span>def <span class="ident">ensure_traced</span></span>(<span>exception)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def ensure_traced(cls, exception):
+    return cls.with_stack_trace(exception)</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.TracedException.in_except_clause"><code class="name flex">
+<span>def <span class="ident">in_except_clause</span></span>(<span>exn)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Collect the stack trace of the exception.</p>
+<p>BEWARE: this method should only be used in the except clause
+of a try-except block and called with the caught exception!</p>
+<p>:param exn:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def in_except_clause(cls, exn):
+    &#34;&#34;&#34;
+    Collect the stack trace of the exception.
+
+    BEWARE: this method should only be used in the except clause
+    of a try-except block and called with the caught exception!
+
+    :param exn:
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(exn, TracedException):
+        return exn
+    return TracedException(exception=exn, stack_trace=format_exc())</code></pre>
+</details>
+</dd>
+<dt id="raffiot.untyped.TracedException.with_stack_trace"><code class="name flex">
+<span>def <span class="ident">with_stack_trace</span></span>(<span>exn)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Collect the stack trace at the current position.</p>
+<p>:param exn:
+:return:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def with_stack_trace(cls, exn):
+    &#34;&#34;&#34;
+    Collect the stack trace at the current position.
+
+    :param exn:
+    :return:
+    &#34;&#34;&#34;
+    if isinstance(exn, TracedException):
+        return exn
+    return TracedException(exception=exn, stack_trace=&#34;&#34;.join(format_stack()))</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="raffiot.untyped.TracedException.exception"><code class="name">var <span class="ident">exception</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The exception that was raised.</p></div>
+</dd>
+<dt id="raffiot.untyped.TracedException.stack_trace"><code class="name">var <span class="ident">stack_trace</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>Its stack trace.</p></div>
 </dd>
 </dl>
 </dd>
@@ -4165,6 +4375,17 @@ def zip(cls, *vars):
 <li><code><a title="raffiot.untyped.Result.unsafe_recover" href="#raffiot.untyped.Result.unsafe_recover">unsafe_recover</a></code></li>
 <li><code><a title="raffiot.untyped.Result.unsafe_tri_map" href="#raffiot.untyped.Result.unsafe_tri_map">unsafe_tri_map</a></code></li>
 <li><code><a title="raffiot.untyped.Result.zip" href="#raffiot.untyped.Result.zip">zip</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="raffiot.untyped.TracedException" href="#raffiot.untyped.TracedException">TracedException</a></code></h4>
+<ul class="two-column">
+<li><code><a title="raffiot.untyped.TracedException.ensure_list_traced" href="#raffiot.untyped.TracedException.ensure_list_traced">ensure_list_traced</a></code></li>
+<li><code><a title="raffiot.untyped.TracedException.ensure_traced" href="#raffiot.untyped.TracedException.ensure_traced">ensure_traced</a></code></li>
+<li><code><a title="raffiot.untyped.TracedException.exception" href="#raffiot.untyped.TracedException.exception">exception</a></code></li>
+<li><code><a title="raffiot.untyped.TracedException.in_except_clause" href="#raffiot.untyped.TracedException.in_except_clause">in_except_clause</a></code></li>
+<li><code><a title="raffiot.untyped.TracedException.stack_trace" href="#raffiot.untyped.TracedException.stack_trace">stack_trace</a></code></li>
+<li><code><a title="raffiot.untyped.TracedException.with_stack_trace" href="#raffiot.untyped.TracedException.with_stack_trace">with_stack_trace</a></code></li>
 </ul>
 </li>
 <li>

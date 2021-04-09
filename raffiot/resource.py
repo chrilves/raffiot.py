@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable, Union
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
 
 from typing_extensions import final
 
@@ -17,7 +17,7 @@ from raffiot import result
 from raffiot._internal import IOTag
 from raffiot.io import IO
 from raffiot.result import Result, Ok, Errors, Panic
-from raffiot.utils import ComputationStatus, MatchError
+from raffiot.utils import ComputationStatus, MatchError, TracedException
 
 __all__ = [
     "Resource",
@@ -147,7 +147,11 @@ class Resource(Generic[R, E, A]):
                 return io.pure((f(a), close))
             except Exception as exception:
                 return close_and_merge_failure(
-                    close, Panic(exceptions=[exception], errors=[])
+                    close,
+                    Panic(
+                        exceptions=[TracedException.in_except_clause(exception)],
+                        errors=[],
+                    ),
                 )
 
         return Resource(self.create.flat_map(safe_map))
@@ -276,7 +280,7 @@ class Resource(Generic[R, E, A]):
     # Panic
 
     def recover(
-        self, handler: Callable[[List[Exception], List[E]], Resource[R, E, A]]
+        self, handler: Callable[[List[TracedException], List[E]], Resource[R, E, A]]
     ) -> Resource[R, E, A]:
         """
         React to panics (the except part of a try-except).
@@ -285,7 +289,9 @@ class Resource(Generic[R, E, A]):
         """
         return Resource(self.create.recover(lambda p, e: handler(p, e).create))
 
-    def map_panic(self, f: Callable[[Exception], Exception]) -> Resource[R, E, A]:
+    def map_panic(
+        self, f: Callable[[TracedException], TracedException]
+    ) -> Resource[R, E, A]:
         """
         Transform the exceptions stored if the computation fails on a panic.
         Do nothing otherwise.
@@ -443,7 +449,7 @@ def error(err: E) -> Resource[R, E, A]:
     return Resource(io.error(err))
 
 
-def errors(*errs: Union[E, Iterable[E]]) -> Resource[R, E, A]:
+def errors(*errs: E) -> Resource[R, E, A]:
     """
     Resource creation that always fails on the errors err.
     """
@@ -456,9 +462,7 @@ def errors(*errs: Union[E, Iterable[E]]) -> Resource[R, E, A]:
     return Resource(io.errors(errs))
 
 
-def panic(
-    *exceptions: Union[Exception, Iterable[Exception]], errors: List[E] = None
-) -> Resource[R, E, A]:
+def panic(*exceptions: TracedException, errors: List[E] = None) -> Resource[R, E, A]:
     """
     Resource creation that always fails with the panic exceptions.
     """
@@ -484,7 +488,9 @@ def from_result(r: Result[E, A]) -> Resource[R, E, A]:
         return errors(r.errors)
     if isinstance(r, Panic):
         return panic(r.exceptions, errors=r.errors)
-    return panic(MatchError(f"{r} should be a Result"))
+    return panic(
+        TracedException.with_stack_trace(MatchError(f"{r} should be a Result"))
+    )
 
 
 def from_io_resource(mio: IO[R, E, Resource[R, E, A]]) -> Resource[R, E, A]:
@@ -537,9 +543,7 @@ def from_with(the_io: IO[R, E, Any]) -> Resource[R, E, A]:
     return Resource(the_io.map(manager_handler))
 
 
-def zip(
-    *rs: Union[Resource[R, E, A], Iterable[Resource[R, E, A]]]
-) -> Resource[R, E, List[A]]:
+def zip(*rs: Resource[R, E, A]) -> Resource[R, E, List[A]]:
     """
     Transform a list of Resource into a Resource creating a list
     of all resources.
