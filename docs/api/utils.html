@@ -50,7 +50,7 @@ E = TypeVar(&#34;E&#34;, covariant=True)
 
 @final
 @dataclass
-class TracedException(Exception):
+class TracedException:
     __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
 
     exception: Exception
@@ -494,7 +494,7 @@ def merge(cls, *exceptions: TracedException, errors: List[E] = None) -&gt; Excep
 </summary>
 <pre><code class="python">@final
 @dataclass
-class TracedException(Exception):
+class TracedException:
     __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
 
     exception: Exception
@@ -547,11 +547,6 @@ class TracedException(Exception):
     ) -&gt; List[TracedException]:
         return [cls.ensure_traced(exn) for exn in exceptions]</code></pre>
 </details>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li>builtins.Exception</li>
-<li>builtins.BaseException</li>
-</ul>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.utils.TracedException.ensure_list_traced"><code class="name flex">

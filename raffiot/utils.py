@@ -22,7 +22,7 @@ E = TypeVar("E", covariant=True)
 
 @final
 @dataclass
-class TracedException(Exception):
+class TracedException:
     __slots__ = ["exception", "stack_trace"]
 
     exception: Exception

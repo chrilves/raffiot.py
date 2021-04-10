@@ -304,7 +304,7 @@ class TestIO(TestCase):
                 return defer(print, j)
 
             def h():
-                raise TracedException(MatchError(j), "")
+                raise MatchError(j)
 
             return defer(h)
 
@@ -319,9 +319,21 @@ class TestIO(TestCase):
                 return result.ok(None)
             return result.panic(TracedException(MatchError(j), ""))
 
-        assert parallel([f(s) for s in l]).flat_map(wait).run(None) == result.ok(
-            [g(s) for s in l]
-        )
+        res = parallel([f(s) for s in l]).flat_map(wait).run(None)
+
+        if res.is_ok():
+
+            def erase_stack_traces(r):
+                if r.is_panic():
+                    return result.Panic(
+                        [TracedException(e.exception, "") for e in r.exceptions],
+                        r.errors,
+                    )
+                return r
+
+            res = result.Ok([erase_stack_traces(r) for r in res.success])
+
+        assert res == result.ok([g(s) for s in l])
 
     @given(st.lists(st.integers()))
     def test_parallel_wait_zip_ok(self, l: List[int]):

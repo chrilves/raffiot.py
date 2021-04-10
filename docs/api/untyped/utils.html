@@ -45,7 +45,7 @@ __all__ = [
 
 
 @dataclass
-class TracedException(Exception):
+class TracedException:
     __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
 
     exception: None
@@ -478,7 +478,7 @@ def merge(cls, *exceptions, errors=None):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">@dataclass
-class TracedException(Exception):
+class TracedException:
     __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
 
     exception: None
@@ -529,11 +529,6 @@ class TracedException(Exception):
     def ensure_list_traced(cls, exceptions):
         return [cls.ensure_traced(exn) for exn in exceptions]</code></pre>
 </details>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li>builtins.Exception</li>
-<li>builtins.BaseException</li>
-</ul>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.untyped.utils.TracedException.ensure_list_traced"><code class="name flex">
