@@ -125,10 +125,8 @@ class MultipleExceptions(Exception, Generic[E]):
             if isinstance(item, abc.Iterable) and not isinstance(item, str):
                 stack.extend(item)
                 continue
-            base_exceptions.append(item)
+            base_exceptions.append(TracedException.ensure_traced(item))
 
-        if len(base_exceptions) == 1:
-            return base_exceptions[0]
         base_exceptions.reverse()
         return MultipleExceptions(base_exceptions, errs)
 
