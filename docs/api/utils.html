@@ -51,7 +51,7 @@ E = TypeVar(&#34;E&#34;, covariant=True)
 @final
 @dataclass
 class TracedException:
-    __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
+    __slots__ = (&#34;exception&#34;, &#34;stack_trace&#34;)
 
     exception: Exception
     &#34;&#34;&#34;
@@ -110,8 +110,6 @@ class MatchError(Exception):
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = &#34;message&#34;
-
     message: str
 
 
@@ -121,8 +119,6 @@ class MultipleExceptions(Exception, Generic[E]):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
-
-    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[TracedException]
     &#34;&#34;&#34;
@@ -179,8 +175,6 @@ class DomainErrors(Exception, Generic[E]):
     &#34;&#34;&#34;
     Errors from the business domain
     &#34;&#34;&#34;
-
-    __slots__ = &#34;error&#34;
 
     errors: List[E]
 
@@ -291,8 +285,6 @@ class DomainErrors(Exception, Generic[E]):
     Errors from the business domain
     &#34;&#34;&#34;
 
-    __slots__ = &#34;error&#34;
-
     errors: List[E]</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -306,13 +298,6 @@ class DomainErrors(Exception, Generic[E]):
 <dt id="raffiot.utils.DomainErrors.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
 <dd>
 <div class="desc"></div>
-</dd>
-</dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="raffiot.utils.DomainErrors.error"><code class="name">var <span class="ident">error</span></code></dt>
-<dd>
-<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
 </dd>
 </dl>
 </dd>
@@ -332,8 +317,6 @@ class MatchError(Exception):
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = &#34;message&#34;
-
     message: str</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -341,11 +324,11 @@ class MatchError(Exception):
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
-<h3>Instance variables</h3>
+<h3>Class variables</h3>
 <dl>
 <dt id="raffiot.utils.MatchError.message"><code class="name">var <span class="ident">message</span> : str</code></dt>
 <dd>
-<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 </dd>
@@ -365,8 +348,6 @@ class MultipleExceptions(Exception, Generic[E]):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
-
-    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[TracedException]
     &#34;&#34;&#34;
@@ -422,6 +403,17 @@ class MultipleExceptions(Exception, Generic[E]):
 <li>builtins.BaseException</li>
 <li>typing.Generic</li>
 </ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.utils.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.utils.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[<a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a>]</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
+</dd>
+</dl>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.utils.MultipleExceptions.merge"><code class="name flex">
@@ -470,17 +462,6 @@ def merge(cls, *exceptions: TracedException, errors: List[E] = None) -&gt; Excep
 </details>
 </dd>
 </dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="raffiot.utils.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
-<dd>
-<div class="desc"><p>The list of errors encountered</p></div>
-</dd>
-<dt id="raffiot.utils.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[<a title="raffiot.utils.TracedException" href="#raffiot.utils.TracedException">TracedException</a>]</code></dt>
-<dd>
-<div class="desc"><p>The list exceptions encountered</p></div>
-</dd>
-</dl>
 </dd>
 <dt id="raffiot.utils.TracedException"><code class="flex name class">
 <span>class <span class="ident">TracedException</span></span>
@@ -495,7 +476,7 @@ def merge(cls, *exceptions: TracedException, errors: List[E] = None) -&gt; Excep
 <pre><code class="python">@final
 @dataclass
 class TracedException:
-    __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
+    __slots__ = (&#34;exception&#34;, &#34;stack_trace&#34;)
 
     exception: Exception
     &#34;&#34;&#34;
@@ -676,7 +657,6 @@ def with_stack_trace(cls, exn: Exception) -&gt; TracedException:
 <li>
 <h4><code><a title="raffiot.utils.DomainErrors" href="#raffiot.utils.DomainErrors">DomainErrors</a></code></h4>
 <ul class="">
-<li><code><a title="raffiot.utils.DomainErrors.error" href="#raffiot.utils.DomainErrors.error">error</a></code></li>
 <li><code><a title="raffiot.utils.DomainErrors.errors" href="#raffiot.utils.DomainErrors.errors">errors</a></code></li>
 </ul>
 </li>

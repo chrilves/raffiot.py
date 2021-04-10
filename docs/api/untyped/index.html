@@ -983,8 +983,6 @@ class MatchError(Exception):
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = &#34;message&#34;
-
     message: None</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -992,11 +990,11 @@ class MatchError(Exception):
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
-<h3>Instance variables</h3>
+<h3>Class variables</h3>
 <dl>
 <dt id="raffiot.untyped.MatchError.message"><code class="name">var <span class="ident">message</span> : NoneType</code></dt>
 <dd>
-<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 </dd>
@@ -1015,8 +1013,6 @@ class MultipleExceptions(Exception):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
-
-    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: None
     &#34;&#34;&#34;
@@ -1071,6 +1067,17 @@ class MultipleExceptions(Exception):
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.untyped.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.untyped.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
+</dd>
+</dl>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.untyped.MultipleExceptions.merge"><code class="name flex">
@@ -1117,17 +1124,6 @@ def merge(cls, *exceptions, errors=None):
     base_exceptions.reverse()
     return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
-</dd>
-</dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="raffiot.untyped.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : NoneType</code></dt>
-<dd>
-<div class="desc"><p>The list of errors encountered</p></div>
-</dd>
-<dt id="raffiot.untyped.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : NoneType</code></dt>
-<dd>
-<div class="desc"><p>The list exceptions encountered</p></div>
 </dd>
 </dl>
 </dd>
@@ -3026,7 +3022,7 @@ Is Panic is there is at least one panic.</p></div>
 </summary>
 <pre><code class="python">@dataclass
 class TracedException:
-    __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
+    __slots__ = (&#34;exception&#34;, &#34;stack_trace&#34;)
 
     exception: None
     &#34;&#34;&#34;

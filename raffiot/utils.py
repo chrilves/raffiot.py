@@ -23,7 +23,7 @@ E = TypeVar("E", covariant=True)
 @final
 @dataclass
 class TracedException:
-    __slots__ = ["exception", "stack_trace"]
+    __slots__ = ("exception", "stack_trace")
 
     exception: Exception
     """
@@ -82,8 +82,6 @@ class MatchError(Exception):
     Exception for pattern matching errors (used internally, should NEVER happen).
     """
 
-    __slots__ = "message"
-
     message: str
 
 
@@ -93,8 +91,6 @@ class MultipleExceptions(Exception, Generic[E]):
     """
     Represents
     """
-
-    __slots__ = "exceptions", "errors"
 
     exceptions: List[TracedException]
     """
@@ -151,8 +147,6 @@ class DomainErrors(Exception, Generic[E]):
     """
     Errors from the business domain
     """
-
-    __slots__ = "error"
 
     errors: List[E]
 

@@ -214,17 +214,6 @@ def finish_fiber(fiber: Fiber[Any, Any, Any]):
 
 @final
 class Runner(Thread):
-
-    __slots__ = (
-        "queue",
-        "shared_state",
-        "state_lock",
-        "state",
-        "count_lock",
-        "count_local",
-        "count_remote",
-    )
-
     def __init__(self, shared_state: SharedState, index: int) -> None:
         super().__init__()
         self.queue: deque[Fiber[Any, Any, Any]] = deque()

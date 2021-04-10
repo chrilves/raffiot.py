@@ -1003,8 +1003,6 @@ class MatchError(Exception):
     Exception for pattern matching errors (used internally, should NEVER happen).
     &#34;&#34;&#34;
 
-    __slots__ = &#34;message&#34;
-
     message: str</code></pre>
 </details>
 <h3>Ancestors</h3>
@@ -1012,11 +1010,11 @@ class MatchError(Exception):
 <li>builtins.Exception</li>
 <li>builtins.BaseException</li>
 </ul>
-<h3>Instance variables</h3>
+<h3>Class variables</h3>
 <dl>
 <dt id="raffiot.MatchError.message"><code class="name">var <span class="ident">message</span> : str</code></dt>
 <dd>
-<div class="desc"><p>Return an attribute of instance, which is of type owner.</p></div>
+<div class="desc"></div>
 </dd>
 </dl>
 </dd>
@@ -1036,8 +1034,6 @@ class MultipleExceptions(Exception, Generic[E]):
     &#34;&#34;&#34;
     Represents
     &#34;&#34;&#34;
-
-    __slots__ = &#34;exceptions&#34;, &#34;errors&#34;
 
     exceptions: List[TracedException]
     &#34;&#34;&#34;
@@ -1093,6 +1089,17 @@ class MultipleExceptions(Exception, Generic[E]):
 <li>builtins.BaseException</li>
 <li>typing.Generic</li>
 </ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="raffiot.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
+<dd>
+<div class="desc"><p>The list of errors encountered</p></div>
+</dd>
+<dt id="raffiot.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[<a title="raffiot.utils.TracedException" href="utils.html#raffiot.utils.TracedException">TracedException</a>]</code></dt>
+<dd>
+<div class="desc"><p>The list exceptions encountered</p></div>
+</dd>
+</dl>
 <h3>Static methods</h3>
 <dl>
 <dt id="raffiot.MultipleExceptions.merge"><code class="name flex">
@@ -1139,17 +1146,6 @@ def merge(cls, *exceptions: TracedException, errors: List[E] = None) -&gt; Excep
     base_exceptions.reverse()
     return MultipleExceptions(base_exceptions, errs)</code></pre>
 </details>
-</dd>
-</dl>
-<h3>Instance variables</h3>
-<dl>
-<dt id="raffiot.MultipleExceptions.errors"><code class="name">var <span class="ident">errors</span> : List[+E]</code></dt>
-<dd>
-<div class="desc"><p>The list of errors encountered</p></div>
-</dd>
-<dt id="raffiot.MultipleExceptions.exceptions"><code class="name">var <span class="ident">exceptions</span> : List[<a title="raffiot.utils.TracedException" href="utils.html#raffiot.utils.TracedException">TracedException</a>]</code></dt>
-<dd>
-<div class="desc"><p>The list exceptions encountered</p></div>
 </dd>
 </dl>
 </dd>
@@ -3174,7 +3170,7 @@ def zip(self: Result[E, A], *arg: Result[E, A]) -&gt; Result[E, List[A]]:
 <pre><code class="python">@final
 @dataclass
 class TracedException:
-    __slots__ = [&#34;exception&#34;, &#34;stack_trace&#34;]
+    __slots__ = (&#34;exception&#34;, &#34;stack_trace&#34;)
 
     exception: Exception
     &#34;&#34;&#34;
