@@ -18,7 +18,7 @@ from random import randint
 from threading import Thread
 from typing import Any, List, TypeVar, Generic, Callable, Optional, Tuple
 
-from typing_extensions import final
+from typing import final
 
 from raffiot._internal import ContTag, FiberState, IOTag, ResultTag
 from raffiot.io import IO
