@@ -4,9 +4,7 @@ from collections import abc
 from dataclasses import dataclass
 from enum import IntEnum
 from traceback import format_exc, format_stack
-from typing import Any, List, Generic, TypeVar, Iterable
-
-from typing_extensions import final
+from typing import Any, List, Generic, TypeVar, Iterable, final
 
 __all__ = [
     "TracedException",
