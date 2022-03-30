@@ -36,7 +36,7 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Operating System :: OS Independent",
     ],
-    install_requires=["typing-extensions"],
+    install_requires=[],
     python_requires=">=3.8",
     zip_safe=False,
     package_data={"raffiot": ["py.typed"]},
