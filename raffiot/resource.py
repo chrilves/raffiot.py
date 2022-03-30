@@ -7,9 +7,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable
-
-from typing_extensions import final
+from typing import TypeVar, Generic, Callable, Any, Tuple, List, Iterable, final
 
 from raffiot import _runtime
 from raffiot import io
