@@ -1,6 +1,6 @@
 # Robust And Fast Functional IO Toolkit
 
-*Raffiot* is small (almost) dependency-free python library providing some
+*Raffiot* is small dependency-free python library providing some
 usual functional tools. It currently provides
 - an easy-to-use `IO` monad which is **stack-safe**, **fast**, support
   **asynchronous**, **concurrent**, **parallel** programming, has many other features.
@@ -35,10 +35,9 @@ The [API](https://chrilves.github.io/raffiot.py/api/index.html) is online at
 
 ## Features
 
-- **pure python**: *Raffiot* is written entirely in Python 3.7+.
+- **pure python**: *Raffiot* is written entirely in Python 3.8+.
 - **small**: it is just a few small files.
-- **(almost) dependency-free**: it only depends on `typing-extensions` (for the
-  `@final` annotation).
+- **dependency-free**: it only depends on the python standary library.
 - **crystal clear code** 
 
 ### IO

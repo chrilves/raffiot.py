@@ -6,9 +6,7 @@ from __future__ import annotations
 
 import time
 from collections import abc
-from typing import TypeVar, Generic, Callable, Any, List, Iterable
-
-from typing_extensions import final
+from typing import TypeVar, Generic, Callable, Any, List, Iterable, final
 
 from raffiot import result
 from raffiot._internal import IOTag

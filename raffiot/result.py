@@ -6,9 +6,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable, Any, List, Iterable, Union
-
-from typing_extensions import final
+from typing import TypeVar, Generic, Callable, Any, List, Iterable, Union, final
 
 from raffiot.utils import (
     ComputationStatus,
