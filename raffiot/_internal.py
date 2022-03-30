@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from typing import final
-from typing import List, Any, Iterable
+from typing import List, Any, Iterable, final
 from collections import abc
 
 __all__ = ["IOTag", "ContTag", "ResultTag", "FiberState"]
