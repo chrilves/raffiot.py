@@ -8,9 +8,7 @@ from __future__ import annotations
 
 from collections import abc
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Callable, List, Any, Tuple
-
-from typing_extensions import final
+from typing import Generic, TypeVar, Callable, List, Any, Tuple, final
 
 from raffiot import io, resource
 from raffiot.io import IO
