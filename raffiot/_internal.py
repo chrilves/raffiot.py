@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from typing_extensions import final
+from typing import final
 from typing import List, Any, Iterable
 from collections import abc
 
