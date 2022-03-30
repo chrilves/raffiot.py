@@ -16,9 +16,7 @@ from functools import total_ordering
 from queue import Queue
 from random import randint
 from threading import Thread
-from typing import Any, List, TypeVar, Generic, Callable, Optional, Tuple
-
-from typing import final
+from typing import Any, List, TypeVar, Generic, Callable, Optional, Tuple, final
 
 from raffiot._internal import ContTag, FiberState, IOTag, ResultTag
 from raffiot.io import IO
