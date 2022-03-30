@@ -35,7 +35,7 @@ The [API](https://chrilves.github.io/raffiot.py/api/index.html) is online at
 
 ## Features
 
-- **pure python**: *Raffiot* is written entirely in Python 3.7+.
+- **pure python**: *Raffiot* is written entirely in Python 3.8+.
 - **small**: it is just a few small files.
 - **(almost) dependency-free**: it only depends on `typing-extensions` (for the
   `@final` annotation).
