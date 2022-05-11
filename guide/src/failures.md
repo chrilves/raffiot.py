@@ -476,7 +476,7 @@ functions and methods seen above but they deserve being seeing in details:
 
 ### `attempt` : failures as values.
 
-The method `attemp` transform an `IO[R,E,A]` into
+The method `attempt` transform an `IO[R,E,A]` into
 `IO[R,None,Result[E,A]]`. If the original computation is successful,
 the transformed one returns an `Ok(Ok(...))`. If the original computation fails
 on some errors, the transformed one returns `Ok(Errors(...))`.
